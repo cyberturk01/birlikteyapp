@@ -56,40 +56,40 @@ Amaç: **Ev işleri & market alışverişini basitleştirmek, görevleri adil ş
 
 📌 Flutter SDK kurulu olmalı. Kurulum rehberi
 
-📂 Proje Yapısı (özet)
-lib/
-├─ models/         # Task, Item, WeeklyTask, ViewSection
-├─ providers/      # State management (Provider)
-├─ pages/
-│   ├─ landing/    # Splash + Landing
-│   ├─ home/       # HomePage + MemberCard + QuickPanel
-│   ├─ tasks/      # Görev yönetimi
-│   ├─ market/     # Market listesi
-│   └─ weekly/     # Haftalık görev planı
+##  **📂 Proje Yapısı (özet)**
+    ```bash 
+    lib/
+        ├─ models/         # Task, Item, WeeklyTask, ViewSection
+        ├─ providers/      # State management (Provider)
+        ├─ pages/
+        │   ├─ landing/    # Splash + Landing
+        │   ├─ home/       # HomePage + MemberCard + QuickPanel
+        │   ├─ tasks/      # Görev yönetimi
+        │   ├─ market/     # Market listesi
+        │   └─ weekly/     # Haftalık görev planı    
 
 
-🛠️ Teknolojiler
+##  **🛠️Teknolojiler**
 
-    **Flutter
+  - Flutter
 
-    **Provider
-    (state management)
+  - Provider(state management)
 
-    **Hive
-    / SharedPreferences (persistent storage)
+  - Hive / SharedPreferences (persistent storage)
 
-    **Material 3 Design
+  - Material 3 Design
 
-🤝 Katkı
+##  **🤝 Katkı**
 
-Katkılarınızı memnuniyetle karşılıyoruz!
 
-    **Fork edin
+  - Katkılarınızı memnuniyetle karşılıyoruz!
+
+  - Fork edin
     
-    **Branch açın (feature/yenilik)
+  - Branch açın (feature/yenilik)
     
-    **Commit yapın (git commit -m "özellik eklendi")
+  - Commit yapın (git commit -m "özellik eklendi")
     
-    **Push edin (git push origin feature/yenilik)
+  - Push edin (git push origin feature/yenilik)
     
-    **Pull Request açın
+  - Pull Request açın
