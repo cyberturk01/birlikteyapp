@@ -37,7 +37,7 @@ class _TasksPageState extends State<TasksPage> {
     String? selectedMember;
 
     final Set<String> suggestionSet = {
-      ...taskProvider.frequentTasks, // sık yapılanlar
+      ...taskProvider.suggestedTasks, // sık yapılanlar
       ...defaultTasks, // hazır görevler
       ...taskProvider.tasks.map((t) => t.name), // mevcut listeden
     };

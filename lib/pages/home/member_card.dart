@@ -38,6 +38,20 @@ class _MemberCardState extends State<MemberCard> {
   bool _expandTasks = false;
   bool _expandItems = false;
 
+  void _toggleTask(Task task) {
+    final newVal = !task.completed;
+    context.read<TaskProvider>().toggleTask(task, newVal);
+    // Sekmeyi DEĞİŞTİRME — kullanıcı hangi sekmedeyse orada kalır.
+    // Gerekirse minik bir setState ile "preview/show all" animasyonları tetiklenir:
+    setState(() {});
+  }
+
+  void _toggleItem(Item it) {
+    final newVal = !it.bought;
+    context.read<ItemProvider>().toggleItem(it, newVal);
+    setState(() {});
+  }
+
   static const int _kPreviewTasks = 4;
   static const int _kPreviewItems = 3;
 
@@ -60,10 +74,6 @@ class _MemberCardState extends State<MemberCard> {
     final itemsFiltered = (_itemStatus == _ItemStatus.toBuy)
         ? widget.items.where((i) => !i.bought).toList()
         : widget.items.where((i) => i.bought).toList();
-
-    final pendingCount = tasksBase.where((t) => !t.completed).length;
-    final boughtCount = itemsBase.where((i) => i.bought).length;
-    final toBuyCount = itemsBase.where((i) => !i.bought).length;
 
     return Card(
       elevation: 6,
@@ -144,6 +154,7 @@ class _MemberCardState extends State<MemberCard> {
                             icon: const Icon(Icons.radio_button_unchecked),
                             label: Text(
                               'Pending (${widget.tasks.where((t) => !t.completed).length})',
+                              style: TextStyle(fontSize: 12),
                             ),
                           ),
                           ButtonSegment(
@@ -151,6 +162,7 @@ class _MemberCardState extends State<MemberCard> {
                             icon: const Icon(Icons.check_circle),
                             label: Text(
                               'Completed (${widget.tasks.where((t) => t.completed).length})',
+                              style: TextStyle(fontSize: 12),
                             ),
                           ),
                         ],
@@ -211,6 +223,7 @@ class _MemberCardState extends State<MemberCard> {
                             previewCount: _kPreviewTasks,
                             onToggleExpand: () =>
                                 setState(() => _expandTasks = !_expandTasks),
+                            onToggleTask: _toggleTask, // ⬅️ YENİ
                           )
                         : _ItemsSubsection(
                             itemsFiltered: itemsFiltered,
@@ -218,6 +231,7 @@ class _MemberCardState extends State<MemberCard> {
                             previewCount: _kPreviewItems,
                             onToggleExpand: () =>
                                 setState(() => _expandItems = !_expandItems),
+                            onToggleItem: _toggleItem, // ⬅️ YENİ
                           ),
                   ),
                 ),
@@ -234,13 +248,19 @@ class _MemberCardState extends State<MemberCard> {
                     onPressed: () =>
                         _openQuickAddTaskSheet(context, widget.memberName),
                     icon: const Icon(Icons.add_task),
-                    label: const Text('Add task'),
+                    label: const Text(
+                      'Add task',
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                   FilledButton.tonalIcon(
                     onPressed: () =>
                         _openQuickAddItemSheet(context, widget.memberName),
                     icon: const Icon(Icons.add_shopping_cart),
-                    label: const Text('Add item'),
+                    label: const Text(
+                      'Add item',
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                 ],
               ),
@@ -271,7 +291,7 @@ class _MemberCardState extends State<MemberCard> {
       "Iron clothes",
     ];
 
-    final frequent = taskProv.frequentTasks; // top5 (provider’da var)
+    final frequent = taskProv.suggestedTasks; // top5 (provider’da var)
     final existing = taskProv.tasks.map((t) => t.name).toList();
 
     // Tekrarsız birleşik öneriler
@@ -574,12 +594,12 @@ class _MemberCardState extends State<MemberCard> {
   }
 }
 
-// --- küçük içerik bileşenleri (kısaltılmış) ---
 class _TasksSubsection extends StatelessWidget {
   final List<Task> tasksFiltered;
   final bool expanded;
   final int previewCount;
   final VoidCallback onToggleExpand;
+  final void Function(Task) onToggleTask;
 
   const _TasksSubsection({
     Key? key,
@@ -587,6 +607,7 @@ class _TasksSubsection extends StatelessWidget {
     required this.expanded,
     required this.previewCount,
     required this.onToggleExpand,
+    required this.onToggleTask,
   }) : super(key: key);
 
   @override
@@ -615,8 +636,8 @@ class _TasksSubsection extends StatelessWidget {
             final isDone = task.completed;
             return ListTile(
               dense: true,
+              visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
               contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-              // “radio” görünümü için dairesel checkbox/ikon
               leading: IconButton(
                 tooltip: isDone ? 'Mark as pending' : 'Mark as completed',
                 icon: Icon(
@@ -624,9 +645,7 @@ class _TasksSubsection extends StatelessWidget {
                       ? Icons.radio_button_checked
                       : Icons.radio_button_unchecked,
                 ),
-                onPressed: () {
-                  context.read<TaskProvider>().toggleTask(task, !isDone);
-                },
+                onPressed: () => onToggleTask(task),
               ),
               title: Text(
                 task.name,
@@ -635,10 +654,7 @@ class _TasksSubsection extends StatelessWidget {
                     ? const TextStyle(decoration: TextDecoration.lineThrough)
                     : null,
               ),
-              onTap: () {
-                // Satıra dokunarak da toggle
-                context.read<TaskProvider>().toggleTask(task, !isDone);
-              },
+              onTap: () => onToggleTask(task),
               trailing: IconButton(
                 tooltip: 'Delete',
                 icon: const Icon(Icons.delete, color: Colors.redAccent),
@@ -667,6 +683,7 @@ class _ItemsSubsection extends StatelessWidget {
   final bool expanded;
   final int previewCount;
   final VoidCallback onToggleExpand;
+  final void Function(Item) onToggleItem;
 
   const _ItemsSubsection({
     Key? key,
@@ -674,6 +691,7 @@ class _ItemsSubsection extends StatelessWidget {
     required this.expanded,
     required this.previewCount,
     required this.onToggleExpand,
+    required this.onToggleItem,
   }) : super(key: key);
 
   @override
@@ -702,18 +720,19 @@ class _ItemsSubsection extends StatelessWidget {
             final bought = it.bought;
             return ListTile(
               dense: true,
+              visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
+
               contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+              onTap: () => onToggleItem(it),
               leading: IconButton(
-                tooltip: bought ? 'Mark as to buy' : 'Mark as bought',
                 icon: Icon(
                   bought
                       ? Icons.radio_button_checked
                       : Icons.radio_button_unchecked,
                 ),
-                onPressed: () {
-                  context.read<ItemProvider>().toggleItem(it, !bought);
-                },
+                onPressed: () => onToggleItem(it),
               ),
+
               title: Text(
                 it.name,
                 overflow: TextOverflow.ellipsis,
@@ -721,9 +740,7 @@ class _ItemsSubsection extends StatelessWidget {
                     ? const TextStyle(decoration: TextDecoration.lineThrough)
                     : null,
               ),
-              onTap: () {
-                context.read<ItemProvider>().toggleItem(it, !bought);
-              },
+
               trailing: IconButton(
                 tooltip: 'Delete',
                 icon: const Icon(Icons.delete, color: Colors.redAccent),
@@ -804,7 +821,7 @@ class _MutedText extends StatelessWidget {
 
 class EmptyFamilyCard extends StatelessWidget {
   final VoidCallback onAdd;
-  const EmptyFamilyCard({Key? key, required this.onAdd}) : super(key: key);
+  const EmptyFamilyCard({super.key, required this.onAdd});
 
   @override
   Widget build(BuildContext context) {

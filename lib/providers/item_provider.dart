@@ -53,4 +53,12 @@ class ItemProvider extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  // İSİM DÜZENLE
+  void renameItem(Item item, String newName) {
+    if (newName.trim().isEmpty) return;
+    item.name = newName.trim();
+    item.save();
+    notifyListeners();
+  }
 }

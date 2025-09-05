@@ -1,4 +1,5 @@
 import 'package:birlikteyapp/pages/landing/splash_screen.dart';
+import 'package:birlikteyapp/providers/ui_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
@@ -86,6 +87,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => TaskProvider()),
         ChangeNotifierProvider(create: (_) => ItemProvider()),
         ChangeNotifierProvider(create: (_) => WeeklyProvider()),
+        ChangeNotifierProvider(create: (_) => UiProvider()),
       ],
       child: FamilyApp(),
     ),
@@ -95,9 +97,24 @@ void main() async {
 class FamilyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final ui = context.watch<UiProvider>();
     return MaterialApp(
-      title: 'Togetherly',
-      theme: ThemeData(primarySwatch: Colors.teal),
+      debugShowCheckedModeBanner: false,
+      title: 'Togtherly',
+      themeMode: ui.themeMode,
+      theme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.light,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+      ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.indigo,
+          brightness: Brightness.dark,
+        ),
+      ),
       home: const SplashScreen(),
     );
   }
