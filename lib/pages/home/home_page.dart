@@ -40,16 +40,44 @@ class _HomePageState extends State<HomePage> {
     final itemProv = context.watch<ItemProvider>();
     final ui = context.watch<UiProvider>();
 
+    final active = ui.resolveActive(family);
+
     final allTasks = taskProv.tasks;
     final allItems = itemProv.items;
 
     // Global görünüm ayarları
     final section = ui.section; // HomeSection.tasks | items
     final filterMember = ui.filterMember; // String? (null = herkes)
+    if (active == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Togetherly'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.manage_accounts),
+              onPressed: () => showFamilyManager(context),
+            ),
+          ],
+        ),
+        body: Padding(
+          padding: EdgeInsets.all(12),
+          child: EmptyFamilyCard(
+            onAdd: () => showFamilyManager(context),
+          ), // kendi helperınla değiştir
+        ),
+      );
+    }
+
+    // aktif üyenin tam listeleri (status filtresi yok, kart içinde süzülecek)
+    final activeTasks = allTasks.where((t) => t.assignedTo == active).toList();
+    final activeItems = allItems.where((i) => i.assignedTo == active).toList();
+
+    // diğer üyeler küçük kutucuklar
+    final others = family.where((n) => n != active).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Togetherly'),
+        title: Text('Hi, $active'),
         actions: [
           IconButton(
             icon: const Icon(Icons.group),
@@ -92,7 +120,7 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.all(12),
         child: Column(
           children: [
-            // 🔸 Üst global toggle — artık UiProvider’ı kontrol ediyor
+            // 🔸 Üst global toggle (Tasks / Market)
             SegmentedButton<HomeSection>(
               segments: const [
                 ButtonSegment(
@@ -113,79 +141,102 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 12),
 
-            // Grid
+            // 🔹 FEATURED: aktif üyenin büyük kartı (ekranın çoğunu kaplasın)
             Expanded(
-              child: LayoutBuilder(
-                builder: (context, c) {
-                  int cross = 1;
-                  if (c.maxWidth >= 1200) {
-                    cross = 4;
-                  } else if (c.maxWidth >= 900) {
-                    cross = 3;
-                  } else if (c.maxWidth >= 600) {
-                    cross = 2;
-                  }
-
-                  final ratio = (c.maxWidth >= 600) ? 0.95 : 0.9;
-
-                  return GridView.builder(
-                    itemCount: family.isEmpty ? 1 : family.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: cross,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: ratio,
-                    ),
-                    itemBuilder: (context, i) {
-                      if (family.isEmpty) {
-                        return EmptyFamilyCard(
-                          onAdd: () => showFamilyManager(
-                            context,
-                          ), // ⬅️ Quick Panel değil
-                        );
-                      }
-
-                      final name = family[i];
-
-                      // Kişi filtresi aktifse, filtreden farklı üyeleri "soluk" göstermek istersen:
-                      final bool dim =
-                          (filterMember != null && filterMember != name);
-
-                      final memberTasksAll = allTasks
-                          .where((t) => t.assignedTo == name)
-                          .toList();
-                      final memberItemsAll = allItems
-                          .where((it) => it.assignedTo == name)
-                          .toList();
-
-                      // Task status filter (UiProvider)
-                      final filteredTasks =
-                          ui.taskFilter == TaskViewFilter.pending
-                          ? memberTasksAll.where((t) => !t.completed).toList()
-                          : memberTasksAll.where((t) => t.completed).toList();
-
-                      // Item status filter (UiProvider)
-                      final filteredItems =
-                          ui.itemFilter == ItemViewFilter.toBuy
-                          ? memberItemsAll.where((it) => !it.bought).toList()
-                          : memberItemsAll.where((it) => it.bought).toList();
-
-                      return Opacity(
-                        opacity: dim ? 0.55 : 1.0,
-                        child: MemberCard(
-                          memberName: name,
-                          tasks: memberTasksAll,
-                          items: memberItemsAll,
-                          section:
-                              section, // 🔸 hangi sekme seçiliyse karta geç
-                        ),
-                      );
-                    },
-                  );
-                },
+              child: MemberCard(
+                memberName: active,
+                tasks: activeTasks,
+                items: activeItems,
+                section: section,
               ),
             ),
+
+            const SizedBox(height: 10),
+
+            // 🔹 OTHERS: küçük dikdörtgen kutucuklar (scroll gerektirmeden görünür)
+            if (others.isNotEmpty)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Other members',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  LayoutBuilder(
+                    builder: (ctx, c) {
+                      // küçük kartların genişliğini ayarla
+                      final double tileW = c.maxWidth >= 900
+                          ? 220
+                          : (c.maxWidth >= 600 ? 180 : 150);
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: others.map((name) {
+                          return _MiniMemberTile(
+                            name: name,
+                            width: tileW,
+                            onTap: () => context
+                                .read<UiProvider>()
+                                .setActiveMember(name),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+                ],
+              ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// Küçük dikdörtgen member kutusu:
+class _MiniMemberTile extends StatelessWidget {
+  final String name;
+  final double width;
+  final VoidCallback onTap;
+  const _MiniMemberTile({
+    Key? key,
+    required this.name,
+    required this.width,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final theme = Theme.of(context);
+    return SizedBox(
+      width: width,
+      child: Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              children: [
+                CircleAvatar(radius: 16, child: Text(initial)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, size: 18),
+              ],
+            ),
+          ),
         ),
       ),
     );

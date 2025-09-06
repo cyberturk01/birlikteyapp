@@ -144,58 +144,96 @@ class _TasksFullList extends StatelessWidget {
       itemBuilder: (_, i) {
         final t = tasks[i];
         final done = t.completed;
-
-        return ListTile(
-          dense: true,
-          visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
-
-          leading: IconButton(
-            tooltip: done ? 'Mark as pending' : 'Mark as completed',
-            icon: Icon(
-              done ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-            ),
-            onPressed: () => context.read<TaskProvider>().toggleTask(t, !done),
+        return Dismissible(
+          key: ValueKey(t.key),
+          background: Container(
+            color: Colors.green.withOpacity(0.85),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            alignment: Alignment.centerLeft,
+            child: const Icon(Icons.check, color: Colors.white),
           ),
-          title: Text(
-            t.name + (t.assignedTo != null ? ' (${t.assignedTo})' : ''),
-            overflow: TextOverflow.ellipsis,
-            style: done
-                ? const TextStyle(decoration: TextDecoration.lineThrough)
-                : null,
+          secondaryBackground: Container(
+            color: Colors.red.withOpacity(0.85),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            alignment: Alignment.centerRight,
+            child: const Icon(Icons.delete, color: Colors.white),
           ),
-          onTap: () => context.read<TaskProvider>().toggleTask(t, !done),
-
-          // ➕ trailing aksiyonlar: Assign • Edit • Delete
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min, // içerik kadar genişlik
-            children: [
-              IconButton(
-                padding: EdgeInsets.zero, // ikonun tıklama alanını küçült
-                constraints:
-                    const BoxConstraints(), // default min size’ı kaldır
-                tooltip: 'Assign',
-                icon: const Icon(Icons.person_add_alt, size: 20),
-                onPressed: () => _showAssignTaskSheet(context, t),
-              ),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                tooltip: 'Edit',
-                icon: const Icon(Icons.edit, size: 20),
-                onPressed: () => _showRenameTaskDialog(context, t),
-              ),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                tooltip: 'Delete',
-                icon: const Icon(
-                  Icons.delete,
-                  size: 20,
-                  color: Colors.redAccent,
+          confirmDismiss: (dir) async {
+            if (dir == DismissDirection.startToEnd) {
+              context.read<TaskProvider>().toggleTask(t, !done);
+              return false;
+            } else {
+              final removed = t;
+              context.read<TaskProvider>().removeTask(t);
+              ScaffoldMessenger.of(context).clearSnackBars();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Task deleted'),
+                  action: SnackBarAction(
+                    label: 'Undo',
+                    onPressed: () =>
+                        context.read<TaskProvider>().addTask(removed),
+                  ),
                 ),
-                onPressed: () => context.read<TaskProvider>().removeTask(t),
+              );
+              return true;
+            }
+          },
+          child: ListTile(
+            dense: true,
+            visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
+
+            leading: IconButton(
+              tooltip: done ? 'Mark as pending' : 'Mark as completed',
+              icon: Icon(
+                done
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
               ),
-            ],
+              onPressed: () =>
+                  context.read<TaskProvider>().toggleTask(t, !done),
+            ),
+            title: Text(
+              t.name + (t.assignedTo != null ? ' (${t.assignedTo})' : ''),
+              overflow: TextOverflow.ellipsis,
+              style: done
+                  ? const TextStyle(decoration: TextDecoration.lineThrough)
+                  : null,
+            ),
+            onTap: () => context.read<TaskProvider>().toggleTask(t, !done),
+
+            // ➕ trailing aksiyonlar: Assign • Edit • Delete
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min, // içerik kadar genişlik
+              children: [
+                IconButton(
+                  padding: EdgeInsets.zero, // ikonun tıklama alanını küçült
+                  constraints:
+                      const BoxConstraints(), // default min size’ı kaldır
+                  tooltip: 'Assign',
+                  icon: const Icon(Icons.person_add_alt, size: 20),
+                  onPressed: () => _showAssignTaskSheet(context, t),
+                ),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Edit',
+                  icon: const Icon(Icons.edit, size: 20),
+                  onPressed: () => _showRenameTaskDialog(context, t),
+                ),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Delete',
+                  icon: const Icon(
+                    Icons.delete,
+                    size: 20,
+                    color: Colors.redAccent,
+                  ),
+                  onPressed: () => context.read<TaskProvider>().removeTask(t),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -310,59 +348,94 @@ class _ItemsFullList extends StatelessWidget {
       itemBuilder: (_, i) {
         final it = items[i];
         final bought = it.bought;
-
-        return ListTile(
-          dense: true,
-          visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
-
-          leading: IconButton(
-            tooltip: bought ? 'Mark as to buy' : 'Mark as bought',
-            icon: Icon(
-              bought
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
-            ),
-            onPressed: () =>
-                context.read<ItemProvider>().toggleItem(it, !bought),
+        return Dismissible(
+          key: ValueKey(it.key),
+          background: Container(
+            color: Colors.green.withOpacity(0.85),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            alignment: Alignment.centerLeft,
+            child: const Icon(Icons.check, color: Colors.white),
           ),
-          title: Text(
-            it.name + (it.assignedTo != null ? ' (${it.assignedTo})' : ''),
-            overflow: TextOverflow.ellipsis,
-            style: bought
-                ? const TextStyle(decoration: TextDecoration.lineThrough)
-                : null,
+          secondaryBackground: Container(
+            color: Colors.red.withOpacity(0.85),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            alignment: Alignment.centerRight,
+            child: const Icon(Icons.delete, color: Colors.white),
           ),
-          onTap: () => context.read<ItemProvider>().toggleItem(it, !bought),
-
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min, // içerik kadar genişlik
-            children: [
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                tooltip: 'Assign',
-                icon: const Icon(Icons.person_add_alt, size: 20),
-                onPressed: () => _showAssignItemSheet(context, it),
-              ),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                tooltip: 'Edit',
-                icon: const Icon(Icons.edit, size: 20),
-                onPressed: () => _showRenameItemDialog(context, it),
-              ),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                tooltip: 'Delete',
-                icon: const Icon(
-                  Icons.delete,
-                  color: Colors.redAccent,
-                  size: 20,
+          confirmDismiss: (dir) async {
+            if (dir == DismissDirection.startToEnd) {
+              context.read<ItemProvider>().toggleItem(it, !bought);
+              return false;
+            } else {
+              final removed = it;
+              context.read<ItemProvider>().removeItem(it);
+              ScaffoldMessenger.of(context).clearSnackBars();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Item deleted'),
+                  action: SnackBarAction(
+                    label: 'Undo',
+                    onPressed: () =>
+                        context.read<ItemProvider>().addItem(removed),
+                  ),
                 ),
-                onPressed: () => context.read<ItemProvider>().removeItem(it),
+              );
+              return true;
+            }
+          },
+          child: ListTile(
+            dense: true,
+            visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
+
+            leading: IconButton(
+              tooltip: bought ? 'Mark as to buy' : 'Mark as bought',
+              icon: Icon(
+                bought
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
               ),
-            ],
+              onPressed: () =>
+                  context.read<ItemProvider>().toggleItem(it, !bought),
+            ),
+            title: Text(
+              it.name + (it.assignedTo != null ? ' (${it.assignedTo})' : ''),
+              overflow: TextOverflow.ellipsis,
+              style: bought
+                  ? const TextStyle(decoration: TextDecoration.lineThrough)
+                  : null,
+            ),
+            onTap: () => context.read<ItemProvider>().toggleItem(it, !bought),
+
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min, // içerik kadar genişlik
+              children: [
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Assign',
+                  icon: const Icon(Icons.person_add_alt, size: 20),
+                  onPressed: () => _showAssignItemSheet(context, it),
+                ),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Edit',
+                  icon: const Icon(Icons.edit, size: 20),
+                  onPressed: () => _showRenameItemDialog(context, it),
+                ),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Delete',
+                  icon: const Icon(
+                    Icons.delete,
+                    color: Colors.redAccent,
+                    size: 20,
+                  ),
+                  onPressed: () => context.read<ItemProvider>().removeItem(it),
+                ),
+              ],
+            ),
           ),
         );
       },

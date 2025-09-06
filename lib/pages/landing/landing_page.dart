@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/family_provider.dart';
+import '../../providers/ui_provider.dart';
 import '../home/family_manager.dart';
 import '../home/home_page.dart';
 
@@ -176,12 +177,11 @@ class _LandingPageState extends State<LandingPage> {
                 final name = filtered[i];
                 return _MemberTile(
                   name: name,
-                  onTap: () {
+                  onTap: () async {
+                    await context.read<UiProvider>().setActiveMember(name);
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => HomePage(initialFilterMember: name),
-                      ),
+                      MaterialPageRoute(builder: (_) => const HomePage()),
                     );
                   },
                 );

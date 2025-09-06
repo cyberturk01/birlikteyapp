@@ -634,33 +634,98 @@ class _TasksSubsection extends StatelessWidget {
         else
           ...visible.map((task) {
             final isDone = task.completed;
-            return ListTile(
-              dense: true,
-              visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-              leading: IconButton(
-                tooltip: isDone ? 'Mark as pending' : 'Mark as completed',
-                icon: Icon(
-                  isDone
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_unchecked,
-                ),
-                onPressed: () => onToggleTask(task),
+            return Dismissible(
+              key: ValueKey(
+                task.key,
+              ), // HiveObject.key (Task, HiveObject'tan türemeli)
+              background: Container(
+                color: Colors.green.withOpacity(0.85),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                alignment: Alignment.centerLeft,
+                child: const Icon(Icons.check, color: Colors.white),
               ),
-              title: Text(
-                task.name,
-                overflow: TextOverflow.ellipsis,
-                style: isDone
-                    ? const TextStyle(decoration: TextDecoration.lineThrough)
-                    : null,
+              secondaryBackground: Container(
+                color: Colors.red.withOpacity(0.85),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                alignment: Alignment.centerRight,
+                child: const Icon(Icons.delete, color: Colors.white),
               ),
-              onTap: () => onToggleTask(task),
-              trailing: IconButton(
-                tooltip: 'Delete',
-                icon: const Icon(Icons.delete, color: Colors.redAccent),
-                onPressed: () {
+
+              // Kaydırma davranışı:
+              confirmDismiss: (direction) async {
+                if (direction == DismissDirection.startToEnd) {
+                  // SOL → SAĞ : Toggle (tamamla/geri al) — dismiss ETME
+                  onToggleTask(task);
+                  return false; // tile listeden düşmesin
+                } else {
+                  // SAĞ → SOL : Delete — dismiss ET
+                  final removed = task;
+                  // Önce Hive’dan sil
                   context.read<TaskProvider>().removeTask(task);
-                },
+
+                  // Undo SnackBar
+                  ScaffoldMessenger.of(context).clearSnackBars();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Task deleted'),
+                      action: SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () {
+                          // Not: yeniden eklenir (yeni key alır); sıra üstte olur
+                          context.read<TaskProvider>().addTask(removed);
+                        },
+                      ),
+                    ),
+                  );
+                  return true;
+                }
+              },
+
+              child: ListTile(
+                dense: true,
+                visualDensity: const VisualDensity(
+                  horizontal: -4,
+                  vertical: -2,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                leading: IconButton(
+                  tooltip: isDone ? 'Mark as pending' : 'Mark as completed',
+                  icon: Icon(
+                    isDone
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                  ),
+                  onPressed: () => onToggleTask(task),
+                ),
+                title: Text(
+                  task.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: isDone
+                      ? const TextStyle(decoration: TextDecoration.lineThrough)
+                      : null,
+                ),
+                onTap: () => onToggleTask(task),
+                trailing: IconButton(
+                  tooltip: 'Delete',
+                  icon: const Icon(Icons.delete, color: Colors.redAccent),
+                  onPressed: () {
+                    // butondan da silme + undo
+                    final removed = task;
+                    context.read<TaskProvider>().removeTask(task);
+                    ScaffoldMessenger.of(context).clearSnackBars();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Task deleted'),
+                        action: SnackBarAction(
+                          label: 'Undo',
+                          onPressed: () {
+                            context.read<TaskProvider>().addTask(removed);
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             );
           }),
@@ -718,35 +783,76 @@ class _ItemsSubsection extends StatelessWidget {
         else
           ...visible.map((it) {
             final bought = it.bought;
-            return ListTile(
-              dense: true,
-              visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
-
-              contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-              onTap: () => onToggleItem(it),
-              leading: IconButton(
-                icon: Icon(
-                  bought
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_unchecked,
-                ),
-                onPressed: () => onToggleItem(it),
+            return Dismissible(
+              key: ValueKey(it.key),
+              background: Container(
+                color: Colors.green.withOpacity(0.85),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                alignment: Alignment.centerLeft,
+                child: const Icon(Icons.check, color: Colors.white),
               ),
-
-              title: Text(
-                it.name,
-                overflow: TextOverflow.ellipsis,
-                style: bought
-                    ? const TextStyle(decoration: TextDecoration.lineThrough)
-                    : null,
+              secondaryBackground: Container(
+                color: Colors.red.withOpacity(0.85),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                alignment: Alignment.centerRight,
+                child: const Icon(Icons.delete, color: Colors.white),
               ),
-
-              trailing: IconButton(
-                tooltip: 'Delete',
-                icon: const Icon(Icons.delete, color: Colors.redAccent),
-                onPressed: () {
+              confirmDismiss: (direction) async {
+                if (direction == DismissDirection.startToEnd) {
+                  // Toggle bought
+                  onToggleItem(it);
+                  return false;
+                } else {
+                  final removed = it;
                   context.read<ItemProvider>().removeItem(it);
-                },
+                  ScaffoldMessenger.of(context).clearSnackBars();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Item deleted'),
+                      action: SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () {
+                          context.read<ItemProvider>().addItem(removed);
+                        },
+                      ),
+                    ),
+                  );
+                  return true;
+                }
+              },
+              child: ListTile(
+                dense: true,
+                visualDensity: const VisualDensity(
+                  horizontal: -4,
+                  vertical: -2,
+                ),
+
+                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                onTap: () => onToggleItem(it),
+                leading: IconButton(
+                  icon: Icon(
+                    bought
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                  ),
+                  onPressed: () => onToggleItem(it),
+                ),
+
+                title: Text(
+                  it.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: bought
+                      ? const TextStyle(decoration: TextDecoration.lineThrough)
+                      : null,
+                ),
+
+                trailing: IconButton(
+                  tooltip: 'Delete',
+                  icon: const Icon(Icons.delete, color: Colors.redAccent),
+                  onPressed: () {
+                    context.read<ItemProvider>().removeItem(it);
+                  },
+                ),
               ),
             );
           }),

@@ -13,6 +13,8 @@ class UiProvider extends ChangeNotifier {
   HomeSection _section = HomeSection.tasks;
   TaskViewFilter _taskFilter = TaskViewFilter.pending;
   ItemViewFilter _itemFilter = ItemViewFilter.toBuy;
+  String? _activeMember;
+  String? get activeMember => _activeMember;
 
   // ====== tema modu ======
   ThemeMode _themeMode = ThemeMode.system;
@@ -31,7 +33,26 @@ class UiProvider extends ChangeNotifier {
     if (saved != null) {
       _themeMode = _parseThemeMode(saved);
     }
+    _activeMember = prefs.getString('activeMember');
     notifyListeners();
+  }
+
+  Future<void> setActiveMember(String? name) async {
+    _activeMember = (name != null && name.trim().isEmpty) ? null : name;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    if (_activeMember == null) {
+      await prefs.remove('activeMember');
+    } else {
+      await prefs.setString('activeMember', _activeMember!);
+    }
+  }
+
+  String? resolveActive(List<String> family) {
+    if (_activeMember != null && family.contains(_activeMember)) {
+      return _activeMember;
+    }
+    return family.isNotEmpty ? family.first : null;
   }
 
   // setters

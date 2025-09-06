@@ -1,5 +1,6 @@
 import 'package:birlikteyapp/pages/landing/splash_screen.dart';
 import 'package:birlikteyapp/providers/ui_provider.dart';
+import 'package:birlikteyapp/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
@@ -14,7 +15,7 @@ import 'providers/weekly_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  await NotificationService.init();
   final defaultTasks = [
     "Take out the trash",
     "Clean the kitchen",
@@ -56,7 +57,7 @@ void main() async {
   // Register Hive adapters
   Hive.registerAdapter(TaskAdapter());
   Hive.registerAdapter(ItemAdapter());
-  Hive.registerAdapter(WeeklyTaskAdapter()); // NEW
+  Hive.registerAdapter(WeeklyTaskAdapter());
 
   // Open boxes
   await Hive.openBox<String>('familyBox');
@@ -64,7 +65,8 @@ void main() async {
   await Hive.openBox<Item>('itemBox');
   await Hive.openBox<int>('taskCountBox');
   await Hive.openBox<int>('itemCountBox');
-  await Hive.openBox<WeeklyTask>('weeklyBox'); // NEW
+  await Hive.openBox<WeeklyTask>('weeklyBox');
+  await Hive.openBox<int>('weeklyNotifBox');
 
   final taskBox = Hive.box<Task>('taskBox');
   if (taskBox.isEmpty) {
