@@ -18,6 +18,12 @@ class TaskProvider extends ChangeNotifier {
   ];
 
   void addTask(Task task) {
+    final exists = _taskBox.values.any(
+      (t) => t.name.toLowerCase() == task.name.toLowerCase(),
+    );
+    if (exists) {
+      return;
+    }
     _taskBox.add(task);
     notifyListeners();
   }

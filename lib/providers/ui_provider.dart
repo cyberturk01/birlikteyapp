@@ -116,4 +116,15 @@ class UiProvider extends ChangeNotifier {
         return ThemeMode.system;
     }
   }
+
+  /// 🔄 Sadece tema + weekly reminder saatini sıfırlar
+  Future<void> resetSettings() async {
+    _themeMode = ThemeMode.system;
+    _weeklyDefaultReminder = null;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('weeklyReminderHour');
+    await prefs.remove('weeklyReminderMinute');
+    await prefs.setString('themeMode', ThemeMode.system.name); // isteğe bağlı
+  }
 }

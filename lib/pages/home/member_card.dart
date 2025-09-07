@@ -7,6 +7,7 @@ import '../../models/view_section.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_provider.dart';
 import '../../providers/task_provider.dart';
+import '../../providers/ui_provider.dart';
 import 'family_manager.dart';
 
 enum _TaskStatus { pending, completed }
@@ -20,12 +21,12 @@ class MemberCard extends StatefulWidget {
   final HomeSection section;
 
   const MemberCard({
-    Key? key,
+    super.key,
     required this.memberName,
     required this.tasks,
     required this.items,
     required this.section,
-  }) : super(key: key);
+  });
 
   @override
   State<MemberCard> createState() => _MemberCardState();
@@ -34,7 +35,7 @@ class MemberCard extends StatefulWidget {
 class _MemberCardState extends State<MemberCard> {
   _TaskStatus _taskStatus = _TaskStatus.pending;
   _ItemStatus _itemStatus = _ItemStatus.toBuy;
-  // _MemberCardState içinde:
+
   bool _expandTasks = false;
   bool _expandItems = false;
 
@@ -59,21 +60,23 @@ class _MemberCardState extends State<MemberCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // progress (top bar)
     final totalTasks = widget.tasks.length;
-    final completed = widget.tasks.where((t) => t.completed).length;
-    final progress = totalTasks == 0 ? 0.0 : completed / totalTasks;
+    final completedTasks = widget.tasks.where((t) => t.completed).length;
+    final progress = totalTasks == 0 ? 0.0 : completedTasks / totalTasks;
 
-    // durum bazlı filtreler
-    final tasksBase = widget.tasks;
     final tasksFiltered = (_taskStatus == _TaskStatus.pending)
         ? widget.tasks.where((t) => !t.completed).toList()
         : widget.tasks.where((t) => t.completed).toList();
-    final totalItems = widget.items.length;
-    final itemsBase = widget.items;
+
     final itemsFiltered = (_itemStatus == _ItemStatus.toBuy)
         ? widget.items.where((i) => !i.bought).toList()
         : widget.items.where((i) => i.bought).toList();
+
+    // responsive: dar ekranda daha az preview + daha az padding
+    final width = MediaQuery.of(context).size.width;
+    final isNarrow = width < 380;
+    final int previewTasks = isNarrow ? 3 : _kPreviewTasks;
+    final int previewItems = isNarrow ? 2 : _kPreviewItems;
 
     return Card(
       elevation: 6,
@@ -85,20 +88,20 @@ class _MemberCardState extends State<MemberCard> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              theme.colorScheme.surfaceVariant.withOpacity(0.55),
-              theme.colorScheme.surface.withOpacity(0.9),
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+              theme.colorScheme.surface.withValues(alpha: 0.9),
             ],
           ),
           border: Border.all(
-            color: theme.colorScheme.outlineVariant.withOpacity(0.4),
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: EdgeInsets.all(isNarrow ? 10 : 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // HEADER (sadece ad + (opsiyonel) progress)
+              // HEADER
               Row(
                 children: [
                   _AvatarWithRing(text: widget.memberName),
@@ -139,78 +142,76 @@ class _MemberCardState extends State<MemberCard> {
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              const Divider(thickness: 1, height: 1),
+              const SizedBox(height: 8),
 
-              const SizedBox(height: 12),
-
-              // STATUS BAR — sadece seçili sekmeye göre TEK bar
+              // STATUS BAR (centered)
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 150),
-                child: (widget.section == HomeSection.tasks)
-                    ? SegmentedButton<_TaskStatus>(
-                        key: const ValueKey('task-status'),
-                        segments: [
-                          ButtonSegment(
-                            value: _TaskStatus.pending,
-                            icon: const Icon(Icons.radio_button_unchecked),
-                            label: Text(
-                              'Pending (${widget.tasks.where((t) => !t.completed).length})',
-                              style: TextStyle(fontSize: 12),
+                child: Center(
+                  child: (widget.section == HomeSection.tasks)
+                      ? SegmentedButton<_TaskStatus>(
+                          key: const ValueKey('task-status'),
+                          segments: [
+                            ButtonSegment(
+                              value: _TaskStatus.pending,
+                              icon: const Icon(Icons.radio_button_unchecked),
+                              label: Text(
+                                'Pending (${widget.tasks.where((t) => !t.completed).length})',
+                                style: const TextStyle(fontSize: 12),
+                              ),
                             ),
-                          ),
-                          ButtonSegment(
-                            value: _TaskStatus.completed,
-                            icon: const Icon(Icons.check_circle),
-                            label: Text(
-                              'Completed (${widget.tasks.where((t) => t.completed).length})',
-                              style: TextStyle(fontSize: 12),
+                            ButtonSegment(
+                              value: _TaskStatus.completed,
+                              icon: const Icon(Icons.check_circle),
+                              label: Text(
+                                'Completed (${widget.tasks.where((t) => t.completed).length})',
+                                style: const TextStyle(fontSize: 12),
+                              ),
                             ),
-                          ),
-                        ],
-                        selected: {_taskStatus},
-                        onSelectionChanged: (s) =>
-                            setState(() => _taskStatus = s.first),
-                        showSelectedIcon: false,
-                      )
-                    : SegmentedButton<_ItemStatus>(
-                        key: const ValueKey('item-status'),
-                        segments: [
-                          ButtonSegment(
-                            value: _ItemStatus.toBuy,
-                            icon: const Icon(Icons.shopping_basket),
-                            label: Text(
-                              'To buy (${widget.items.where((i) => !i.bought).length})',
+                          ],
+                          selected: {_taskStatus},
+                          onSelectionChanged: (s) =>
+                              setState(() => _taskStatus = s.first),
+                          showSelectedIcon: false,
+                        )
+                      : SegmentedButton<_ItemStatus>(
+                          key: const ValueKey('item-status'),
+                          segments: [
+                            ButtonSegment(
+                              value: _ItemStatus.toBuy,
+                              icon: const Icon(Icons.shopping_basket),
+                              label: Text(
+                                'To buy (${widget.items.where((i) => !i.bought).length})',
+                              ),
                             ),
-                          ),
-                          ButtonSegment(
-                            value: _ItemStatus.bought,
-                            icon: const Icon(Icons.check_circle),
-                            label: Text(
-                              'Bought (${widget.items.where((i) => i.bought).length})',
+                            ButtonSegment(
+                              value: _ItemStatus.bought,
+                              icon: const Icon(Icons.check_circle),
+                              label: Text(
+                                'Bought (${widget.items.where((i) => i.bought).length})',
+                              ),
                             ),
-                          ),
-                        ],
-                        selected: {_itemStatus},
-                        onSelectionChanged: (s) =>
-                            setState(() => _itemStatus = s.first),
-                        showSelectedIcon: false,
-                      ),
+                          ],
+                          selected: {_itemStatus},
+                          onSelectionChanged: (s) =>
+                              setState(() => _itemStatus = s.first),
+                          showSelectedIcon: false,
+                        ),
+                ),
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
 
-              // CONTENT (tek sekme render edilir)
+              // CONTENT
               Expanded(
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 150),
-                  switchInCurve: Curves.linear,
-                  switchOutCurve: Curves.linear,
-                  // Only fade (no size transition)
                   transitionBuilder: (child, anim) =>
                       FadeTransition(opacity: anim, child: child),
-                  // Lay out ONLY the current child (no previous children stacked)
                   layoutBuilder: (currentChild, _) =>
                       currentChild ?? const SizedBox.shrink(),
-                  // Important: key changes when expanding/collapsing to trigger switch
                   child: SingleChildScrollView(
                     key: ValueKey(
                       '${widget.section}-${widget.section == HomeSection.tasks ? (_expandTasks ? "all" : "less") : (_expandItems ? "all" : "less")}',
@@ -220,31 +221,30 @@ class _MemberCardState extends State<MemberCard> {
                         ? _TasksSubsection(
                             tasksFiltered: tasksFiltered,
                             expanded: _expandTasks,
-                            previewCount: _kPreviewTasks,
+                            previewCount: previewTasks,
                             onToggleExpand: () =>
                                 setState(() => _expandTasks = !_expandTasks),
-                            onToggleTask: _toggleTask, // ⬅️ YENİ
+                            onToggleTask: _toggleTask,
                           )
                         : _ItemsSubsection(
                             itemsFiltered: itemsFiltered,
                             expanded: _expandItems,
-                            previewCount: _kPreviewItems,
+                            previewCount: previewItems,
                             onToggleExpand: () =>
                                 setState(() => _expandItems = !_expandItems),
-                            onToggleItem: _toggleItem, // ⬅️ YENİ
+                            onToggleItem: _toggleItem,
                           ),
                   ),
                 ),
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
 
-              // ACTIONS
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  FilledButton.tonalIcon(
+              // ACTIONS (tek buton)
+              if (widget.section == HomeSection.tasks)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
                     onPressed: () =>
                         _openQuickAddTaskSheet(context, widget.memberName),
                     icon: const Icon(Icons.add_task),
@@ -253,7 +253,11 @@ class _MemberCardState extends State<MemberCard> {
                       style: TextStyle(fontSize: 12),
                     ),
                   ),
-                  FilledButton.tonalIcon(
+                )
+              else
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
                     onPressed: () =>
                         _openQuickAddItemSheet(context, widget.memberName),
                     icon: const Icon(Icons.add_shopping_cart),
@@ -262,8 +266,7 @@ class _MemberCardState extends State<MemberCard> {
                       style: TextStyle(fontSize: 12),
                     ),
                   ),
-                ],
-              ),
+                ),
             ],
           ),
         ),
@@ -271,13 +274,12 @@ class _MemberCardState extends State<MemberCard> {
     );
   }
 
-  // ---- helper widgets/fonksiyonlar (sende zaten vardıysa aynı kalsın) ----
+  // ===== Quick add sheets (assign OR create) =====
 
   void _openQuickAddTaskSheet(BuildContext context, String member) {
     final taskProv = context.read<TaskProvider>();
     final familyProv = context.read<FamilyProvider>();
 
-    // Hazır listeler (istersen constants dosyasına taşı)
     const defaultTasks = [
       "Take out the trash",
       "Clean the kitchen",
@@ -291,10 +293,8 @@ class _MemberCardState extends State<MemberCard> {
       "Iron clothes",
     ];
 
-    final frequent = taskProv.suggestedTasks; // top5 (provider’da var)
+    final frequent = taskProv.suggestedTasks;
     final existing = taskProv.tasks.map((t) => t.name).toList();
-
-    // Tekrarsız birleşik öneriler
     final suggestions = {
       ...frequent,
       ...defaultTasks,
@@ -352,7 +352,6 @@ class _MemberCardState extends State<MemberCard> {
                     ],
                   ),
                   const SizedBox(height: 8),
-
                   TextField(
                     controller: c,
                     decoration: const InputDecoration(
@@ -362,10 +361,9 @@ class _MemberCardState extends State<MemberCard> {
                       isDense: true,
                     ),
                     onSubmitted: (_) =>
-                        _submitTask(taskProv, c.text, member, context),
+                        _assignOrCreateTask(context, c.text, member),
                   ),
                   const SizedBox(height: 12),
-
                   if (suggestions.isNotEmpty) ...[
                     Text(
                       "Suggestions",
@@ -382,7 +380,7 @@ class _MemberCardState extends State<MemberCard> {
                             return ActionChip(
                               label: Text(name),
                               onPressed: () =>
-                                  _submitTask(taskProv, name, member, context),
+                                  _assignOrCreateTask(context, name, member),
                             );
                           }).toList(),
                         ),
@@ -390,35 +388,14 @@ class _MemberCardState extends State<MemberCard> {
                     ),
                     const SizedBox(height: 12),
                   ],
-
-                  // Kişi değiştirilebilir olsun (default: current member)
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: "Assign to",
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    value: member,
-                    items: familyProv.familyMembers
-                        .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                        .toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        // butonun onPressed'inde tekrar member gönderiyoruz
-                        Navigator.pop(context);
-                        _openQuickAddTaskSheet(context, val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-
+                  // Assign dropdown kaldırıldı – sadece bu member’a ekliyoruz
                   Align(
                     alignment: Alignment.centerRight,
                     child: FilledButton.icon(
                       icon: const Icon(Icons.add),
                       label: const Text("Add"),
                       onPressed: () =>
-                          _submitTask(taskProv, c.text, member, context),
+                          _assignOrCreateTask(context, c.text, member),
                     ),
                   ),
                 ],
@@ -457,9 +434,8 @@ class _MemberCardState extends State<MemberCard> {
       "Tea",
     ];
 
-    final frequent = itemProv.frequentItems; // top5
+    final frequent = itemProv.frequentItems;
     final existing = itemProv.items.map((i) => i.name).toList();
-
     final suggestions = {
       ...frequent,
       ...defaultItems,
@@ -517,7 +493,6 @@ class _MemberCardState extends State<MemberCard> {
                     ],
                   ),
                   const SizedBox(height: 8),
-
                   TextField(
                     controller: c,
                     decoration: const InputDecoration(
@@ -527,10 +502,9 @@ class _MemberCardState extends State<MemberCard> {
                       isDense: true,
                     ),
                     onSubmitted: (_) =>
-                        _submitItem(itemProv, c.text, member, context),
+                        _assignOrCreateItem(context, c.text, member),
                   ),
                   const SizedBox(height: 12),
-
                   if (suggestions.isNotEmpty) ...[
                     Text(
                       "Suggestions",
@@ -547,7 +521,7 @@ class _MemberCardState extends State<MemberCard> {
                             return ActionChip(
                               label: Text(name),
                               onPressed: () =>
-                                  _submitItem(itemProv, name, member, context),
+                                  _assignOrCreateItem(context, name, member),
                             );
                           }).toList(),
                         ),
@@ -555,33 +529,13 @@ class _MemberCardState extends State<MemberCard> {
                     ),
                     const SizedBox(height: 12),
                   ],
-
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: "Assign to",
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    value: member,
-                    items: familyProv.familyMembers
-                        .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                        .toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        Navigator.pop(context);
-                        _openQuickAddItemSheet(context, val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-
                   Align(
                     alignment: Alignment.centerRight,
                     child: FilledButton.icon(
                       icon: const Icon(Icons.add),
                       label: const Text("Add"),
                       onPressed: () =>
-                          _submitItem(itemProv, c.text, member, context),
+                          _assignOrCreateItem(context, c.text, member),
                     ),
                   ),
                 ],
@@ -594,6 +548,8 @@ class _MemberCardState extends State<MemberCard> {
   }
 }
 
+// ====== Subsections ======
+
 class _TasksSubsection extends StatelessWidget {
   final List<Task> tasksFiltered;
   final bool expanded;
@@ -602,18 +558,16 @@ class _TasksSubsection extends StatelessWidget {
   final void Function(Task) onToggleTask;
 
   const _TasksSubsection({
-    Key? key,
     required this.tasksFiltered,
     required this.expanded,
     required this.previewCount,
     required this.onToggleExpand,
     required this.onToggleTask,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-
     final total = tasksFiltered.length;
     final showAll = expanded || total <= previewCount;
     final visible = showAll
@@ -628,7 +582,6 @@ class _TasksSubsection extends StatelessWidget {
           'Tasks',
           style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
-
         if (tasksFiltered.isEmpty)
           const _MutedText('No tasks')
         else
@@ -639,13 +592,13 @@ class _TasksSubsection extends StatelessWidget {
                 task.key,
               ), // HiveObject.key (Task, HiveObject'tan türemeli)
               background: Container(
-                color: Colors.green.withOpacity(0.85),
+                color: Colors.green.withValues(alpha: 0.85),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 alignment: Alignment.centerLeft,
                 child: const Icon(Icons.check, color: Colors.white),
               ),
               secondaryBackground: Container(
-                color: Colors.red.withOpacity(0.85),
+                color: Colors.red.withValues(alpha: 0.85),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 alignment: Alignment.centerRight,
                 child: const Icon(Icons.delete, color: Colors.white),
@@ -680,7 +633,6 @@ class _TasksSubsection extends StatelessWidget {
                   return true;
                 }
               },
-
               child: ListTile(
                 dense: true,
                 visualDensity: const VisualDensity(
@@ -695,7 +647,7 @@ class _TasksSubsection extends StatelessWidget {
                         ? Icons.radio_button_checked
                         : Icons.radio_button_unchecked,
                   ),
-                  onPressed: () => onToggleTask(task),
+                  onPressed: () => _handleToggleTask(context, task),
                 ),
                 title: Text(
                   task.name,
@@ -704,32 +656,16 @@ class _TasksSubsection extends StatelessWidget {
                       ? const TextStyle(decoration: TextDecoration.lineThrough)
                       : null,
                 ),
-                onTap: () => onToggleTask(task),
+                onTap: () => _handleToggleTask(context, task),
                 trailing: IconButton(
                   tooltip: 'Delete',
                   icon: const Icon(Icons.delete, color: Colors.redAccent),
-                  onPressed: () {
-                    // butondan da silme + undo
-                    final removed = task;
-                    context.read<TaskProvider>().removeTask(task);
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Task deleted'),
-                        action: SnackBarAction(
-                          label: 'Undo',
-                          onPressed: () {
-                            context.read<TaskProvider>().addTask(removed);
-                          },
-                        ),
-                      ),
-                    );
-                  },
+                  onPressed: () =>
+                      context.read<TaskProvider>().removeTask(task),
                 ),
               ),
             );
           }),
-
         if (hiddenCount > 0 || expanded)
           Align(
             alignment: Alignment.centerRight,
@@ -751,18 +687,16 @@ class _ItemsSubsection extends StatelessWidget {
   final void Function(Item) onToggleItem;
 
   const _ItemsSubsection({
-    Key? key,
     required this.itemsFiltered,
     required this.expanded,
     required this.previewCount,
     required this.onToggleExpand,
     required this.onToggleItem,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-
     final total = itemsFiltered.length;
     final showAll = expanded || total <= previewCount;
     final visible = showAll
@@ -777,86 +711,38 @@ class _ItemsSubsection extends StatelessWidget {
           'Market',
           style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
-
         if (itemsFiltered.isEmpty)
           const _MutedText('No items')
         else
           ...visible.map((it) {
             final bought = it.bought;
-            return Dismissible(
-              key: ValueKey(it.key),
-              background: Container(
-                color: Colors.green.withOpacity(0.85),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                alignment: Alignment.centerLeft,
-                child: const Icon(Icons.check, color: Colors.white),
+            return ListTile(
+              dense: true,
+              visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+              onTap: () => _handleToggleItem(context, it),
+              leading: IconButton(
+                icon: Icon(
+                  bought
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                ),
+                onPressed: () => _handleToggleItem(context, it),
               ),
-              secondaryBackground: Container(
-                color: Colors.red.withOpacity(0.85),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                alignment: Alignment.centerRight,
-                child: const Icon(Icons.delete, color: Colors.white),
+              title: Text(
+                it.name,
+                overflow: TextOverflow.ellipsis,
+                style: bought
+                    ? const TextStyle(decoration: TextDecoration.lineThrough)
+                    : null,
               ),
-              confirmDismiss: (direction) async {
-                if (direction == DismissDirection.startToEnd) {
-                  // Toggle bought
-                  onToggleItem(it);
-                  return false;
-                } else {
-                  final removed = it;
-                  context.read<ItemProvider>().removeItem(it);
-                  ScaffoldMessenger.of(context).clearSnackBars();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Item deleted'),
-                      action: SnackBarAction(
-                        label: 'Undo',
-                        onPressed: () {
-                          context.read<ItemProvider>().addItem(removed);
-                        },
-                      ),
-                    ),
-                  );
-                  return true;
-                }
-              },
-              child: ListTile(
-                dense: true,
-                visualDensity: const VisualDensity(
-                  horizontal: -4,
-                  vertical: -2,
-                ),
-
-                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                onTap: () => onToggleItem(it),
-                leading: IconButton(
-                  icon: Icon(
-                    bought
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                  ),
-                  onPressed: () => onToggleItem(it),
-                ),
-
-                title: Text(
-                  it.name,
-                  overflow: TextOverflow.ellipsis,
-                  style: bought
-                      ? const TextStyle(decoration: TextDecoration.lineThrough)
-                      : null,
-                ),
-
-                trailing: IconButton(
-                  tooltip: 'Delete',
-                  icon: const Icon(Icons.delete, color: Colors.redAccent),
-                  onPressed: () {
-                    context.read<ItemProvider>().removeItem(it);
-                  },
-                ),
+              trailing: IconButton(
+                tooltip: 'Delete',
+                icon: const Icon(Icons.delete, color: Colors.redAccent),
+                onPressed: () => context.read<ItemProvider>().removeItem(it),
               ),
             );
           }),
-
         if (hiddenCount > 0 || expanded)
           Align(
             alignment: Alignment.centerRight,
@@ -870,14 +756,15 @@ class _ItemsSubsection extends StatelessWidget {
   }
 }
 
+// ====== Small widgets & helpers ======
+
 class _AvatarWithRing extends StatelessWidget {
   final String text;
   const _AvatarWithRing({required this.text});
-
   @override
   Widget build(BuildContext context) {
     final initial = text.isNotEmpty ? text[0].toUpperCase() : '?';
-    final ring = Theme.of(context).colorScheme.primary.withOpacity(0.25);
+    final ring = Theme.of(context).colorScheme.primary.withValues(alpha: 0.25);
     return Container(
       padding: const EdgeInsets.all(2.5),
       decoration: BoxDecoration(shape: BoxShape.circle, color: ring),
@@ -886,30 +773,9 @@ class _AvatarWithRing extends StatelessWidget {
   }
 }
 
-class _RowItem extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  const _RowItem({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Icon(icon, size: 16),
-          const SizedBox(width: 6),
-          Expanded(child: Text(text, overflow: TextOverflow.ellipsis)),
-        ],
-      ),
-    );
-  }
-}
-
 class _MutedText extends StatelessWidget {
   final String text;
   const _MutedText(this.text);
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -923,6 +789,151 @@ class _MutedText extends StatelessWidget {
       ),
     );
   }
+}
+
+// ---- toggle handlers keep auto-switch behavior via UiProvider ----
+void _handleToggleTask(BuildContext context, Task t) {
+  final ui = context.read<UiProvider>();
+  final newVal = !t.completed;
+  context.read<TaskProvider>().toggleTask(t, newVal);
+
+  if (newVal && ui.taskFilter == TaskViewFilter.pending) {
+    context.read<UiProvider>().setTaskFilter(TaskViewFilter.completed);
+  } else if (!newVal && ui.taskFilter == TaskViewFilter.completed) {
+    context.read<UiProvider>().setTaskFilter(TaskViewFilter.pending);
+  }
+}
+
+void _handleToggleItem(BuildContext context, Item it) {
+  final ui = context.read<UiProvider>();
+  final newVal = !it.bought;
+  context.read<ItemProvider>().toggleItem(it, newVal);
+
+  if (newVal && ui.itemFilter == ItemViewFilter.toBuy) {
+    context.read<UiProvider>().setItemFilter(ItemViewFilter.bought);
+  } else if (!newVal && ui.itemFilter == ItemViewFilter.bought) {
+    context.read<UiProvider>().setItemFilter(ItemViewFilter.toBuy);
+  }
+}
+
+// ====== assign or create helpers ======
+
+Task? _pickTaskByName(List<Task> list, String name) {
+  final lower = name.trim().toLowerCase();
+  final unassigned = list.where(
+    (t) =>
+        t.name.toLowerCase() == lower &&
+        (t.assignedTo == null || t.assignedTo!.isEmpty) &&
+        !t.completed,
+  );
+  if (unassigned.isNotEmpty) return unassigned.first;
+
+  final anyUnassigned = list.where(
+    (t) =>
+        t.name.toLowerCase() == lower &&
+        (t.assignedTo == null || t.assignedTo!.isEmpty),
+  );
+  if (anyUnassigned.isNotEmpty) return anyUnassigned.first;
+
+  try {
+    return list.firstWhere((t) => t.name.toLowerCase() == lower);
+  } catch (_) {
+    return null;
+  }
+}
+
+Item? _pickItemByName(List<Item> list, String name) {
+  final lower = name.trim().toLowerCase();
+  final unassigned = list.where(
+    (i) =>
+        i.name.toLowerCase() == lower &&
+        (i.assignedTo == null || i.assignedTo!.isEmpty) &&
+        !i.bought,
+  );
+  if (unassigned.isNotEmpty) return unassigned.first;
+
+  final anyUnassigned = list.where(
+    (i) =>
+        i.name.toLowerCase() == lower &&
+        (i.assignedTo == null || i.assignedTo!.isEmpty),
+  );
+  if (anyUnassigned.isNotEmpty) return anyUnassigned.first;
+
+  try {
+    return list.firstWhere((i) => i.name.toLowerCase() == lower);
+  } catch (_) {
+    return null;
+  }
+}
+
+void _assignOrCreateTask(BuildContext context, String name, String member) {
+  final prov = context.read<TaskProvider>();
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) return;
+
+  final existing = _pickTaskByName(prov.tasks, trimmed);
+  if (existing != null) {
+    context.read<TaskProvider>().updateAssignment(existing, member);
+  } else {
+    prov.addTask(Task(trimmed, assignedTo: member));
+  }
+  Navigator.pop(context);
+}
+
+void _assignOrCreateItem(BuildContext context, String name, String member) {
+  final prov = context.read<ItemProvider>();
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) return;
+
+  final existing = _pickItemByName(prov.items, trimmed);
+  if (existing != null) {
+    context.read<ItemProvider>().updateAssignment(existing, member);
+  } else {
+    prov.addItem(Item(trimmed, assignedTo: member));
+  }
+  Navigator.pop(context);
+}
+
+void _submitTask(
+  TaskProvider prov,
+  String text,
+  String member,
+  BuildContext ctx,
+) {
+  final t = text.trim();
+  if (t.isEmpty) return;
+  final exists = prov.tasks.any(
+    (task) => task.name.toLowerCase() == t.toLowerCase(),
+  );
+  if (exists) {
+    ScaffoldMessenger.of(
+      ctx,
+    ).showSnackBar(const SnackBar(content: Text('This task already exists')));
+    return;
+  }
+  prov.addTask(Task(t, assignedTo: member));
+  Navigator.pop(ctx);
+}
+
+void _submitItem(
+  ItemProvider prov,
+  String text,
+  String member,
+  BuildContext ctx,
+) {
+  final t = text.trim();
+  if (t.isEmpty) return;
+  final exists = prov.items.any(
+    (task) => task.name.toLowerCase() == t.toLowerCase(),
+  );
+  if (exists) {
+    ScaffoldMessenger.of(
+      ctx,
+    ).showSnackBar(const SnackBar(content: Text('This item already exists')));
+    return;
+  }
+  prov.addItem(Item(t, assignedTo: member));
+  Navigator.pop(ctx);
 }
 
 class EmptyFamilyCard extends StatelessWidget {
@@ -942,12 +953,12 @@ class EmptyFamilyCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              theme.colorScheme.surfaceVariant.withOpacity(0.55),
-              theme.colorScheme.surface.withOpacity(0.9),
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+              theme.colorScheme.surface.withValues(alpha: 0.9),
             ],
           ),
           border: Border.all(
-            color: theme.colorScheme.outlineVariant.withOpacity(0.4),
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
           ),
         ),
         child: Center(
@@ -975,28 +986,4 @@ class EmptyFamilyCard extends StatelessWidget {
       ),
     );
   }
-}
-
-void _submitTask(
-  TaskProvider prov,
-  String text,
-  String member,
-  BuildContext ctx,
-) {
-  final t = text.trim();
-  if (t.isEmpty) return;
-  prov.addTask(Task(t, assignedTo: member));
-  Navigator.pop(ctx);
-}
-
-void _submitItem(
-  ItemProvider prov,
-  String text,
-  String member,
-  BuildContext ctx,
-) {
-  final t = text.trim();
-  if (t.isEmpty) return;
-  prov.addItem(Item(t, assignedTo: member));
-  Navigator.pop(ctx);
 }

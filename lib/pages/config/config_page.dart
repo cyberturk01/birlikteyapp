@@ -1,13 +1,10 @@
+// lib/pages/config/config_page.dart
 import 'dart:io';
 
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/view_section.dart';
-import '../../providers/family_provider.dart';
-import '../../providers/item_provider.dart';
-import '../../providers/task_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../services/notification_service.dart';
 
@@ -17,11 +14,6 @@ class ConfigurationPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ui = context.watch<UiProvider>();
-    final family = context.watch<FamilyProvider>().familyMembers;
-    final taskProv = context.read<TaskProvider>();
-    final itemProv = context.read<ItemProvider>();
-
-    final t = Theme.of(context);
 
     String _fmt(TimeOfDay tod) {
       final h = tod.hour.toString().padLeft(2, '0');
@@ -37,7 +29,14 @@ class ConfigurationPage extends StatelessWidget {
         title: const Text('Configuration'),
         actions: [
           TextButton(
-            onPressed: () => context.read<UiProvider>().resetFilters(),
+            onPressed: () async {
+              await context.read<UiProvider>().resetSettings();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Settings reset to defaults')),
+                );
+              }
+            },
             child: const Text(
               'Reset',
               style: TextStyle(fontWeight: FontWeight.bold),
@@ -48,8 +47,8 @@ class ConfigurationPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          // === Appearance / Theme ===
-          Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
+          // === Reminders ===
+          Text('Reminders', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 6),
           ListTile(
             leading: const Icon(Icons.access_time),
@@ -80,7 +79,8 @@ class ConfigurationPage extends StatelessWidget {
             },
           ),
           const Divider(height: 24),
-          // ... Weekly default reminder time ListTile'ından sonra:
+
+          // Exact alarm ayarı (Android)
           ListTile(
             leading: const Icon(Icons.alarm_on),
             title: const Text('Enable exact alarms (Android)'),
@@ -107,6 +107,10 @@ class ConfigurationPage extends StatelessWidget {
           ),
 
           const Divider(height: 24),
+
+          // === Theme ===
+          Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 6),
           SegmentedButton<ThemeMode>(
             segments: const [
               ButtonSegment(
@@ -131,125 +135,11 @@ class ConfigurationPage extends StatelessWidget {
             showSelectedIcon: false,
           ),
 
-          const SizedBox(height: 20),
-          const Divider(),
-          const SizedBox(height: 12),
-
-          // Section: Tasks / Market
-          Text('Section', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 6),
-          SegmentedButton<HomeSection>(
-            segments: const [
-              ButtonSegment(
-                value: HomeSection.tasks,
-                label: Text('Tasks'),
-                icon: Icon(Icons.task_alt),
-              ),
-              ButtonSegment(
-                value: HomeSection.items,
-                label: Text('Market'),
-                icon: Icon(Icons.shopping_cart),
-              ),
-            ],
-            selected: {ui.section},
-            onSelectionChanged: (s) =>
-                context.read<UiProvider>().setSection(s.first),
-            showSelectedIcon: false,
-          ),
-          const SizedBox(height: 16),
-
-          // Member filter
-          Text(
-            'Filter by member',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 6),
-          DropdownButtonFormField<String>(
-            value: ui.filterMember,
-            isExpanded: true,
-            items: [
-              const DropdownMenuItem(value: null, child: Text('All members')),
-              ...family.map((m) => DropdownMenuItem(value: m, child: Text(m))),
-            ],
-            onChanged: (v) => context.read<UiProvider>().setMember(v),
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Status filter (Tasks OR Market'a göre)
-          if (ui.section == HomeSection.tasks) ...[
-            Text('Task status', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 6),
-            SegmentedButton<TaskViewFilter>(
-              segments: const [
-                ButtonSegment(
-                  value: TaskViewFilter.pending,
-                  label: Text('Pending'),
-                  icon: Icon(Icons.radio_button_unchecked),
-                ),
-                ButtonSegment(
-                  value: TaskViewFilter.completed,
-                  label: Text('Completed'),
-                  icon: Icon(Icons.check_circle),
-                ),
-              ],
-              selected: {ui.taskFilter},
-              onSelectionChanged: (s) =>
-                  context.read<UiProvider>().setTaskFilter(s.first),
-              showSelectedIcon: false,
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                icon: const Icon(Icons.delete_sweep),
-                label: const Text('Clear completed'),
-                onPressed: () =>
-                    taskProv.clearCompleted(forMember: ui.filterMember),
-              ),
-            ),
-          ] else ...[
-            Text(
-              'Market status',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 6),
-            SegmentedButton<ItemViewFilter>(
-              segments: const [
-                ButtonSegment(
-                  value: ItemViewFilter.toBuy,
-                  label: Text('To buy'),
-                  icon: Icon(Icons.shopping_bag),
-                ),
-                ButtonSegment(
-                  value: ItemViewFilter.bought,
-                  label: Text('Bought'),
-                  icon: Icon(Icons.check_circle),
-                ),
-              ],
-              selected: {ui.itemFilter},
-              onSelectionChanged: (s) =>
-                  context.read<UiProvider>().setItemFilter(s.first),
-              showSelectedIcon: false,
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                icon: const Icon(Icons.delete_sweep),
-                label: const Text('Clear bought'),
-                onPressed: () =>
-                    itemProv.clearBought(forMember: ui.filterMember),
-              ),
-            ),
-          ],
-
           const SizedBox(height: 24),
-          Divider(),
+          const Divider(),
           const SizedBox(height: 8),
+
+          // === Debug / Notifications ===
           Text(
             'Debug / Notifications',
             style: Theme.of(context).textTheme.titleMedium,

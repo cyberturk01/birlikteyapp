@@ -17,6 +17,12 @@ class ItemProvider extends ChangeNotifier {
   }
 
   void addItem(Item item) {
+    final exists = _itemBox.values.any(
+      (i) => i.name.toLowerCase() == item.name.toLowerCase(),
+    );
+    if (exists) {
+      return;
+    }
     _itemBox.add(item);
     final current = _itemCountBox.get(item.name, defaultValue: 0)!;
     _itemCountBox.put(item.name, current + 1);

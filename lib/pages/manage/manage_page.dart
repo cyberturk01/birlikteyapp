@@ -18,28 +18,12 @@ class ManagePage extends StatefulWidget {
 
 class _ManagePageState extends State<ManagePage> {
   _ManageTab _tab = _ManageTab.tasks;
-  final TextEditingController _textCtrl = TextEditingController();
+  final TextEditingController _input = TextEditingController();
 
   @override
   void dispose() {
-    _textCtrl.dispose();
+    _input.dispose();
     super.dispose();
-  }
-
-  void _submitTask() {
-    final t = _textCtrl.text.trim();
-    if (t.isEmpty) return;
-    context.read<TaskProvider>().addTask(Task(t)); // unassigned
-    _textCtrl.clear();
-    FocusScope.of(context).unfocus();
-  }
-
-  void _submitItem() {
-    final t = _textCtrl.text.trim();
-    if (t.isEmpty) return;
-    context.read<ItemProvider>().addItem(Item(t)); // unassigned
-    _textCtrl.clear();
-    FocusScope.of(context).unfocus();
   }
 
   @override
@@ -47,17 +31,66 @@ class _ManagePageState extends State<ManagePage> {
     final taskProv = context.watch<TaskProvider>();
     final itemProv = context.watch<ItemProvider>();
 
-    final tasks = taskProv.tasks; // tüm görevler
-    final items = itemProv.items; // tüm ürünler
+    // --- Hazır listeler ---
+    const defaultTasks = <String>[
+      "Take out the trash",
+      "Clean the kitchen",
+      "Do the laundry",
+      "Vacuum the living room",
+      "Wash the dishes",
+      "Water the plants",
+      "Cook dinner",
+      "Organize the fridge",
+      "Change bedsheets",
+      "Iron clothes",
+    ];
+
+    const defaultItems = <String>[
+      "Milk",
+      "Bread",
+      "Eggs",
+      "Butter",
+      "Cheese",
+      "Rice",
+      "Pasta",
+      "Tomatoes",
+      "Potatoes",
+      "Onions",
+      "Apples",
+      "Bananas",
+      "Chicken",
+      "Beef",
+      "Fish",
+      "Olive oil",
+      "Salt",
+      "Sugar",
+      "Coffee",
+      "Tea",
+    ];
+
+    // --- Öneriler (dedupe + alfabetik) ---
+    final taskSuggestions = _buildSuggestions(
+      frequent: taskProv.suggestedTasks,
+      defaults: defaultTasks,
+      existing: taskProv.tasks.map((t) => t.name).toList(),
+    );
+    final itemSuggestions = _buildSuggestions(
+      frequent: itemProv.frequentItems,
+      defaults: defaultItems,
+      existing: itemProv.items.map((i) => i.name).toList(),
+    );
+    final suggestions = _tab == _ManageTab.tasks
+        ? taskSuggestions
+        : itemSuggestions;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Add Center')),
-      body: Padding(
+      body: ListView(
         padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            // Toggle: Tasks / Market
-            SegmentedButton<_ManageTab>(
+        children: [
+          // Sekme
+          Center(
+            child: SegmentedButton<_ManageTab>(
               segments: const [
                 ButtonSegment(
                   value: _ManageTab.tasks,
@@ -71,371 +104,287 @@ class _ManagePageState extends State<ManagePage> {
                 ),
               ],
               selected: {_tab},
-              onSelectionChanged: (s) {
-                setState(() {
-                  _tab = s.first;
-                  _textCtrl.clear();
-                });
-              },
+              onSelectionChanged: (s) => setState(() => _tab = s.first),
               showSelectedIcon: false,
             ),
-            const SizedBox(height: 12),
+          ),
 
-            // Girdi satırı (sadece metin)
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _textCtrl,
-                    decoration: InputDecoration(
-                      hintText: _tab == _ManageTab.tasks
-                          ? 'Add a new task…'
-                          : 'Add a new item…',
-                      border: const OutlineInputBorder(),
-                      isDense: true,
+          const SizedBox(height: 12),
+          const Divider(),
+
+          // Giriş satırı (Assign kaldırıldı)
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _input,
+                  decoration: InputDecoration(
+                    hintText: _tab == _ManageTab.tasks
+                        ? 'Enter task…'
+                        : 'Enter item…',
+                    prefixIcon: Icon(
+                      _tab == _ManageTab.tasks
+                          ? Icons.task_alt
+                          : Icons.shopping_bag,
                     ),
-                    onSubmitted: (_) => _tab == _ManageTab.tasks
-                        ? _submitTask()
-                        : _submitItem(),
+                    border: const OutlineInputBorder(),
+                    isDense: true,
                   ),
+                  onSubmitted: (_) => _handleAdd(context),
                 ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed: _tab == _ManageTab.tasks
-                      ? _submitTask
-                      : _submitItem,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add'),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-
-            // Tam liste
-            Expanded(
-              child: _tab == _ManageTab.tasks
-                  ? _TasksFullList(tasks: tasks)
-                  : _ItemsFullList(items: items),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ======= Tam görev listesi (radio-toggle + delete) =======
-class _TasksFullList extends StatelessWidget {
-  final List<Task> tasks;
-  const _TasksFullList({Key? key, required this.tasks}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    if (tasks.isEmpty) {
-      return const Center(child: Text('No tasks yet'));
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 12),
-      itemCount: tasks.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (_, i) {
-        final t = tasks[i];
-        final done = t.completed;
-        return Dismissible(
-          key: ValueKey(t.key),
-          background: Container(
-            color: Colors.green.withOpacity(0.85),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            alignment: Alignment.centerLeft,
-            child: const Icon(Icons.check, color: Colors.white),
-          ),
-          secondaryBackground: Container(
-            color: Colors.red.withOpacity(0.85),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            alignment: Alignment.centerRight,
-            child: const Icon(Icons.delete, color: Colors.white),
-          ),
-          confirmDismiss: (dir) async {
-            if (dir == DismissDirection.startToEnd) {
-              context.read<TaskProvider>().toggleTask(t, !done);
-              return false;
-            } else {
-              final removed = t;
-              context.read<TaskProvider>().removeTask(t);
-              ScaffoldMessenger.of(context).clearSnackBars();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Task deleted'),
-                  action: SnackBarAction(
-                    label: 'Undo',
-                    onPressed: () =>
-                        context.read<TaskProvider>().addTask(removed),
-                  ),
-                ),
-              );
-              return true;
-            }
-          },
-          child: ListTile(
-            dense: true,
-            visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
-
-            leading: IconButton(
-              tooltip: done ? 'Mark as pending' : 'Mark as completed',
-              icon: Icon(
-                done
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_unchecked,
               ),
-              onPressed: () =>
-                  context.read<TaskProvider>().toggleTask(t, !done),
-            ),
-            title: Text(
-              t.name + (t.assignedTo != null ? ' (${t.assignedTo})' : ''),
-              overflow: TextOverflow.ellipsis,
-              style: done
-                  ? const TextStyle(decoration: TextDecoration.lineThrough)
-                  : null,
-            ),
-            onTap: () => context.read<TaskProvider>().toggleTask(t, !done),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: () => _handleAdd(context),
+                icon: const Icon(Icons.add),
+                label: const Text('Add'),
+              ),
+            ],
+          ),
 
-            // ➕ trailing aksiyonlar: Assign • Edit • Delete
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min, // içerik kadar genişlik
-              children: [
-                IconButton(
-                  padding: EdgeInsets.zero, // ikonun tıklama alanını küçült
-                  constraints:
-                      const BoxConstraints(), // default min size’ı kaldır
-                  tooltip: 'Assign',
-                  icon: const Icon(Icons.person_add_alt, size: 20),
-                  onPressed: () => _showAssignTaskSheet(context, t),
-                ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Edit',
-                  icon: const Icon(Icons.edit, size: 20),
-                  onPressed: () => _showRenameTaskDialog(context, t),
-                ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Delete',
-                  icon: const Icon(
-                    Icons.delete,
-                    size: 20,
-                    color: Colors.redAccent,
-                  ),
-                  onPressed: () => context.read<TaskProvider>().removeTask(t),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
+          const SizedBox(height: 16),
 
-  void _showRenameTaskDialog(BuildContext context, Task task) {
-    final ctrl = TextEditingController(text: task.name);
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Edit task'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            hintText: 'Task name',
-            isDense: true,
-          ),
-          onSubmitted: (_) {
-            context.read<TaskProvider>().renameTask(task, ctrl.text);
-            Navigator.pop(context);
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              context.read<TaskProvider>().renameTask(task, ctrl.text);
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
+          // Mevcut kayıtlar — ayrı bölüm
+          if (_tab == _ManageTab.tasks) ...[
+            Text('All tasks', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            _TaskListView(),
+          ] else ...[
+            Text('All items', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            _ItemListView(),
+          ],
         ],
       ),
     );
   }
 
-  void _showAssignTaskSheet(BuildContext context, Task task) {
-    final family = context.read<FamilyProvider>().familyMembers;
-    String? selected = task.assignedTo;
+  List<String> _buildSuggestions({
+    required List<String> frequent,
+    required List<String> defaults,
+    required List<String> existing,
+  }) {
+    final set = <String>{};
+    for (final s in frequent) {
+      final t = s.trim();
+      if (t.isNotEmpty) set.add(t);
+    }
+    for (final s in defaults) {
+      final t = s.trim();
+      if (t.isNotEmpty) set.add(t);
+    }
+    for (final s in existing) {
+      final t = s.trim();
+      if (t.isNotEmpty) set.add(t);
+    }
+    final list = set.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return list;
+  }
 
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Assign task',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: selected,
-              isExpanded: true,
-              items: [
-                const DropdownMenuItem(value: null, child: Text('No one')),
-                ...family.map(
-                  (m) => DropdownMenuItem(value: m, child: Text(m)),
-                ),
-              ],
-              onChanged: (v) => selected = v,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                isDense: true,
+  void _handleQuickAdd(BuildContext context, String name) {
+    final taskProv = context.read<TaskProvider>();
+    final itemProv = context.read<ItemProvider>();
+
+    if (_tab == _ManageTab.tasks) {
+      final exists = taskProv.tasks.any(
+        (t) => t.name.toLowerCase() == name.toLowerCase(),
+      );
+      if (exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This task already exists')),
+        );
+        return;
+      }
+      taskProv.addTask(Task(name)); // assign yok
+    } else {
+      final exists = itemProv.items.any(
+        (i) => i.name.toLowerCase() == name.toLowerCase(),
+      );
+      if (exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This item already exists')),
+        );
+        return;
+      }
+      itemProv.addItem(Item(name)); // assign yok
+    }
+
+    _input.clear();
+    FocusScope.of(context).unfocus();
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Added: $name')));
+  }
+
+  void _handleAdd(BuildContext context) {
+    final taskProv = context.read<TaskProvider>();
+    final itemProv = context.read<ItemProvider>();
+    final text = _input.text.trim();
+    if (text.isEmpty) return;
+
+    if (_tab == _ManageTab.tasks) {
+      final dup = taskProv.tasks.any(
+        (t) => t.name.toLowerCase() == text.toLowerCase(),
+      );
+      if (dup) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This task already exists')),
+        );
+        return;
+      }
+      taskProv.addTask(Task(text));
+    } else {
+      final dup = itemProv.items.any(
+        (i) => i.name.toLowerCase() == text.toLowerCase(),
+      );
+      if (dup) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This item already exists')),
+        );
+        return;
+      }
+      itemProv.addItem(Item(text));
+    }
+
+    _input.clear();
+    FocusScope.of(context).unfocus();
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Added')));
+  }
+}
+
+// ================== Alt bileşenler: mevcut listeler ==================
+
+class _TaskListView extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final taskProv = context.watch<TaskProvider>();
+    final tasks = taskProv.tasks;
+
+    if (tasks.isEmpty) {
+      return const Text('No tasks yet');
+    }
+
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: tasks.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (_, i) {
+        final t = tasks[i];
+        return ListTile(
+          dense: true,
+          visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
+          leading: Checkbox(
+            value: t.completed,
+            onChanged: (v) =>
+                context.read<TaskProvider>().toggleTask(t, v ?? false),
+          ),
+          title: Text(
+            t.name,
+            overflow: TextOverflow.ellipsis,
+            style: t.completed
+                ? const TextStyle(decoration: TextDecoration.lineThrough)
+                : null,
+          ),
+          subtitle: (t.assignedTo != null && t.assignedTo!.isNotEmpty)
+              ? Text('👤 ${t.assignedTo}')
+              : null,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: 'Assign',
+                icon: const Icon(Icons.person_add_alt),
+                onPressed: () => _showAssignTaskSheet(context, t),
               ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                  context.read<TaskProvider>().updateAssignment(
-                    task,
-                    (selected != null && selected!.trim().isNotEmpty)
-                        ? selected
-                        : null,
-                  );
-                  Navigator.pop(context);
-                },
-                child: const Text('Save'),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: 'Edit',
+                icon: const Icon(Icons.edit),
+                onPressed: () => _showRenameTaskDialog(context, t),
               ),
-            ),
-          ],
-        ),
-      ),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: 'Delete',
+                icon: const Icon(Icons.delete, color: Colors.redAccent),
+                onPressed: () => context.read<TaskProvider>().removeTask(t),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
 
-// ======= Tam ürün listesi (radio-toggle + delete) =======
-class _ItemsFullList extends StatelessWidget {
-  final List<Item> items;
-  const _ItemsFullList({Key? key, required this.items}) : super(key: key);
-
+class _ItemListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final itemProv = context.watch<ItemProvider>();
+    final items = itemProv.items;
+
     if (items.isEmpty) {
-      return const Center(child: Text('No items yet'));
+      return const Text('No items yet');
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 12),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: items.length,
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (_, i) {
         final it = items[i];
-        final bought = it.bought;
-        return Dismissible(
-          key: ValueKey(it.key),
-          background: Container(
-            color: Colors.green.withOpacity(0.85),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            alignment: Alignment.centerLeft,
-            child: const Icon(Icons.check, color: Colors.white),
+        return ListTile(
+          dense: true,
+          visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
+          leading: Checkbox(
+            value: it.bought,
+            onChanged: (v) =>
+                context.read<ItemProvider>().toggleItem(it, v ?? false),
           ),
-          secondaryBackground: Container(
-            color: Colors.red.withOpacity(0.85),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            alignment: Alignment.centerRight,
-            child: const Icon(Icons.delete, color: Colors.white),
+          title: Text(
+            it.name,
+            overflow: TextOverflow.ellipsis,
+            style: it.bought
+                ? const TextStyle(decoration: TextDecoration.lineThrough)
+                : null,
           ),
-          confirmDismiss: (dir) async {
-            if (dir == DismissDirection.startToEnd) {
-              context.read<ItemProvider>().toggleItem(it, !bought);
-              return false;
-            } else {
-              final removed = it;
-              context.read<ItemProvider>().removeItem(it);
-              ScaffoldMessenger.of(context).clearSnackBars();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Item deleted'),
-                  action: SnackBarAction(
-                    label: 'Undo',
-                    onPressed: () =>
-                        context.read<ItemProvider>().addItem(removed),
-                  ),
-                ),
-              );
-              return true;
-            }
-          },
-          child: ListTile(
-            dense: true,
-            visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
-
-            leading: IconButton(
-              tooltip: bought ? 'Mark as to buy' : 'Mark as bought',
-              icon: Icon(
-                bought
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_unchecked,
+          subtitle: (it.assignedTo != null && it.assignedTo!.isNotEmpty)
+              ? Text('👤 ${it.assignedTo}')
+              : null,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: 'Assign',
+                icon: const Icon(Icons.person_add_alt),
+                onPressed: () => _showAssignItemSheet(context, it),
               ),
-              onPressed: () =>
-                  context.read<ItemProvider>().toggleItem(it, !bought),
-            ),
-            title: Text(
-              it.name + (it.assignedTo != null ? ' (${it.assignedTo})' : ''),
-              overflow: TextOverflow.ellipsis,
-              style: bought
-                  ? const TextStyle(decoration: TextDecoration.lineThrough)
-                  : null,
-            ),
-            onTap: () => context.read<ItemProvider>().toggleItem(it, !bought),
-
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min, // içerik kadar genişlik
-              children: [
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Assign',
-                  icon: const Icon(Icons.person_add_alt, size: 20),
-                  onPressed: () => _showAssignItemSheet(context, it),
-                ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Edit',
-                  icon: const Icon(Icons.edit, size: 20),
-                  onPressed: () => _showRenameItemDialog(context, it),
-                ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Delete',
-                  icon: const Icon(
-                    Icons.delete,
-                    color: Colors.redAccent,
-                    size: 20,
-                  ),
-                  onPressed: () => context.read<ItemProvider>().removeItem(it),
-                ),
-              ],
-            ),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: 'Edit',
+                icon: const Icon(Icons.edit),
+                onPressed: () => _showRenameItemDialog(context, it),
+              ),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: 'Delete',
+                icon: const Icon(Icons.delete, color: Colors.redAccent),
+                onPressed: () => context.read<ItemProvider>().removeItem(it),
+              ),
+            ],
           ),
         );
       },
@@ -530,4 +479,91 @@ class _ItemsFullList extends StatelessWidget {
       ),
     );
   }
+}
+
+void _showRenameTaskDialog(BuildContext context, Task task) {
+  final ctrl = TextEditingController(text: task.name);
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Edit task'),
+      content: TextField(
+        controller: ctrl,
+        autofocus: true,
+        decoration: const InputDecoration(
+          border: OutlineInputBorder(),
+          hintText: 'Task name',
+          isDense: true,
+        ),
+        onSubmitted: (_) {
+          context.read<TaskProvider>().renameTask(task, ctrl.text);
+          Navigator.pop(context);
+        },
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            context.read<TaskProvider>().renameTask(task, ctrl.text);
+            Navigator.pop(context);
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  );
+}
+
+void _showAssignTaskSheet(BuildContext context, Task task) {
+  final family = context.read<FamilyProvider>().familyMembers;
+  String? selected = task.assignedTo;
+
+  showModalBottomSheet(
+    context: context,
+    builder: (_) => Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Assign task',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: selected,
+            isExpanded: true,
+            items: [
+              const DropdownMenuItem(value: null, child: Text('No one')),
+              ...family.map((m) => DropdownMenuItem(value: m, child: Text(m))),
+            ],
+            onChanged: (v) => selected = v,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () {
+                context.read<TaskProvider>().updateAssignment(
+                  task,
+                  (selected != null && selected!.trim().isNotEmpty)
+                      ? selected
+                      : null,
+                );
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
