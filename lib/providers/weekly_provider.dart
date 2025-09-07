@@ -1,52 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/weekly_task.dart';
 import '../services/notification_service.dart';
 
 class WeeklyProvider extends ChangeNotifier {
   final Box<WeeklyTask> _weeklyBox = Hive.box<WeeklyTask>('weeklyBox');
-  final Box<int> _notifBox = Hive.box<int>(
-    'weeklyNotifBox',
-  ); // weeklyTask.key -> notifId
+  final Box<int> _notifBox = Hive.box<int>('weeklyNotifBox');
 
-  static const TimeOfDay _defaultTime = TimeOfDay(hour: 19, minute: 0);
-
-  List<WeeklyTask> get allPlans => _weeklyBox.values.toList();
   List<WeeklyTask> get tasks => _weeklyBox.values.toList();
-
-  List<WeeklyTask> tasksForDay(String day) {
-    return _weeklyBox.values.where((t) => t.day == day).toList();
-  }
+  List<WeeklyTask> tasksForDay(String day) =>
+      _weeklyBox.values.where((t) => t.day == day).toList();
 
   Future<void> addWeeklyTask(WeeklyTask task) async {
     final key = await _weeklyBox.add(task);
-
-    final weekday = _dayStringToWeekdayInt(task.day);
-    final notifId = await NotificationService.scheduleWeekly(
-      title: 'Weekly task',
-      body:
-          '${task.task}${task.assignedTo != null ? " – ${task.assignedTo}" : ""}', // <-- title
-      weekday: weekday,
-      timeOfDay: _defaultTime,
-    );
-
-    await _notifBox.put(key, notifId);
+    await _scheduleFor(task, boxKey: key);
     notifyListeners();
   }
 
   Future<void> removeWeeklyTask(int index) async {
     final task = _weeklyBox.getAt(index);
     if (task == null) return;
-
     await _cancelFor(task);
     await _weeklyBox.deleteAt(index);
     notifyListeners();
   }
 
-  Future<void> addTask(WeeklyTask task) async {
-    await addWeeklyTask(task);
-  }
+  Future<void> addTask(WeeklyTask task) async => addWeeklyTask(task);
 
   Future<void> removeTask(WeeklyTask task) async {
     await _cancelFor(task);
@@ -54,17 +35,18 @@ class WeeklyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// title/day/assignedTo ve/veya saat güncellenebilir
   Future<void> updateWeeklyTask(
     WeeklyTask task, {
-    String? title, // <-- name yerine title
+    String? title, // sende `task.task` ise burayı title→task yap
     String? day,
     String? assignedTo,
-    TimeOfDay? timeOfDay,
+    TimeOfDay? timeOfDay, // görev özel saat
   }) async {
     bool needsReschedule = false;
 
     if (title != null && title.trim().isNotEmpty) {
-      task.task = title.trim(); // <-- title
+      task.title = title.trim(); // sende `task.task = ...` olabilir
       needsReschedule = true;
     }
     if (day != null && day.trim().isNotEmpty && day != task.day) {
@@ -75,37 +57,61 @@ class WeeklyProvider extends ChangeNotifier {
       task.assignedTo = assignedTo.trim().isEmpty ? null : assignedTo.trim();
       needsReschedule = true;
     }
+    if (timeOfDay != null) {
+      task.hour = timeOfDay.hour;
+      task.minute = timeOfDay.minute;
+      needsReschedule = true;
+    }
 
     await task.save();
 
     if (needsReschedule) {
       await _cancelFor(task);
-      final weekday = _dayStringToWeekdayInt(task.day);
-      final notifId = await NotificationService.scheduleWeekly(
-        title: 'Weekly task',
-        body:
-            '${task.task}${task.assignedTo != null ? " – ${task.assignedTo}" : ""}', // <-- title
-        weekday: weekday,
-        timeOfDay: timeOfDay ?? _defaultTime,
-      );
-      await _notifBox.put(task.key, notifId);
+      await _scheduleFor(task); // kendi saatini ya da defaultu kullanır
     }
-
     notifyListeners();
   }
 
-  Future<void> _cancelFor(WeeklyTask t) async {
-    final id = _notifBox.get(t.key);
+  // ========= helpers =========
+
+  Future<void> _scheduleFor(WeeklyTask task, {int? boxKey}) async {
+    final weekday = _dayStringToWeekdayInt(task.day);
+    final time = await _resolveTime(task); // görev saati yoksa default
+
+    final id = await NotificationService.scheduleWeekly(
+      title: 'Weekly task',
+      body:
+          '${task.title}${task.assignedTo != null ? " – ${task.assignedTo}" : ""}',
+      weekday: weekday,
+      timeOfDay: time,
+    );
+    await _notifBox.put(boxKey ?? task.key, id);
+  }
+
+  Future<void> _cancelFor(WeeklyTask task) async {
+    final id = _notifBox.get(task.key);
     if (id != null) {
       await NotificationService.cancel(id);
-      await _notifBox.delete(t.key);
+      await _notifBox.delete(task.key);
     }
+  }
+
+  Future<TimeOfDay> _resolveTime(WeeklyTask task) async {
+    // 1) Görev özel saat
+    if (task.hour != null && task.minute != null) {
+      return TimeOfDay(hour: task.hour!, minute: task.minute!);
+    }
+    // 2) Configuration’dan varsayılan saat
+    final prefs = await SharedPreferences.getInstance();
+    final h = prefs.getInt('weeklyReminderHour');
+    final m = prefs.getInt('weeklyReminderMinute');
+    if (h != null && m != null) return TimeOfDay(hour: h, minute: m);
+    // 3) Fallback: 19:00
+    return const TimeOfDay(hour: 19, minute: 0);
   }
 
   int _dayStringToWeekdayInt(String day) {
     final d = day.trim().toLowerCase();
-
-    // TR
     if (d.startsWith('pazartesi')) return DateTime.monday;
     if (d.startsWith('salı') || d.startsWith('sali')) return DateTime.tuesday;
     if (d.startsWith('çar') || d.startsWith('car')) return DateTime.wednesday;
@@ -114,8 +120,6 @@ class WeeklyProvider extends ChangeNotifier {
     if (d.startsWith('cmt') || d.startsWith('cumartesi'))
       return DateTime.saturday;
     if (d.startsWith('paz')) return DateTime.sunday;
-
-    // EN
     if (d.startsWith('mon')) return DateTime.monday;
     if (d.startsWith('tue')) return DateTime.tuesday;
     if (d.startsWith('wed')) return DateTime.wednesday;
@@ -123,7 +127,6 @@ class WeeklyProvider extends ChangeNotifier {
     if (d.startsWith('fri')) return DateTime.friday;
     if (d.startsWith('sat')) return DateTime.saturday;
     if (d.startsWith('sun')) return DateTime.sunday;
-
     return DateTime.monday;
   }
 }

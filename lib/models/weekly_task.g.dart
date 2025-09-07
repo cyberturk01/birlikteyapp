@@ -17,22 +17,28 @@ class WeeklyTaskAdapter extends TypeAdapter<WeeklyTask> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return WeeklyTask(
-      fields[0] as String,
       fields[1] as String,
+      fields[0] as String,
       assignedTo: fields[2] as String?,
+      hour: fields[3] as int?,
+      minute: fields[4] as int?,
     );
   }
 
   @override
   void write(BinaryWriter writer, WeeklyTask obj) {
     writer
-      ..writeByte(3)
+      ..writeByte(5)
       ..writeByte(0)
       ..write(obj.day)
       ..writeByte(1)
-      ..write(obj.task)
+      ..write(obj.title)
       ..writeByte(2)
-      ..write(obj.assignedTo);
+      ..write(obj.assignedTo)
+      ..writeByte(3)
+      ..write(obj.hour)
+      ..writeByte(4)
+      ..write(obj.minute);
   }
 
   @override

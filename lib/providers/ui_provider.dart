@@ -25,15 +25,30 @@ class UiProvider extends ChangeNotifier {
   TaskViewFilter get taskFilter => _taskFilter;
   ItemViewFilter get itemFilter => _itemFilter;
   ThemeMode get themeMode => _themeMode;
+  TimeOfDay? _weeklyDefaultReminder; // null ise 19:00 fallback
+  TimeOfDay? get weeklyDefaultReminder => _weeklyDefaultReminder;
+
+  Future<void> setWeeklyDefaultReminder(TimeOfDay time) async {
+    _weeklyDefaultReminder = time;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('weeklyReminderHour', time.hour);
+    await prefs.setInt('weeklyReminderMinute', time.minute);
+  }
 
   // init (prefs yükle)
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
+    final h = prefs.getInt('weeklyReminderHour');
+    final m = prefs.getInt('weeklyReminderMinute');
     final saved = prefs.getString('themeMode'); // 'system' | 'light' | 'dark'
     if (saved != null) {
       _themeMode = _parseThemeMode(saved);
     }
     _activeMember = prefs.getString('activeMember');
+
+    if (h != null && m != null)
+      _weeklyDefaultReminder = TimeOfDay(hour: h, minute: m);
     notifyListeners();
   }
 

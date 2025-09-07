@@ -8,10 +8,16 @@ class WeeklyTask extends HiveObject {
   String day; // e.g. Monday, Tuesday
 
   @HiveField(1)
-  String task;
+  String title;
 
   @HiveField(2)
   String? assignedTo;
 
-  WeeklyTask(this.day, this.task, {this.assignedTo});
+  @HiveField(3)
+  int? hour; // 0-23
+
+  @HiveField(4)
+  int? minute; // 0-59
+
+  WeeklyTask(this.title, this.day, {this.assignedTo, this.hour, this.minute});
 }
