@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../constants/app_lists.dart';
+import '../../constants/app_strings.dart';
 import '../../models/item.dart';
 import '../../models/task.dart';
 import '../../models/view_section.dart';
-import '../../providers/family_provider.dart';
 import '../../providers/item_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/ui_provider.dart';
@@ -379,20 +380,8 @@ class _MemberCardState extends State<MemberCard> {
 
   void _openQuickAddTaskSheet(BuildContext context, String member) {
     final taskProv = context.read<TaskProvider>();
-    final familyProv = context.read<FamilyProvider>();
 
-    const defaultTasks = [
-      "Take out the trash",
-      "Clean the kitchen",
-      "Do the laundry",
-      "Vacuum the living room",
-      "Wash the dishes",
-      "Water the plants",
-      "Cook dinner",
-      "Organize the fridge",
-      "Change bedsheets",
-      "Iron clothes",
-    ];
+    const defaultTasks = AppLists.defaultTasks;
 
     final frequent = taskProv.suggestedTasks;
     final existing = taskProv.tasks.map((t) => t.name).toList();
@@ -510,30 +499,8 @@ class _MemberCardState extends State<MemberCard> {
 
   void _openQuickAddItemSheet(BuildContext context, String member) {
     final itemProv = context.read<ItemProvider>();
-    final familyProv = context.read<FamilyProvider>();
 
-    const defaultItems = [
-      "Milk",
-      "Bread",
-      "Eggs",
-      "Butter",
-      "Cheese",
-      "Rice",
-      "Pasta",
-      "Tomatoes",
-      "Potatoes",
-      "Onions",
-      "Apples",
-      "Bananas",
-      "Chicken",
-      "Beef",
-      "Fish",
-      "Olive oil",
-      "Salt",
-      "Sugar",
-      "Coffee",
-      "Tea",
-    ];
+    const defaultItems = AppLists.defaultTasks;
 
     final frequent = itemProv.frequentItems;
     final existing = itemProv.items.map((i) => i.name).toList();
@@ -763,7 +730,7 @@ class _TasksSubsection extends StatelessWidget {
                 ),
                 onTap: () => _handleToggleTask(context, task),
                 trailing: IconButton(
-                  tooltip: 'Delete',
+                  tooltip: S.delete,
                   icon: const Icon(Icons.delete, color: Colors.redAccent),
                   onPressed: () =>
                       context.read<TaskProvider>().removeTask(task),
@@ -886,7 +853,7 @@ class _ItemsSubsection extends StatelessWidget {
                       : null,
                 ),
                 trailing: IconButton(
-                  tooltip: 'Delete',
+                  tooltip: S.delete,
                   icon: const Icon(Icons.delete, color: Colors.redAccent),
                   onPressed: () => context.read<ItemProvider>().removeItem(it),
                 ),

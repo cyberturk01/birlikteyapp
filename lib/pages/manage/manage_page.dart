@@ -1,6 +1,8 @@
+import 'package:birlikteyapp/constants/app_lists.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../constants/app_strings.dart';
 import '../../models/item.dart';
 import '../../models/task.dart';
 import '../../providers/family_provider.dart';
@@ -33,41 +35,9 @@ class _ManagePageState extends State<ManagePage> {
     final itemProv = context.watch<ItemProvider>();
 
     // --- Hazır listeler ---
-    const defaultTasks = <String>[
-      "Take out the trash",
-      "Clean the kitchen",
-      "Do the laundry",
-      "Vacuum the living room",
-      "Wash the dishes",
-      "Water the plants",
-      "Cook dinner",
-      "Organize the fridge",
-      "Change bedsheets",
-      "Iron clothes",
-    ];
+    const defaultTasks = AppLists.defaultTasks;
 
-    const defaultItems = <String>[
-      "Milk",
-      "Bread",
-      "Eggs",
-      "Butter",
-      "Cheese",
-      "Rice",
-      "Pasta",
-      "Tomatoes",
-      "Potatoes",
-      "Onions",
-      "Apples",
-      "Bananas",
-      "Chicken",
-      "Beef",
-      "Fish",
-      "Olive oil",
-      "Salt",
-      "Sugar",
-      "Coffee",
-      "Tea",
-    ];
+    const defaultItems = AppLists.defaultItems;
 
     // --- Öneriler (dedupe + alfabetik) ---
     final taskSuggestions = _buildSuggestions(
@@ -139,7 +109,7 @@ class _ManagePageState extends State<ManagePage> {
               FilledButton.icon(
                 onPressed: () => _handleAdd(context),
                 icon: const Icon(Icons.add),
-                label: const Text('Add'),
+                label: const Text(S.add),
               ),
             ],
           ),
@@ -349,7 +319,7 @@ class _TaskListView extends StatelessWidget {
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  tooltip: 'Delete',
+                  tooltip: S.delete,
                   icon: const Icon(Icons.delete, color: Colors.redAccent),
                   onPressed: () => context.read<TaskProvider>().removeTask(t),
                 ),
@@ -452,7 +422,7 @@ class _ItemListView extends StatelessWidget {
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  tooltip: 'Delete',
+                  tooltip: S.delete,
                   icon: const Icon(Icons.delete, color: Colors.redAccent),
                   onPressed: () => context.read<ItemProvider>().removeItem(it),
                 ),
@@ -486,7 +456,7 @@ class _ItemListView extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text(S.cancel),
           ),
           FilledButton(
             onPressed: () {
@@ -576,7 +546,7 @@ void _showRenameTaskDialog(BuildContext context, Task task) {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: const Text(S.cancel),
         ),
         FilledButton(
           onPressed: () {

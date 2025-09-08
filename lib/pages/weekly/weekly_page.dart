@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../constants/app_strings.dart';
 import '../../models/weekly_task.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/ui_provider.dart'; // default reminder için
@@ -91,7 +92,7 @@ class WeeklyPage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text(S.cancel),
           ),
           ElevatedButton(
             onPressed: () {
@@ -101,7 +102,7 @@ class WeeklyPage extends StatelessWidget {
               }
               Navigator.pop(context);
             },
-            child: const Text('Add'),
+            child: const Text(S.add),
           ),
         ],
       ),

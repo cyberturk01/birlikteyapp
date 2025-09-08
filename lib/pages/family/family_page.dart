@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../constants/app_strings.dart';
 import '../../providers/family_provider.dart';
 
 class FamilyPage extends StatefulWidget {
@@ -130,7 +131,7 @@ class _AddMemberRow extends StatelessWidget {
         const SizedBox(width: 8),
         FilledButton.icon(
           icon: const Icon(Icons.person_add_alt_1),
-          label: const Text('Add'),
+          label: const Text(S.add),
           onPressed: onAdd,
         ),
       ],

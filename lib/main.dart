@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 
+import 'constants/app_lists.dart';
 import 'models/item.dart';
 import 'models/task.dart';
 import 'models/weekly_task.dart';
@@ -16,41 +17,9 @@ import 'providers/weekly_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.init();
-  final defaultTasks = [
-    "Take out the trash",
-    "Clean the kitchen",
-    "Do the laundry",
-    "Vacuum the living room",
-    "Water the plants",
-    "Cook dinner",
-    "Wash the dishes",
-    "Change the bedsheets",
-    "Iron clothes",
-    "Organize the fridge",
-  ];
+  final defaultTasks = AppLists.defaultTasks;
 
-  final defaultItems = [
-    "Milk",
-    "Bread",
-    "Eggs",
-    "Butter",
-    "Cheese",
-    "Rice",
-    "Pasta",
-    "Tomatoes",
-    "Potatoes",
-    "Onions",
-    "Apples",
-    "Bananas",
-    "Chicken",
-    "Beef",
-    "Fish",
-    "Olive oil",
-    "Salt",
-    "Sugar",
-    "Coffee",
-    "Tea",
-  ];
+  final defaultItems = AppLists.defaultItems;
 
   await Hive.initFlutter();
 

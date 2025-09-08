@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../constants/app_strings.dart';
+
 const String kNoOne = '__NONE__';
 
 class QuickAddRow extends StatefulWidget {
@@ -64,7 +66,7 @@ class _QuickAddRowState extends State<QuickAddRow> {
           onChanged: (v) => setState(() => _selected = v ?? kNoOne),
         ),
         const SizedBox(width: 8),
-        ElevatedButton(onPressed: _submit, child: const Text('Add')),
+        ElevatedButton(onPressed: _submit, child: const Text(S.add)),
       ],
     );
   }

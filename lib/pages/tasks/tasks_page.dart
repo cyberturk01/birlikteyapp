@@ -1,3 +1,4 @@
+import 'package:birlikteyapp/constants/app_lists.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -19,19 +20,7 @@ class _TasksPageState extends State<TasksPage> {
     final taskProvider = Provider.of<TaskProvider>(context, listen: false);
     final familyProvider = Provider.of<FamilyProvider>(context, listen: false);
 
-    // Hazır (default) görev önerileri – istersen ortak bir constants dosyasına taşıyabilirsin
-    const defaultTasks = [
-      "Take out the trash",
-      "Clean the kitchen",
-      "Do the laundry",
-      "Vacuum the living room",
-      "Water the plants",
-      "Cook dinner",
-      "Wash the dishes",
-      "Change the bedsheets",
-      "Iron clothes",
-      "Organize the fridge",
-    ];
+    const defaultTasks = AppLists.defaultTasks;
 
     TextEditingController controller = TextEditingController();
     String? selectedMember;

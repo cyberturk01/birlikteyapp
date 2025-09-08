@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../constants/app_strings.dart';
 import '../../models/item.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_provider.dart';
@@ -205,7 +206,7 @@ class _MarketPageState extends State<MarketPage> {
                   value: 'assign',
                   child: Text('Assign / Change person'),
                 ),
-                PopupMenuItem(value: 'delete', child: Text('Delete')),
+                PopupMenuItem(value: 'delete', child: Text(S.delete)),
               ],
             ),
           );
