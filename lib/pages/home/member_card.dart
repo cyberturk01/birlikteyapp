@@ -219,60 +219,158 @@ class _MemberCardState extends State<MemberCard> {
                     key: ValueKey(
                       '${widget.section}-${widget.section == HomeSection.tasks ? (_expandTasks ? "all" : "less") : (_expandItems ? "all" : "less")}',
                     ),
-                    padding: const EdgeInsets.only(right: 2),
-                    child: (widget.section == HomeSection.tasks)
-                        ? _TasksSubsection(
-                            tasksFiltered: tasksFiltered,
-                            expanded: _expandTasks,
-                            previewCount: previewTasks,
-                            onToggleExpand: () =>
-                                setState(() => _expandTasks = !_expandTasks),
-                            onToggleTask: _toggleTask,
+                    padding: const EdgeInsets.only(right: 2, bottom: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        (widget.section == HomeSection.tasks)
+                            ? _TasksSubsection(
+                                tasksFiltered: tasksFiltered,
+                                expanded: _expandTasks,
+                                previewCount: previewTasks,
+                                onToggleExpand: () => setState(
+                                  () => _expandTasks = !_expandTasks,
+                                ),
+                                onToggleTask: _toggleTask,
+                              )
+                            : _ItemsSubsection(
+                                itemsFiltered: itemsFiltered,
+                                expanded: _expandItems,
+                                previewCount: previewItems,
+                                onToggleExpand: () => setState(
+                                  () => _expandItems = !_expandItems,
+                                ),
+                                onToggleItem: _toggleItem,
+                              ),
+                        const SizedBox(height: 8),
+                        // --- CLEAR (Completed / Bought) with UNDO ---
+                        if (widget.section == HomeSection.tasks &&
+                            _taskStatus == _TaskStatus.completed &&
+                            tasksFiltered.isNotEmpty)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              icon: const Icon(Icons.delete_sweep),
+                              label: const Text('Clear completed'),
+                              onPressed: () => _clearCompletedForMember(
+                                context,
+                                widget.memberName,
+                              ),
+                            ),
                           )
-                        : _ItemsSubsection(
-                            itemsFiltered: itemsFiltered,
-                            expanded: _expandItems,
-                            previewCount: previewItems,
-                            onToggleExpand: () =>
-                                setState(() => _expandItems = !_expandItems),
-                            onToggleItem: _toggleItem,
+                        else if (widget.section == HomeSection.items &&
+                            _itemStatus == _ItemStatus.bought &&
+                            itemsFiltered.isNotEmpty)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              icon: const Icon(Icons.delete_sweep),
+                              label: const Text('Clear bought'),
+                              onPressed: () => _clearBoughtForMember(
+                                context,
+                                widget.memberName,
+                              ),
+                            ),
                           ),
+                      ],
+                    ),
                   ),
                 ),
               ),
 
-              const SizedBox(height: 8),
-
-              // ACTIONS (tek buton)
-              if (widget.section == HomeSection.tasks)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton.tonalIcon(
-                    onPressed: () =>
-                        _openQuickAddTaskSheet(context, widget.memberName),
-                    icon: const Icon(Icons.add_task),
-                    label: const Text(
-                      'Add task',
-                      style: TextStyle(fontSize: 12),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  // ACTIONS (tek buton)
+                  if (widget.section == HomeSection.tasks)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FilledButton.tonalIcon(
+                        onPressed: () =>
+                            _openQuickAddTaskSheet(context, widget.memberName),
+                        icon: const Icon(Icons.add_task),
+                        label: const Text(
+                          'Add task',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    )
+                  else
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FilledButton.tonalIcon(
+                        onPressed: () =>
+                            _openQuickAddItemSheet(context, widget.memberName),
+                        icon: const Icon(Icons.add_shopping_cart),
+                        label: const Text(
+                          'Add item',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
                     ),
-                  ),
-                )
-              else
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton.tonalIcon(
-                    onPressed: () =>
-                        _openQuickAddItemSheet(context, widget.memberName),
-                    icon: const Icon(Icons.add_shopping_cart),
-                    label: const Text(
-                      'Add item',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ),
-                ),
+                ],
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _clearCompletedForMember(BuildContext context, String member) {
+    final prov = context.read<TaskProvider>();
+
+    // Undo için anlık snapshot
+    final removed = prov.tasks
+        .where((t) => (t.assignedTo ?? '') == member && t.completed)
+        .map(
+          (t) => Task(t.name, completed: t.completed, assignedTo: t.assignedTo),
+        )
+        .toList();
+
+    prov.clearCompleted(forMember: member);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Cleared – Undo'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            for (final t in removed) {
+              context.read<TaskProvider>().addTask(t);
+            }
+          },
+        ),
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
+  void _clearBoughtForMember(BuildContext context, String member) {
+    final prov = context.read<ItemProvider>();
+
+    // Undo için snapshot
+    final removed = prov.items
+        .where((i) => (i.assignedTo ?? '') == member && i.bought)
+        .map((i) => Item(i.name, bought: i.bought, assignedTo: i.assignedTo))
+        .toList();
+
+    prov.clearBought(forMember: member);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Cleared – Undo'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            for (final it in removed) {
+              context.read<ItemProvider>().addItem(it);
+            }
+          },
+        ),
+        duration: const Duration(seconds: 5),
       ),
     );
   }
@@ -758,7 +856,7 @@ class _ItemsSubsection extends StatelessWidget {
                         onPressed: () =>
                             context.read<ItemProvider>().addItem(copy),
                       ),
-                      duration: const Duration(seconds: 3),
+                      duration: const Duration(seconds: 5),
                     ),
                   );
                   return true;
