@@ -66,4 +66,14 @@ class TaskProvider extends ChangeNotifier {
     task.save();
     notifyListeners();
   }
+
+  void updateAssignmentsOnRename(String oldName, String newName) {
+    for (final t in _taskBox.values) {
+      if ((t.assignedTo ?? '').toLowerCase() == oldName.toLowerCase()) {
+        t.assignedTo = newName;
+        t.save();
+      }
+    }
+    notifyListeners();
+  }
 }

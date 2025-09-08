@@ -18,12 +18,12 @@ class _QuickAddRow extends StatefulWidget {
   final void Function(String text, String? assignedTo) onSubmit;
 
   const _QuickAddRow({
-    Key? key,
+    super.key,
     required this.hint,
     required this.familyMembers,
     required this.onSubmit,
     this.presetAssignee,
-  }) : super(key: key);
+  });
 
   @override
   State<_QuickAddRow> createState() => _QuickAddRowState();

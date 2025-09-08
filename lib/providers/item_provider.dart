@@ -67,4 +67,14 @@ class ItemProvider extends ChangeNotifier {
     item.save();
     notifyListeners();
   }
+
+  void updateAssignmentsOnRename(String oldName, String newName) {
+    for (final i in _itemBox.values) {
+      if ((i.assignedTo ?? '').toLowerCase() == oldName.toLowerCase()) {
+        i.assignedTo = newName;
+        i.save();
+      }
+    }
+    notifyListeners();
+  }
 }

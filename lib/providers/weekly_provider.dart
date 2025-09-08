@@ -72,6 +72,16 @@ class WeeklyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateAssignmentsOnRename(String oldName, String newName) {
+    for (final w in _weeklyBox.values) {
+      if ((w.assignedTo ?? '').toLowerCase() == oldName.toLowerCase()) {
+        w.assignedTo = newName;
+        w.save();
+      }
+    }
+    notifyListeners();
+  }
+
   // ========= helpers =========
 
   Future<void> _scheduleFor(WeeklyTask task, {int? boxKey}) async {

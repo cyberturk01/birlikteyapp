@@ -8,6 +8,9 @@ import '../../providers/family_provider.dart';
 import '../../providers/item_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/ui_provider.dart';
+import '../../widgets/avatar_ring.dart';
+import '../../widgets/muted_text.dart';
+import '../../widgets/swipe_bg.dart';
 import 'family_manager.dart';
 
 enum _TaskStatus { pending, completed }
@@ -104,7 +107,7 @@ class _MemberCardState extends State<MemberCard> {
               // HEADER
               Row(
                 children: [
-                  _AvatarWithRing(text: widget.memberName),
+                  AvatarWithRing(text: widget.memberName),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Column(
@@ -583,7 +586,7 @@ class _TasksSubsection extends StatelessWidget {
           style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         if (tasksFiltered.isEmpty)
-          const _MutedText('No tasks')
+          const MutedText('No tasks')
         else
           ...visible.map((task) {
             final isDone = task.completed;
@@ -591,17 +594,21 @@ class _TasksSubsection extends StatelessWidget {
               key: ValueKey(
                 task.key,
               ), // HiveObject.key (Task, HiveObject'tan türemeli)
-              background: Container(
-                color: Colors.green.withValues(alpha: 0.85),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                alignment: Alignment.centerLeft,
-                child: const Icon(Icons.check, color: Colors.white),
+              background: const SwipeBg(
+                color: Colors.green,
+                icon: Icons.check,
+                align: Alignment.centerLeft,
               ),
-              secondaryBackground: Container(
-                color: Colors.red.withValues(alpha: 0.85),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                alignment: Alignment.centerRight,
-                child: const Icon(Icons.delete, color: Colors.white),
+              // Container(
+              //   color: Colors.green.withValues(alpha: 0.85),
+              //   padding: const EdgeInsets.symmetric(horizontal: 16),
+              //   alignment: Alignment.centerLeft,
+              //   child: const Icon(Icons.check, color: Colors.white),
+              // ),
+              secondaryBackground: const SwipeBg(
+                color: Colors.red,
+                icon: Icons.delete,
+                align: Alignment.centerRight,
               ),
 
               // Kaydırma davranışı:
@@ -712,34 +719,79 @@ class _ItemsSubsection extends StatelessWidget {
           style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         if (itemsFiltered.isEmpty)
-          const _MutedText('No items')
+          const MutedText('No items')
         else
           ...visible.map((it) {
             final bought = it.bought;
-            return ListTile(
-              dense: true,
-              visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-              onTap: () => _handleToggleItem(context, it),
-              leading: IconButton(
-                icon: Icon(
-                  bought
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_unchecked,
+            return Dismissible(
+              key: ValueKey('item-${it.key ?? it.name}-${it.hashCode}'),
+              background: const SwipeBg(
+                color: Colors.green,
+                icon: Icons.check,
+                align: Alignment.centerLeft,
+              ),
+              secondaryBackground: const SwipeBg(
+                color: Colors.red,
+                icon: Icons.delete,
+                align: Alignment.centerRight,
+              ),
+              confirmDismiss: (dir) async {
+                if (dir == DismissDirection.startToEnd) {
+                  // Toggle (satırı listeden ÇIKARMA)
+                  _handleToggleItem(context, it);
+                  return false;
+                } else {
+                  // Delete + Undo
+                  final removed = it;
+                  final copy = Item(
+                    removed.name,
+                    bought: removed.bought,
+                    assignedTo: removed.assignedTo,
+                  );
+                  context.read<ItemProvider>().removeItem(removed);
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Item deleted'),
+                      action: SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () =>
+                            context.read<ItemProvider>().addItem(copy),
+                      ),
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                  return true;
+                }
+              },
+              child: ListTile(
+                dense: true,
+                visualDensity: const VisualDensity(
+                  horizontal: -4,
+                  vertical: -2,
                 ),
-                onPressed: () => _handleToggleItem(context, it),
-              ),
-              title: Text(
-                it.name,
-                overflow: TextOverflow.ellipsis,
-                style: bought
-                    ? const TextStyle(decoration: TextDecoration.lineThrough)
-                    : null,
-              ),
-              trailing: IconButton(
-                tooltip: 'Delete',
-                icon: const Icon(Icons.delete, color: Colors.redAccent),
-                onPressed: () => context.read<ItemProvider>().removeItem(it),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                onTap: () => _handleToggleItem(context, it),
+                leading: IconButton(
+                  icon: Icon(
+                    bought
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                  ),
+                  onPressed: () => _handleToggleItem(context, it),
+                ),
+                title: Text(
+                  it.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: bought
+                      ? const TextStyle(decoration: TextDecoration.lineThrough)
+                      : null,
+                ),
+                trailing: IconButton(
+                  tooltip: 'Delete',
+                  icon: const Icon(Icons.delete, color: Colors.redAccent),
+                  onPressed: () => context.read<ItemProvider>().removeItem(it),
+                ),
               ),
             );
           }),
@@ -752,41 +804,6 @@ class _ItemsSubsection extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-// ====== Small widgets & helpers ======
-
-class _AvatarWithRing extends StatelessWidget {
-  final String text;
-  const _AvatarWithRing({required this.text});
-  @override
-  Widget build(BuildContext context) {
-    final initial = text.isNotEmpty ? text[0].toUpperCase() : '?';
-    final ring = Theme.of(context).colorScheme.primary.withValues(alpha: 0.25);
-    return Container(
-      padding: const EdgeInsets.all(2.5),
-      decoration: BoxDecoration(shape: BoxShape.circle, color: ring),
-      child: CircleAvatar(radius: 20, child: Text(initial)),
-    );
-  }
-}
-
-class _MutedText extends StatelessWidget {
-  final String text;
-  const _MutedText(this.text);
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: Theme.of(context).hintColor,
-          fontStyle: FontStyle.italic,
-        ),
-      ),
     );
   }
 }

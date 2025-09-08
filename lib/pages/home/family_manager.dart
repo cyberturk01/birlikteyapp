@@ -2,20 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/family_provider.dart';
-
-Future<void> showFamilyManager(BuildContext context) {
-  return showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-    ),
-    builder: (ctx) => const _FamilyManagerSheet(),
-  );
-}
+import '../../providers/item_provider.dart';
+import '../../providers/task_provider.dart';
+import '../../providers/weekly_provider.dart';
 
 class _FamilyManagerSheet extends StatefulWidget {
-  const _FamilyManagerSheet({Key? key}) : super(key: key);
+  const _FamilyManagerSheet({super.key});
 
   @override
   State<_FamilyManagerSheet> createState() => _FamilyManagerSheetState();
@@ -142,9 +134,24 @@ class _FamilyManagerSheetState extends State<_FamilyManagerSheet> {
                           ),
                         ),
                         title: Text(name),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => familyProv.removeMember(i),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Edit name',
+                              icon: const Icon(Icons.edit),
+                              onPressed: () => _showEditDialog(
+                                context,
+                                index: i,
+                                currentName: name,
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Delete',
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => familyProv.removeMember(i),
+                            ),
+                          ],
                         ),
                       );
                     },
@@ -160,8 +167,11 @@ class _AddMemberRow extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback onAdd;
 
-  const _AddMemberRow({Key? key, required this.controller, required this.onAdd})
-    : super(key: key);
+  const _AddMemberRow({
+    super.key,
+    required this.controller,
+    required this.onAdd,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -188,4 +198,87 @@ class _AddMemberRow extends StatelessWidget {
       ],
     );
   }
+}
+
+void _showEditDialog(
+  BuildContext context, {
+  required int index,
+  required String currentName,
+}) {
+  final fam = context.read<FamilyProvider>();
+  final taskProv = context.read<TaskProvider>();
+  final itemProv = context.read<ItemProvider>();
+  final weeklyProv = context
+      .read<WeeklyProvider?>(); // weekly yoksa null olabilir (optional)
+
+  final c = TextEditingController(text: currentName);
+
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Edit member'),
+      content: TextField(
+        controller: c,
+        decoration: const InputDecoration(
+          labelText: 'Name',
+          border: OutlineInputBorder(),
+          isDense: true,
+        ),
+        autofocus: true,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final newName = c.text.trim();
+            if (newName.isEmpty) return;
+
+            // Duplicate kontrol
+            final exists = fam.familyMembers.asMap().entries.any(
+              (e) =>
+                  e.key != index &&
+                  e.value.toLowerCase() == newName.toLowerCase(),
+            );
+            if (exists) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('This name already exists')),
+              );
+              return;
+            }
+
+            final oldName = currentName;
+
+            // 1) Family’de değiştir
+            fam.renameMember(index: index, newName: newName);
+
+            // 2) Bağlı atamaları güncelle
+            taskProv.updateAssignmentsOnRename(oldName, newName);
+            itemProv.updateAssignmentsOnRename(oldName, newName);
+            weeklyProv?.updateAssignmentsOnRename(oldName, newName);
+
+            Navigator.pop(context);
+
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Renamed to "$newName"')));
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> showFamilyManager(BuildContext context) {
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => const _FamilyManagerSheet(),
+  );
 }

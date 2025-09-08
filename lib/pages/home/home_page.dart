@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/item.dart';
-import '../../models/task.dart';
 import '../../models/view_section.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_provider.dart';
@@ -23,6 +21,36 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   HomeSection _section = HomeSection.tasks;
+  late final PageController _pageController;
+  int _activeIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _activeIndex);
+
+    // initialFilterMember geldiyse index’e çevir
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final family = context.read<FamilyProvider>().familyMembers;
+      final target = widget.initialFilterMember;
+      if (target != null && target.isNotEmpty) {
+        final idx = family.indexOf(target);
+        if (idx >= 0) {
+          _activeIndex = idx;
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(idx);
+          }
+          setState(() {}); // aktif index’i yansıt
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   String? _activeMember;
 
@@ -40,13 +68,15 @@ class _HomePageState extends State<HomePage> {
     final tasks = context.watch<TaskProvider>().tasks;
     final items = context.watch<ItemProvider>().items;
 
-    final active = _activeMember;
-    final activeTasks = (active == null)
-        ? <Task>[]
-        : tasks.where((t) => t.assignedTo == active).toList();
-    final activeItems = (active == null)
-        ? <Item>[]
-        : items.where((i) => i.assignedTo == active).toList();
+    // Liste değişmişse index sınırını koru
+    if (_activeIndex >= family.length) {
+      _activeIndex = family.isEmpty ? 0 : family.length - 1;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(_activeIndex);
+        }
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -123,80 +153,70 @@ class _HomePageState extends State<HomePage> {
                     showSelectedIcon: false,
                   ),
                   const SizedBox(height: 12),
-                  // ANA ÜYE KARTI
-                  if (active != null)
-                    Expanded(
-                      child: MemberCard(
-                        memberName: active,
-                        tasks: activeTasks,
-                        items: activeItems,
-                        section: _section,
-                      ),
-                    )
-                  else
-                    Expanded(
-                      child: LayoutBuilder(
-                        builder: (context, c) {
-                          // responsive columns
-                          int cross = 1;
-                          if (c.maxWidth >= 1200)
-                            cross = 4;
-                          else if (c.maxWidth >= 900)
-                            cross = 3;
-                          else if (c.maxWidth >= 600)
-                            cross = 2;
 
-                          // responsive aspect ratio (daha dar ekranda daha küçük oran → kart daha uzun olur)
-                          final ratio = (c.maxWidth < 380)
-                              ? 0.70
-                              : (c.maxWidth < 480)
-                              ? 0.78
-                              : (c.maxWidth < 600)
-                              ? 0.88
-                              : 0.95;
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, c) {
+                        // responsive columns
+                        int cross = 1;
+                        if (c.maxWidth >= 1200)
+                          cross = 4;
+                        else if (c.maxWidth >= 900)
+                          cross = 3;
+                        else if (c.maxWidth >= 600)
+                          cross = 2;
 
-                          return GridView.builder(
-                            itemCount: family.isEmpty ? 1 : family.length,
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: cross,
-                                  crossAxisSpacing: 12,
-                                  mainAxisSpacing: 12,
-                                  childAspectRatio: ratio,
-                                ),
-                            itemBuilder: (context, i) {
-                              if (family.isEmpty) {
-                                return EmptyFamilyCard(
-                                  onAdd: () => showFamilyManager(context),
-                                );
-                              }
-                              final name = family[i];
-                              final t = tasks
-                                  .where((x) => x.assignedTo == name)
-                                  .toList();
-                              final it = items
-                                  .where((x) => x.assignedTo == name)
-                                  .toList();
+                        // responsive aspect ratio (daha dar ekranda daha küçük oran → kart daha uzun olur)
+                        final ratio = (c.maxWidth < 380)
+                            ? 0.70
+                            : (c.maxWidth < 480)
+                            ? 0.78
+                            : (c.maxWidth < 600)
+                            ? 0.88
+                            : 0.95;
 
-                              return MemberCard(
+                        return PageView.builder(
+                          controller: _pageController,
+                          onPageChanged: (i) =>
+                              setState(() => _activeIndex = i),
+
+                          itemCount: family.length,
+                          itemBuilder: (context, i) {
+                            final name = family[i];
+                            final memberTasks = tasks
+                                .where((t) => t.assignedTo == name)
+                                .toList();
+                            final memberItems = items
+                                .where((it) => it.assignedTo == name)
+                                .toList();
+                            return KeyedSubtree(
+                              key: ValueKey('member-page-$i'),
+                              child: MemberCard(
                                 memberName: name,
-                                tasks: t,
-                                items: it,
+                                tasks: memberTasks,
+                                items: memberItems,
                                 section: _section,
-                              );
-                            },
-                          );
-                        },
-                      ),
+                              ),
+                            );
+                          },
+                        );
+                      },
                     ),
+                  ),
+
                   const SizedBox(height: 12),
 
                   // MİNİ ÜYE BAR (diğerleri)
                   MiniMembersBar(
                     names: family,
-                    active: active ?? '',
-                    onPick: (name) {
-                      setState(() => _activeMember = name);
+                    activeIndex: _activeIndex,
+                    onPickIndex: (i) {
+                      setState(() => _activeIndex = i);
+                      _pageController.animateToPage(
+                        i,
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutCubic,
+                      );
                     },
                   ),
                   const SizedBox(height: 36),
@@ -249,56 +269,69 @@ class _MiniMemberTile extends StatelessWidget {
   }
 }
 
-/// Ana kartın altında mini üyeleri gösteren responsive bar.
-/// - Telefon: 2 sütun
-/// - Orta ekran: 3 sütun
-/// - Geniş: 4 sütun
 class MiniMembersBar extends StatelessWidget {
   final List<String> names;
-  final String active; // şu an seçili olan (ana kart)
-  final ValueChanged<String> onPick;
+  final int activeIndex;
+  final ValueChanged<int> onPickIndex;
 
   const MiniMembersBar({
     Key? key,
     required this.names,
-    required this.active,
-    required this.onPick,
+    required this.activeIndex,
+    required this.onPickIndex,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // aktif olanı listeden çıkar, sadece "diğerleri" görünsün
-    final others = names.where((n) => n != active).toList();
-    if (others.isEmpty) return const SizedBox.shrink();
+    // Liste 0 veya 1 ise bar göstermeye gerek yok
+    // if (names.length <= 1) {
+    //   return const SizedBox(height: 0);
+    // }
+    if (names.length <= 1) return const SizedBox.shrink();
 
-    return LayoutBuilder(
-      builder: (context, c) {
-        final w = c.maxWidth;
+    // Aktif dışındakiler (index bazlı)
+    final others = <(int, String)>[];
+    for (var i = 0; i < names.length; i++) {
+      if (i == activeIndex) continue;
+      others.add((i, names[i]));
+    }
 
-        int cols;
-        if (w >= 1100)
-          cols = 4;
-        else if (w >= 800)
-          cols = 3;
-        else
-          cols = 2;
+    return SafeArea(
+      // alt çentik / nav bar ile çakışmayı önler
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final w = c.maxWidth;
+            final cols = w >= 1100
+                ? 4
+                : w >= 800
+                ? 3
+                : 2;
+            const spacing = 12.0;
+            final tileWidth = (w - (cols - 1) * spacing) / cols;
 
-        const spacing = 12.0;
-        // sabit kutu genişliği: wrap ortalansın diye
-        final tileWidth = (w - (cols - 1) * spacing) / cols;
-
-        return Wrap(
-          alignment: WrapAlignment.center, // soldan-sağdan eşit boşluk
-          spacing: spacing,
-          runSpacing: spacing,
-          children: others.map((name) {
-            return SizedBox(
-              width: tileWidth,
-              child: _MiniMemberTile(name: name, onTap: () => onPick(name)),
+            return Wrap(
+              alignment: WrapAlignment.center,
+              spacing: spacing,
+              runSpacing: spacing,
+              children: others.map((e) {
+                return SizedBox(
+                  width: tileWidth,
+                  child: KeyedSubtree(
+                    key: ValueKey('mini-${e.$1}'),
+                    child: _MiniMemberTile(
+                      name: e.$2,
+                      onTap: () => onPickIndex(e.$1),
+                    ),
+                  ),
+                );
+              }).toList(),
             );
-          }).toList(),
-        );
-      },
+          },
+        ),
+      ),
     );
   }
 }

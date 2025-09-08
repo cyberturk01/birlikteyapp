@@ -15,4 +15,9 @@ class FamilyProvider extends ChangeNotifier {
     _familyBox.deleteAt(index);
     notifyListeners();
   }
+
+  void renameMember({required int index, required String newName}) {
+    _familyBox.putAt(index, newName);
+    notifyListeners();
+  }
 }
