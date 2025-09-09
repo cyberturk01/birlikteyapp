@@ -6,6 +6,7 @@ import '../../providers/family_provider.dart';
 import '../../providers/item_provider.dart';
 import '../../providers/task_provider.dart';
 import '../config/config_page.dart';
+import '../expenses/expenses_card.dart';
 import '../manage/manage_page.dart';
 import '../weekly/weekly_page.dart';
 import 'family_manager.dart';
@@ -27,8 +28,10 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: _activeIndex);
-
+    _pageController = PageController(
+      // viewportFraction: 0.92, // yanlardan küçük boşluk
+      initialPage: _activeIndex,
+    );
     // initialFilterMember geldiyse index’e çevir
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final family = context.read<FamilyProvider>().familyMembers;
@@ -160,47 +163,62 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(height: 12),
 
                   Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, c) {
-                        // responsive columns
-                        int cross = 1;
-                        if (c.maxWidth >= 1200)
-                          cross = 4;
-                        else if (c.maxWidth >= 900)
-                          cross = 3;
-                        else if (c.maxWidth >= 600)
-                          cross = 2;
+                    child: PageView.builder(
+                      controller: _pageController,
+                      physics: const BouncingScrollPhysics(),
+                      onPageChanged: (i) {
+                        setState(() => _activeIndex = i);
+                      },
+                      itemCount: family.length,
+                      itemBuilder: (context, i) {
+                        final name = family[i];
+                        final memberTasks = tasks
+                            .where((t) => t.assignedTo == name)
+                            .toList();
+                        final memberItems = items
+                            .where((it) => it.assignedTo == name)
+                            .toList();
 
-                        // responsive aspect ratio (daha dar ekranda daha küçük oran → kart daha uzun olur)
-                        final ratio = (c.maxWidth < 380)
-                            ? 0.70
-                            : (c.maxWidth < 480)
-                            ? 0.78
-                            : (c.maxWidth < 600)
-                            ? 0.88
-                            : 0.95;
+                        // aktif sayfayı büyült, diğerlerini hafif küçült
+                        return AnimatedBuilder(
+                          animation: _pageController,
+                          builder: (context, child) {
+                            double scale = 1.0;
+                            double opacity = 1.0;
 
-                        return PageView.builder(
-                          controller: _pageController,
-                          onPageChanged: (i) =>
-                              setState(() => _activeIndex = i),
+                            if (_pageController.position.haveDimensions) {
+                              final page =
+                                  _pageController.page ??
+                                  _activeIndex.toDouble();
+                              final dist = (page - i).abs().clamp(0.0, 1.0);
+                              scale = 1.0 - dist * 0.06; // 6% küçülme
+                              opacity = 1.0 - dist * 0.20; // %20 solma
+                            }
 
-                          itemCount: family.length,
-                          itemBuilder: (context, i) {
-                            final name = family[i];
-                            final memberTasks = tasks
-                                .where((t) => t.assignedTo == name)
-                                .toList();
-                            final memberItems = items
-                                .where((it) => it.assignedTo == name)
-                                .toList();
-                            return KeyedSubtree(
-                              key: ValueKey('member-page-$i'),
-                              child: MemberCard(
-                                memberName: name,
-                                tasks: memberTasks,
-                                items: memberItems,
-                                section: _section,
+                            return Center(
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 150),
+                                opacity: opacity,
+                                child: Transform.scale(
+                                  scale: scale,
+                                  child: _MemberPageKeepAlive(
+                                    key: PageStorageKey('member-page-$i'),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      // section'a göre kartı seç
+                                      child: (_section == HomeSection.expenses)
+                                          ? ExpensesCard(memberName: name)
+                                          : MemberCard(
+                                              memberName: name,
+                                              tasks: memberTasks,
+                                              items: memberItems,
+                                              section: _section,
+                                            ),
+                                    ),
+                                  ),
+                                ),
                               ),
                             );
                           },
@@ -232,12 +250,31 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+class _MemberPageKeepAlive extends StatefulWidget {
+  final Widget child;
+  const _MemberPageKeepAlive({super.key, required this.child});
+
+  @override
+  State<_MemberPageKeepAlive> createState() => _MemberPageKeepAliveState();
+}
+
+class _MemberPageKeepAliveState extends State<_MemberPageKeepAlive>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+
 // Küçük dikdörtgen member kutusu:
 class _MiniMemberTile extends StatelessWidget {
   final String name;
   final VoidCallback onTap;
-  const _MiniMemberTile({Key? key, required this.name, required this.onTap})
-    : super(key: key);
+  const _MiniMemberTile({required this.name, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -280,11 +317,11 @@ class MiniMembersBar extends StatelessWidget {
   final ValueChanged<int> onPickIndex;
 
   const MiniMembersBar({
-    Key? key,
+    super.key,
     required this.names,
     required this.activeIndex,
     required this.onPickIndex,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

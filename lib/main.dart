@@ -1,4 +1,5 @@
 import 'package:birlikteyapp/pages/landing/splash_screen.dart';
+import 'package:birlikteyapp/providers/expense_provider.dart';
 import 'package:birlikteyapp/providers/templates_provider.dart';
 import 'package:birlikteyapp/providers/ui_provider.dart';
 import 'package:birlikteyapp/services/notification_service.dart';
@@ -8,6 +9,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 
 import 'constants/app_lists.dart';
+import 'models/expense.dart';
 import 'models/item.dart';
 import 'models/task.dart';
 import 'models/user_template.dart';
@@ -55,6 +57,7 @@ void main() async {
   Hive.registerAdapter(WeeklyTaskAdapter());
   Hive.registerAdapter(UserTemplateAdapter());
   Hive.registerAdapter(WeeklyEntryAdapter());
+  Hive.registerAdapter(ExpenseAdapter());
 
   // Open boxes
   await Hive.openBox<String>('familyBox');
@@ -65,6 +68,7 @@ void main() async {
   await Hive.openBox<WeeklyTask>('weeklyBox');
   await Hive.openBox<int>('weeklyNotifBox');
   await Hive.openBox<UserTemplate>('userTemplates');
+  await Hive.openBox<Expense>('expenseBox');
 
   final taskBox = Hive.box<Task>('taskBox');
   if (taskBox.isEmpty) {
@@ -89,6 +93,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => WeeklyProvider()),
         ChangeNotifierProvider(create: (_) => UiProvider()),
         ChangeNotifierProvider(create: (_) => TemplatesProvider()),
+        ChangeNotifierProvider(create: (_) => ExpenseProvider()),
       ],
       child: FamilyApp(),
     ),

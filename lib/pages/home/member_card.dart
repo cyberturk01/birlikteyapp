@@ -9,7 +9,6 @@ import '../../models/view_section.dart';
 import '../../providers/item_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/ui_provider.dart';
-import '../../widgets/avatar_ring.dart';
 import '../../widgets/muted_text.dart';
 import '../../widgets/swipe_bg.dart';
 import 'family_manager.dart';
@@ -105,8 +104,14 @@ class _MemberCardState extends State<MemberCard> {
               // HEADER
               Row(
                 children: [
-                  AvatarWithRing(text: widget.memberName),
-                  const SizedBox(width: 6),
+                  CircleAvatar(
+                    child: Text(
+                      widget.memberName.isNotEmpty
+                          ? widget.memberName[0].toUpperCase()
+                          : '?',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

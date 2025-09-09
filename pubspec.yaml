@@ -17,6 +17,10 @@ dependencies:
   timezone: ^0.9.2
   flutter_timezone: ^4.1.1
   android_intent_plus: ^5.0.2
+  fl_chart: ^0.66.2
+  csv: ^5.0.2
+  share_plus: ^7.2.1
+  path_provider: ^2.1.3
 
   cupertino_icons: ^1.0.8
 
