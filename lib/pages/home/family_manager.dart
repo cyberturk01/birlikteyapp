@@ -8,7 +8,7 @@ import '../../providers/task_provider.dart';
 import '../../providers/weekly_provider.dart';
 
 class _FamilyManagerSheet extends StatefulWidget {
-  const _FamilyManagerSheet({super.key});
+  const _FamilyManagerSheet();
 
   @override
   State<_FamilyManagerSheet> createState() => _FamilyManagerSheetState();
@@ -168,11 +168,7 @@ class _AddMemberRow extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback onAdd;
 
-  const _AddMemberRow({
-    super.key,
-    required this.controller,
-    required this.onAdd,
-  });
+  const _AddMemberRow({required this.controller, required this.onAdd});
 
   @override
   Widget build(BuildContext context) {

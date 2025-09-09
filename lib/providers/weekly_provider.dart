@@ -82,6 +82,31 @@ class WeeklyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  List<WeeklyTask> addWeeklyBulk(
+    List<(String, String)> entries, {
+    String? assignedTo,
+  }) {
+    final created = <WeeklyTask>[];
+    for (final e in entries) {
+      final day = e.$1.trim();
+      final title = e.$2.trim();
+      if (day.isEmpty || title.isEmpty) continue;
+      final wt = WeeklyTask(day, title, assignedTo: assignedTo);
+      _weeklyBox.add(wt);
+      created.add(wt);
+    }
+    if (created.isNotEmpty) notifyListeners();
+    return created;
+  }
+
+  // ✅ YENİ: Toplu silme (UNDO için)
+  void removeManyWeekly(Iterable<WeeklyTask> list) {
+    for (final t in list) {
+      t.delete();
+    }
+    if (list.isNotEmpty) notifyListeners();
+  }
+
   // ========= helpers =========
 
   Future<void> _scheduleFor(WeeklyTask task, {int? boxKey}) async {

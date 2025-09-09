@@ -76,4 +76,32 @@ class TaskProvider extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  List<Task> addTasksBulk(
+    List<String> names, {
+    String? assignedTo,
+    bool skipDuplicates = true,
+  }) {
+    final created = <Task>[];
+    final existing = tasks.map((t) => t.name.toLowerCase()).toSet();
+
+    for (final n in names) {
+      final name = n.trim();
+      if (name.isEmpty) continue;
+      if (skipDuplicates && existing.contains(name.toLowerCase())) continue;
+
+      final t = Task(name, assignedTo: assignedTo);
+      _taskBox.add(t);
+      created.add(t);
+    }
+    if (created.isNotEmpty) notifyListeners();
+    return created;
+  }
+
+  void removeManyTasks(Iterable<Task> list) {
+    for (final t in list) {
+      t.delete();
+    }
+    if (list.isNotEmpty) notifyListeners();
+  }
 }

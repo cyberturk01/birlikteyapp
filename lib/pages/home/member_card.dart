@@ -46,8 +46,6 @@ class _MemberCardState extends State<MemberCard> {
   void _toggleTask(Task task) {
     final newVal = !task.completed;
     context.read<TaskProvider>().toggleTask(task, newVal);
-    // Sekmeyi DEĞİŞTİRME — kullanıcı hangi sekmedeyse orada kalır.
-    // Gerekirse minik bir setState ile "preview/show all" animasyonları tetiklenir:
     setState(() {});
   }
 
@@ -57,11 +55,11 @@ class _MemberCardState extends State<MemberCard> {
     setState(() {});
   }
 
-  static const int _kPreviewTasks = 4;
-  static const int _kPreviewItems = 3;
-
   @override
   Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final isLandscape = media.orientation == Orientation.landscape;
+    final isShort = media.size.height < 620; // küçük yükseklik eşiği
     final theme = Theme.of(context);
 
     final totalTasks = widget.tasks.length;
@@ -76,11 +74,10 @@ class _MemberCardState extends State<MemberCard> {
         ? widget.items.where((i) => !i.bought).toList()
         : widget.items.where((i) => i.bought).toList();
 
-    // responsive: dar ekranda daha az preview + daha az padding
     final width = MediaQuery.of(context).size.width;
     final isNarrow = width < 380;
-    final int previewTasks = isNarrow ? 3 : _kPreviewTasks;
-    final int previewItems = isNarrow ? 2 : _kPreviewItems;
+    final previewTasks = (isLandscape || isShort) ? 2 : 6;
+    final previewItems = (isLandscape || isShort) ? 2 : 3;
 
     return Card(
       elevation: 6,
@@ -1026,7 +1023,7 @@ class EmptyFamilyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
-      elevation: 4,
+      elevation: 5,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: Ink(

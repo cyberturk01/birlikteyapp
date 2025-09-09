@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../constants/app_strings.dart';
+import '../../constants/app_templates.dart';
 import '../../models/item.dart';
 import '../../models/task.dart';
 import '../../providers/family_provider.dart';
@@ -33,6 +34,8 @@ class _ManagePageState extends State<ManagePage> {
   Widget build(BuildContext context) {
     final taskProv = context.watch<TaskProvider>();
     final itemProv = context.watch<ItemProvider>();
+    final family = context.watch<FamilyProvider>().familyMembers;
+    String? assignTo;
 
     // --- Hazır listeler ---
     const defaultTasks = AppLists.defaultTasks;
@@ -50,9 +53,6 @@ class _ManagePageState extends State<ManagePage> {
       defaults: defaultItems,
       existing: itemProv.items.map((i) => i.name).toList(),
     );
-    final suggestions = _tab == _ManageTab.tasks
-        ? taskSuggestions
-        : itemSuggestions;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Add Center')),
@@ -152,41 +152,6 @@ class _ManagePageState extends State<ManagePage> {
     final list = set.toList()
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     return list;
-  }
-
-  void _handleQuickAdd(BuildContext context, String name) {
-    final taskProv = context.read<TaskProvider>();
-    final itemProv = context.read<ItemProvider>();
-
-    if (_tab == _ManageTab.tasks) {
-      final exists = taskProv.tasks.any(
-        (t) => t.name.toLowerCase() == name.toLowerCase(),
-      );
-      if (exists) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This task already exists')),
-        );
-        return;
-      }
-      taskProv.addTask(Task(name)); // assign yok
-    } else {
-      final exists = itemProv.items.any(
-        (i) => i.name.toLowerCase() == name.toLowerCase(),
-      );
-      if (exists) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This item already exists')),
-        );
-        return;
-      }
-      itemProv.addItem(Item(name)); // assign yok
-    }
-
-    _input.clear();
-    FocusScope.of(context).unfocus();
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Added: $name')));
   }
 
   void _handleAdd(BuildContext context) {
@@ -556,6 +521,37 @@ void _showRenameTaskDialog(BuildContext context, Task task) {
           child: const Text('Save'),
         ),
       ],
+    ),
+  );
+}
+
+void _applyTemplate(BuildContext context, TemplatePack tpl, String? assignTo) {
+  final taskProv = context.read<TaskProvider>();
+  final itemProv = context.read<ItemProvider>();
+
+  final createdTasks = taskProv.addTasksBulk(tpl.tasks, assignedTo: assignTo);
+  final createdItems = itemProv.addItemsBulk(tpl.items, assignedTo: assignTo);
+
+  final total = createdTasks.length + createdItems.length;
+
+  if (total == 0) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Nothing to add (all duplicates?)')),
+    );
+    return;
+  }
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text('Added $total from "${tpl.name}"'),
+      action: SnackBarAction(
+        label: 'Undo',
+        onPressed: () {
+          taskProv.removeManyTasks(createdTasks);
+          itemProv.removeManyItems(createdItems);
+        },
+      ),
+      duration: const Duration(seconds: 4),
     ),
   );
 }

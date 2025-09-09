@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/ui_provider.dart';
 import '../../services/notification_service.dart';
+import '../templates/templates_page.dart';
 
 class ConfigurationPage extends StatelessWidget {
   const ConfigurationPage({Key? key}) : super(key: key);
@@ -47,6 +48,50 @@ class ConfigurationPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 6),
+          SegmentedButton<ThemeMode>(
+            segments: const [
+              ButtonSegment(
+                value: ThemeMode.system,
+                label: Text('System'),
+                icon: Icon(Icons.phone_android),
+              ),
+              ButtonSegment(
+                value: ThemeMode.light,
+                label: Text('Light'),
+                icon: Icon(Icons.light_mode),
+              ),
+              ButtonSegment(
+                value: ThemeMode.dark,
+                label: Text('Dark'),
+                icon: Icon(Icons.dark_mode),
+              ),
+            ],
+            selected: {ui.themeMode},
+            onSelectionChanged: (s) =>
+                context.read<UiProvider>().setThemeMode(s.first),
+            showSelectedIcon: false,
+          ),
+          const SizedBox(height: 24),
+          const Divider(height: 24),
+          // === Theme ===
+          Text('Templates', style: Theme.of(context).textTheme.titleMedium),
+          ListTile(
+            leading: const Icon(Icons.dashboard_customize),
+            title: const Text('Templates'),
+            subtitle: const Text('One-tap task & market packs'),
+            trailing: const Icon(Icons.open_in_new),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TemplatesPage()),
+              );
+            },
+          ),
+          const Divider(),
+          const SizedBox(height: 8),
+
           // === Reminders ===
           Text('Reminders', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 6),
@@ -79,66 +124,6 @@ class ConfigurationPage extends StatelessWidget {
             },
           ),
           const Divider(height: 24),
-
-          // Exact alarm ayarı (Android)
-          ListTile(
-            leading: const Icon(Icons.alarm_on),
-            title: const Text('Enable exact alarms (Android)'),
-            subtitle: const Text('Open system setting to allow precise alarms'),
-            trailing: const Icon(Icons.open_in_new),
-            onTap: () async {
-              if (!Platform.isAndroid) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('This setting is Android-only')),
-                );
-                return;
-              }
-              try {
-                const intent = AndroidIntent(
-                  action: 'android.settings.REQUEST_SCHEDULE_EXACT_ALARM',
-                );
-                await intent.launch();
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Could not open settings: $e')),
-                );
-              }
-            },
-          ),
-
-          const Divider(height: 24),
-
-          // === Theme ===
-          Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 6),
-          SegmentedButton<ThemeMode>(
-            segments: const [
-              ButtonSegment(
-                value: ThemeMode.system,
-                label: Text('System'),
-                icon: Icon(Icons.phone_android),
-              ),
-              ButtonSegment(
-                value: ThemeMode.light,
-                label: Text('Light'),
-                icon: Icon(Icons.light_mode),
-              ),
-              ButtonSegment(
-                value: ThemeMode.dark,
-                label: Text('Dark'),
-                icon: Icon(Icons.dark_mode),
-              ),
-            ],
-            selected: {ui.themeMode},
-            onSelectionChanged: (s) =>
-                context.read<UiProvider>().setThemeMode(s.first),
-            showSelectedIcon: false,
-          ),
-
-          const SizedBox(height: 24),
-          const Divider(),
-          const SizedBox(height: 8),
-
           // === Debug / Notifications ===
           Text(
             'Debug / Notifications',
@@ -160,27 +145,31 @@ class ConfigurationPage extends StatelessWidget {
                 },
                 child: const Text('Request permission'),
               ),
-              FilledButton.tonal(
-                onPressed: () async {
-                  await NotificationService.debugTestIn30s();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Scheduled: 30s test notification'),
-                    ),
-                  );
-                },
-                child: const Text('Test notification (30s)'),
-              ),
-              FilledButton.tonal(
-                onPressed: () async {
-                  await NotificationService.debugWeeklyIn1Minute();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Scheduled: weekly debug (≈1 min)'),
-                    ),
-                  );
-                },
-                child: const Text('Test weekly (+1 min)'),
+              Tooltip(
+                message: 'Open system setting to allow precise alarms',
+                child: FilledButton.tonal(
+                  onPressed: () async {
+                    if (!Platform.isAndroid) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('This setting is Android-only'),
+                        ),
+                      );
+                      return;
+                    }
+                    try {
+                      const intent = AndroidIntent(
+                        action: 'android.settings.REQUEST_SCHEDULE_EXACT_ALARM',
+                      );
+                      await intent.launch();
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Could not open settings: $e')),
+                      );
+                    }
+                  },
+                  child: const Text('Enable exact alarms'),
+                ),
               ),
             ],
           ),

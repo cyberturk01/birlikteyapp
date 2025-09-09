@@ -146,6 +146,11 @@ class _HomePageState extends State<HomePage> {
                         icon: Icon(Icons.shopping_cart, size: 16),
                         label: Text('Market', style: TextStyle(fontSize: 12)),
                       ),
+                      ButtonSegment(
+                        value: HomeSection.expenses,
+                        icon: Icon(Icons.account_balance_wallet),
+                        label: Text('Expenses'),
+                      ),
                     ],
                     selected: {_section},
                     onSelectionChanged: (s) =>
@@ -283,10 +288,6 @@ class MiniMembersBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Liste 0 veya 1 ise bar göstermeye gerek yok
-    // if (names.length <= 1) {
-    //   return const SizedBox(height: 0);
-    // }
     if (names.length <= 1) return const SizedBox.shrink();
 
     // Aktif dışındakiler (index bazlı)

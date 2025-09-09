@@ -1,13 +1,16 @@
 import 'package:birlikteyapp/pages/landing/splash_screen.dart';
+import 'package:birlikteyapp/providers/templates_provider.dart';
 import 'package:birlikteyapp/providers/ui_provider.dart';
 import 'package:birlikteyapp/services/notification_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 
 import 'constants/app_lists.dart';
 import 'models/item.dart';
 import 'models/task.dart';
+import 'models/user_template.dart';
 import 'models/weekly_task.dart';
 import 'providers/family_provider.dart';
 import 'providers/item_provider.dart';
@@ -16,7 +19,30 @@ import 'providers/weekly_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Cihaz boyutlarını (runApp öncesi) al
+  final view = WidgetsBinding.instance.platformDispatcher.views.first;
+  final shortestLogical =
+      view.physicalSize.shortestSide / view.devicePixelRatio;
+
+  // 600+ logical px → tablet kabul (Material breakpoint)
+  final isTablet = shortestLogical >= 600;
+
+  await SystemChrome.setPreferredOrientations(
+    isTablet
+        ? <DeviceOrientation>[
+            DeviceOrientation.portraitUp,
+            DeviceOrientation.portraitDown,
+            DeviceOrientation.landscapeLeft,
+            DeviceOrientation.landscapeRight,
+          ]
+        : <DeviceOrientation>[
+            DeviceOrientation.portraitUp,
+            DeviceOrientation.portraitDown,
+          ],
+  );
   await NotificationService.init();
+
   final defaultTasks = AppLists.defaultTasks;
 
   final defaultItems = AppLists.defaultItems;
@@ -27,6 +53,8 @@ void main() async {
   Hive.registerAdapter(TaskAdapter());
   Hive.registerAdapter(ItemAdapter());
   Hive.registerAdapter(WeeklyTaskAdapter());
+  Hive.registerAdapter(UserTemplateAdapter());
+  Hive.registerAdapter(WeeklyEntryAdapter());
 
   // Open boxes
   await Hive.openBox<String>('familyBox');
@@ -36,6 +64,7 @@ void main() async {
   await Hive.openBox<int>('itemCountBox');
   await Hive.openBox<WeeklyTask>('weeklyBox');
   await Hive.openBox<int>('weeklyNotifBox');
+  await Hive.openBox<UserTemplate>('userTemplates');
 
   final taskBox = Hive.box<Task>('taskBox');
   if (taskBox.isEmpty) {
@@ -59,6 +88,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ItemProvider()),
         ChangeNotifierProvider(create: (_) => WeeklyProvider()),
         ChangeNotifierProvider(create: (_) => UiProvider()),
+        ChangeNotifierProvider(create: (_) => TemplatesProvider()),
       ],
       child: FamilyApp(),
     ),

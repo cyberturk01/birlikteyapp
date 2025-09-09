@@ -19,7 +19,6 @@ class _QuickAddRow extends StatefulWidget {
   final void Function(String text, String? assignedTo) onSubmit;
 
   const _QuickAddRow({
-    super.key,
     required this.hint,
     required this.familyMembers,
     required this.onSubmit,
@@ -171,7 +170,7 @@ class _TasksMiniPanelState extends State<_TasksMiniPanel> {
             elevation: 0,
             color: Theme.of(
               context,
-            ).colorScheme.surfaceVariant.withOpacity(0.35),
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -337,7 +336,7 @@ class _TasksMiniPanelState extends State<_TasksMiniPanel> {
 
 class _MarketMiniPanel extends StatefulWidget {
   final String? filterMember; // null = All
-  const _MarketMiniPanel({Key? key, this.filterMember}) : super(key: key);
+  const _MarketMiniPanel({super.key, this.filterMember});
 
   @override
   State<_MarketMiniPanel> createState() => _MarketMiniPanelState();
@@ -411,7 +410,7 @@ class _MarketMiniPanelState extends State<_MarketMiniPanel> {
             elevation: 0,
             color: Theme.of(
               context,
-            ).colorScheme.surfaceVariant.withOpacity(0.35),
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),

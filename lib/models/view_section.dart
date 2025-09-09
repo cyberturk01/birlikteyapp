@@ -1,1 +1,1 @@
-enum HomeSection { tasks, items }
+enum HomeSection { tasks, items, expenses }
