@@ -2,7 +2,7 @@ import 'package:hive/hive.dart';
 
 part 'expense.g.dart';
 
-@HiveType(typeId: 8) // ⚠️ Projendeki diğer typeId’lerle çakışmasın
+@HiveType(typeId: 8)
 class Expense extends HiveObject {
   @HiveField(0)
   String title;
@@ -11,11 +11,18 @@ class Expense extends HiveObject {
   double amount;
 
   @HiveField(2)
-  String? assignedTo; // kimin harcaması (opsiyonel)
+  String? assignedTo;
 
   @HiveField(3)
   DateTime date;
+  @HiveField(4)
+  String? category;
 
-  Expense(this.title, this.amount, {this.assignedTo, DateTime? date})
-    : date = date ?? DateTime.now();
+  Expense(
+    this.title,
+    this.amount, {
+    DateTime? date,
+    this.assignedTo,
+    this.category,
+  }) : date = date ?? DateTime.now();
 }

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../constants/app_strings.dart';
-import '../../constants/app_templates.dart';
 import '../../models/item.dart';
 import '../../models/task.dart';
 import '../../providers/family_provider.dart';
@@ -34,7 +33,6 @@ class _ManagePageState extends State<ManagePage> {
   Widget build(BuildContext context) {
     final taskProv = context.watch<TaskProvider>();
     final itemProv = context.watch<ItemProvider>();
-    final family = context.watch<FamilyProvider>().familyMembers;
     String? assignTo;
 
     // --- Hazır listeler ---
@@ -521,37 +519,6 @@ void _showRenameTaskDialog(BuildContext context, Task task) {
           child: const Text('Save'),
         ),
       ],
-    ),
-  );
-}
-
-void _applyTemplate(BuildContext context, TemplatePack tpl, String? assignTo) {
-  final taskProv = context.read<TaskProvider>();
-  final itemProv = context.read<ItemProvider>();
-
-  final createdTasks = taskProv.addTasksBulk(tpl.tasks, assignedTo: assignTo);
-  final createdItems = itemProv.addItemsBulk(tpl.items, assignedTo: assignTo);
-
-  final total = createdTasks.length + createdItems.length;
-
-  if (total == 0) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Nothing to add (all duplicates?)')),
-    );
-    return;
-  }
-
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text('Added $total from "${tpl.name}"'),
-      action: SnackBarAction(
-        label: 'Undo',
-        onPressed: () {
-          taskProv.removeManyTasks(createdTasks);
-          itemProv.removeManyItems(createdItems);
-        },
-      ),
-      duration: const Duration(seconds: 4),
     ),
   );
 }

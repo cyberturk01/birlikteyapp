@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../models/expense.dart';
 import '../../providers/expense_provider.dart';
 import '../../providers/family_provider.dart';
+import 'expenses_by_category_page.dart';
 
 class ExpensesInsightsPage extends StatefulWidget {
   final String? initialMember;
@@ -101,15 +102,33 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
 
               // Export / Share
               const SizedBox(width: 12),
-              TextButton.icon(
-                onPressed: () => _exportCsv(context, expenses),
-                icon: const Icon(Icons.download),
-                label: const Text('Export CSV'),
-              ),
-              TextButton.icon(
-                onPressed: () => _shareCsv(context, expenses),
-                icon: const Icon(Icons.share),
-                label: const Text('Share'),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ExpensesByCategoryPage(initialMember: _member),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.pie_chart_outline),
+                    label: const Text('By category'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _exportCsv(context, expenses),
+                    icon: const Icon(Icons.download),
+                    label: const Text('Export CSV'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _shareCsv(context, expenses),
+                    icon: const Icon(Icons.share),
+                    label: const Text('Share'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -153,6 +172,7 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                   ),
                 ),
                 const Divider(height: 1),
+
                 if (expenses.isEmpty)
                   const Padding(
                     padding: EdgeInsets.all(16),
@@ -212,13 +232,14 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
   Future<void> _exportCsv(BuildContext context, List<Expense> expenses) async {
     try {
       final rows = <List<dynamic>>[
-        ['date', 'title', 'amount', 'member'],
+        ['date', 'title', 'amount', 'member', 'category'],
         ...expenses.map(
           (e) => [
             _fmtDate(e.date),
             e.title,
             e.amount.toStringAsFixed(2),
             e.assignedTo ?? '',
+            e.category ?? '',
           ],
         ),
       ];

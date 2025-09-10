@@ -85,4 +85,19 @@ class ExpenseProvider extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  Map<String, double> totalsByCategory({
+    required String? member,
+    required ExpenseDateFilter filter,
+  }) {
+    final list = forMemberFiltered(member, filter);
+    final map = <String, double>{};
+    for (final e in list) {
+      final key = (e.category == null || e.category!.trim().isEmpty)
+          ? 'Uncategorized'
+          : e.category!;
+      map.update(key, (v) => v + e.amount, ifAbsent: () => e.amount);
+    }
+    return map;
+  }
 }
