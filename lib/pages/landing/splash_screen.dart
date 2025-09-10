@@ -52,7 +52,7 @@ class _SplashScreenState extends State<SplashScreen> {
             Icon(Icons.family_restroom, size: 64),
             SizedBox(height: 16),
             Text(
-              'Birliktey',
+              'Togetherly',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 8),
