@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/view_section.dart';
+import '../theme/brand_seed.dart';
 
 enum TaskViewFilter { pending, completed }
 
@@ -18,15 +19,50 @@ class UiProvider extends ChangeNotifier {
 
   // ====== tema modu ======
   ThemeMode _themeMode = ThemeMode.system;
-
+  ThemeMode get themeMode => _themeMode;
+  BrandSeed _brand = BrandSeed.teal;
+  BrandSeed get brand => _brand;
   // getters
   String? get filterMember => _filterMember;
   HomeSection get section => _section;
   TaskViewFilter get taskFilter => _taskFilter;
   ItemViewFilter get itemFilter => _itemFilter;
-  ThemeMode get themeMode => _themeMode;
+
   TimeOfDay? _weeklyDefaultReminder; // null ise 19:00 fallback
   TimeOfDay? get weeklyDefaultReminder => _weeklyDefaultReminder;
+
+  Future<void> setBrand(BrandSeed b) async {
+    _brand = b;
+    notifyListeners();
+    final sp = await SharedPreferences.getInstance();
+    await sp.setInt('brandSeed', b.index);
+  }
+
+  Future<void> loadPrefs() async {
+    final sp = await SharedPreferences.getInstance();
+
+    // ThemeMode
+    int? tm = sp.getInt('themeMode');
+    if (tm == null) {
+      final s = sp.getString('themeMode');
+      if (s != null) tm = int.tryParse(s);
+    }
+    if (tm != null && tm >= 0 && tm < ThemeMode.values.length) {
+      _themeMode = ThemeMode.values[tm];
+    }
+
+    // BrandSeed
+    int? bs = sp.getInt('brandSeed');
+    if (bs == null) {
+      final s = sp.getString('brandSeed');
+      if (s != null) bs = int.tryParse(s);
+    }
+    if (bs != null && bs >= 0 && bs < BrandSeed.values.length) {
+      _brand = BrandSeed.values[bs];
+    }
+
+    notifyListeners();
+  }
 
   Future<void> setWeeklyDefaultReminder(TimeOfDay time) async {
     _weeklyDefaultReminder = time;
@@ -91,11 +127,11 @@ class UiProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setThemeMode(ThemeMode mode) async {
-    _themeMode = mode;
+  Future<void> setThemeMode(ThemeMode m) async {
+    _themeMode = m;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('themeMode', _themeMode.name);
+    final sp = await SharedPreferences.getInstance();
+    await sp.setInt('themeMode', m.index);
   }
 
   void resetFilters() {
@@ -126,5 +162,15 @@ class UiProvider extends ChangeNotifier {
     await prefs.remove('weeklyReminderHour');
     await prefs.remove('weeklyReminderMinute');
     await prefs.setString('themeMode', ThemeMode.system.name); // isteğe bağlı
+  }
+
+  // istersen reset:
+  Future<void> resetUi() async {
+    _themeMode = ThemeMode.system;
+    _brand = BrandSeed.teal;
+    notifyListeners();
+    final sp = await SharedPreferences.getInstance();
+    await sp.remove('themeMode');
+    await sp.remove('brandSeed');
   }
 }

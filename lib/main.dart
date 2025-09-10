@@ -3,6 +3,7 @@ import 'package:birlikteyapp/providers/expense_provider.dart';
 import 'package:birlikteyapp/providers/templates_provider.dart';
 import 'package:birlikteyapp/providers/ui_provider.dart';
 import 'package:birlikteyapp/services/notification_service.dart';
+import 'package:birlikteyapp/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -83,6 +84,8 @@ void main() async {
       itemBox.add(Item(i));
     }
   }
+  final ui = UiProvider();
+  await ui.loadPrefs();
 
   runApp(
     MultiProvider(
@@ -94,6 +97,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => UiProvider()),
         ChangeNotifierProvider(create: (_) => TemplatesProvider()),
         ChangeNotifierProvider(create: (_) => ExpenseProvider()),
+        ChangeNotifierProvider.value(value: ui),
       ],
       child: FamilyApp(),
     ),
@@ -106,21 +110,10 @@ class FamilyApp extends StatelessWidget {
     final ui = context.watch<UiProvider>();
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Togtherly',
+      title: 'Togetherly',
       themeMode: ui.themeMode,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.light,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.indigo,
-          brightness: Brightness.dark,
-        ),
-      ),
+      theme: AppTheme.light(ui.brand), // ✅ brand buradan
+      darkTheme: AppTheme.dark(ui.brand),
       home: const SplashScreen(),
     );
   }

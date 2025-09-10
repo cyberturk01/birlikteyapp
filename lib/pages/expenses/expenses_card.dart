@@ -278,16 +278,16 @@ class _ExpensesCardState extends State<ExpensesCard> {
               ),
             ),
             const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
+            DropdownButtonFormField<String?>(
               value: cat,
               isExpanded: true,
               items: [
-                const DropdownMenuItem(
+                const DropdownMenuItem<String?>(
                   value: null,
                   child: Text('Uncategorized'),
                 ),
                 ...categories.map(
-                  (c) => DropdownMenuItem(value: c, child: Text(c)),
+                  (c) => DropdownMenuItem<String?>(value: c, child: Text(c)),
                 ),
               ],
               onChanged: (v) => cat = v,

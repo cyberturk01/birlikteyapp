@@ -92,12 +92,22 @@ class ExpenseProvider extends ChangeNotifier {
   }) {
     final list = forMemberFiltered(member, filter);
     final map = <String, double>{};
+
     for (final e in list) {
-      final key = (e.category == null || e.category!.trim().isEmpty)
-          ? 'Uncategorized'
-          : e.category!;
+      String key = (e.category ?? '').trim();
+      if (key.isEmpty) key = 'Uncategorized';
+
+      // istersen aynı adı farklı büyük/küçük kullanımları birleştir:
+      //key = key.toLowerCase();
+
       map.update(key, (v) => v + e.amount, ifAbsent: () => e.amount);
     }
     return map;
+  }
+
+  void updateCategory(Expense e, String? category) {
+    e.category = (category?.trim().isEmpty ?? true) ? null : category!.trim();
+    e.save();
+    notifyListeners();
   }
 }

@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/ui_provider.dart';
 import '../../services/notification_service.dart';
+import '../../theme/brand_seed.dart';
 import '../templates/templates_page.dart';
 
 class ConfigurationPage extends StatelessWidget {
@@ -76,6 +77,36 @@ class ConfigurationPage extends StatelessWidget {
           const SizedBox(height: 24),
           const Divider(height: 24),
           // === Theme ===
+          Text('App color', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<BrandSeed>(
+            value: context.watch<UiProvider>().brand,
+            isExpanded: true,
+            items: BrandSeed.values.map((b) {
+              return DropdownMenuItem(
+                value: b,
+                child: Row(
+                  children: [
+                    b.swatch(size: 20), // küçük renk kutusu
+                    const SizedBox(width: 8),
+                    Text(b.label),
+                  ],
+                ),
+              );
+            }).toList(),
+            onChanged: (b) {
+              if (b != null) {
+                context.read<UiProvider>().setBrand(b);
+              }
+            },
+            decoration: const InputDecoration(
+              labelText: "App color",
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+
+          const SizedBox(height: 16),
           Text('Templates', style: Theme.of(context).textTheme.titleMedium),
           ListTile(
             leading: const Icon(Icons.dashboard_customize),
@@ -179,6 +210,84 @@ class ConfigurationPage extends StatelessWidget {
             icon: const Icon(Icons.check),
             label: const Text('Apply & Close'),
             onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BrandSwatch extends StatelessWidget {
+  final BrandSeed brand;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _BrandSwatch({
+    super.key,
+    required this.brand,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = brand.seed; // BrandSeed extension’dan
+    final cs = Theme.of(context).colorScheme;
+    final label = brand.label;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? cs.primary : cs.outlineVariant,
+            width: selected ? 2 : 1,
+          ),
+          color: cs.surfaceContainerLow,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _Dot(color: color),
+            const SizedBox(width: 8),
+            Text(
+              brand.name, // enum ismi: teal/coral/deepPurple/forest
+              style: TextStyle(
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+            if (selected) ...[
+              const SizedBox(width: 6),
+              const Icon(Icons.check, size: 16),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  final Color color;
+  const _Dot({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 18,
+      height: 18,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.35),
+            blurRadius: 6,
+            spreadRadius: 1,
           ),
         ],
       ),

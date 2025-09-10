@@ -89,12 +89,13 @@ class _MemberCardState extends State<MemberCard> {
             end: Alignment.bottomRight,
             colors: [
               theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-              theme.colorScheme.surface.withValues(alpha: 0.9),
+              theme.colorScheme.surface.withValues(alpha: 0.92),
             ],
           ),
           border: Border.all(
             color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
           ),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Padding(
           padding: EdgeInsets.all(isNarrow ? 10 : 14),
@@ -978,47 +979,47 @@ void _assignOrCreateItem(BuildContext context, String name, String member) {
   Navigator.pop(context);
 }
 
-void _submitTask(
-  TaskProvider prov,
-  String text,
-  String member,
-  BuildContext ctx,
-) {
-  final t = text.trim();
-  if (t.isEmpty) return;
-  final exists = prov.tasks.any(
-    (task) => task.name.toLowerCase() == t.toLowerCase(),
-  );
-  if (exists) {
-    ScaffoldMessenger.of(
-      ctx,
-    ).showSnackBar(const SnackBar(content: Text('This task already exists')));
-    return;
-  }
-  prov.addTask(Task(t, assignedTo: member));
-  Navigator.pop(ctx);
-}
-
-void _submitItem(
-  ItemProvider prov,
-  String text,
-  String member,
-  BuildContext ctx,
-) {
-  final t = text.trim();
-  if (t.isEmpty) return;
-  final exists = prov.items.any(
-    (task) => task.name.toLowerCase() == t.toLowerCase(),
-  );
-  if (exists) {
-    ScaffoldMessenger.of(
-      ctx,
-    ).showSnackBar(const SnackBar(content: Text('This item already exists')));
-    return;
-  }
-  prov.addItem(Item(t, assignedTo: member));
-  Navigator.pop(ctx);
-}
+// void _submitTask(
+//   TaskProvider prov,
+//   String text,
+//   String member,
+//   BuildContext ctx,
+// ) {
+//   final t = text.trim();
+//   if (t.isEmpty) return;
+//   final exists = prov.tasks.any(
+//     (task) => task.name.toLowerCase() == t.toLowerCase(),
+//   );
+//   if (exists) {
+//     ScaffoldMessenger.of(
+//       ctx,
+//     ).showSnackBar(const SnackBar(content: Text('This task already exists')));
+//     return;
+//   }
+//   prov.addTask(Task(t, assignedTo: member));
+//   Navigator.pop(ctx);
+// }
+//
+// void _submitItem(
+//   ItemProvider prov,
+//   String text,
+//   String member,
+//   BuildContext ctx,
+// ) {
+//   final t = text.trim();
+//   if (t.isEmpty) return;
+//   final exists = prov.items.any(
+//     (task) => task.name.toLowerCase() == t.toLowerCase(),
+//   );
+//   if (exists) {
+//     ScaffoldMessenger.of(
+//       ctx,
+//     ).showSnackBar(const SnackBar(content: Text('This item already exists')));
+//     return;
+//   }
+//   prov.addItem(Item(t, assignedTo: member));
+//   Navigator.pop(ctx);
+// }
 
 class EmptyFamilyCard extends StatelessWidget {
   final VoidCallback onAdd;

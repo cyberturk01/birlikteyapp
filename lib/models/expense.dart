@@ -15,6 +15,7 @@ class Expense extends HiveObject {
 
   @HiveField(3)
   DateTime date;
+
   @HiveField(4)
   String? category;
 

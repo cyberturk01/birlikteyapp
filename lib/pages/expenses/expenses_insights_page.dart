@@ -184,9 +184,11 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                       dense: true,
                       title: Text(e.title, overflow: TextOverflow.ellipsis),
                       subtitle: Text(
-                        '${_fmtDate(e.date)} • ${e.assignedTo ?? 'Unassigned'}',
-                      ),
+                        '${_fmtDate(e.date)} • ${e.assignedTo ?? 'Unassigned'}'
+                        '${e.category == null ? '' : ' • ${e.category}'}',
+                      ), // geçici görünürlük
                       trailing: Text('€ ${e.amount.toStringAsFixed(2)}'),
+                      onLongPress: () => _showChangeCategorySheet(context, e),
                     ),
                   ),
               ],
@@ -290,6 +292,117 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
       ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
     }
   }
+}
+
+void _showChangeCategorySheet(BuildContext context, Expense e) {
+  const categories = <String>[
+    'Groceries',
+    'Dining',
+    'Transport',
+    'Utilities',
+    'Health',
+    'Kids',
+    'Home',
+    'Other',
+  ];
+  String? current = e.category;
+
+  showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) {
+      final ctrl = TextEditingController(text: current ?? '');
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).dividerColor,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Change category',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Hızlı seçimler
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ActionChip(
+                  label: const Text('Uncategorized'),
+                  onPressed: () {
+                    context.read<ExpenseProvider>().updateCategory(e, null);
+                    Navigator.pop(context);
+                  },
+                ),
+                ...categories.map(
+                  (c) => ActionChip(
+                    label: Text(c),
+                    onPressed: () {
+                      context.read<ExpenseProvider>().updateCategory(e, c);
+                      Navigator.pop(context);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Özel kategori
+            TextField(
+              controller: ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Custom category',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              onSubmitted: (val) {
+                context.read<ExpenseProvider>().updateCategory(
+                  e,
+                  val.trim().isEmpty ? null : val.trim(),
+                );
+                Navigator.pop(context);
+              },
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton(
+                onPressed: () {
+                  final val = ctrl.text.trim();
+                  context.read<ExpenseProvider>().updateCategory(
+                    e,
+                    val.isEmpty ? null : val,
+                  );
+                  Navigator.pop(context);
+                },
+                child: const Text('Save'),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }
 
 class _MonthlyBarChart extends StatelessWidget {
