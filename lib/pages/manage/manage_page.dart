@@ -53,7 +53,24 @@ class _ManagePageState extends State<ManagePage> {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Center')),
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Quick Add',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            Text(
+              'Add new tasks and market items in one place.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [

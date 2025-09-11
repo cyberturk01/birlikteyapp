@@ -105,6 +105,24 @@ class ExpenseProvider extends ChangeNotifier {
     return map;
   }
 
+  void addExpense({
+    required String title,
+    required double amount,
+    required DateTime date,
+    String? assignedTo,
+    String? category, // ✅ kategori parametresi olmalı
+  }) {
+    final e = Expense(
+      title,
+      amount,
+      date: date,
+      assignedTo: assignedTo,
+      category: category ?? 'Uncategorized', // ✅ burada da set et
+    );
+    _box.add(e);
+    notifyListeners();
+  }
+
   void updateCategory(Expense e, String? category) {
     e.category = (category?.trim().isEmpty ?? true) ? null : category!.trim();
     e.save();

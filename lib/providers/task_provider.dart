@@ -104,4 +104,14 @@ class TaskProvider extends ChangeNotifier {
     }
     if (list.isNotEmpty) notifyListeners();
   }
+
+  bool existsByNameAndAssignee(String name, String? assigned) {
+    final ln = name.toLowerCase();
+    final la = (assigned ?? '').toLowerCase();
+    return tasks.any(
+      (t) =>
+          t.name.toLowerCase() == ln &&
+          (t.assignedTo ?? '').toLowerCase() == la,
+    );
+  }
 }

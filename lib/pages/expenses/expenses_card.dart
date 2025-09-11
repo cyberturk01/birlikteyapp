@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/expense.dart';
 import '../../providers/expense_provider.dart';
 import '../../providers/family_provider.dart';
 import 'expenses_insights_page.dart';
@@ -141,7 +140,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
                               horizontal: 0,
                             ),
                             title: Text(
-                              e.title,
+                              '${e.title} ${e.category == null ? '' : '• ${e.category}'}',
                               overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(_fmtDate(e.date)),
@@ -224,8 +223,9 @@ class _ExpensesCardState extends State<ExpensesCard> {
   ) {
     final titleC = TextEditingController();
     final amountC = TextEditingController();
-    String assign = member;
 
+    String assign = member; // varsayılan atanacak kişi
+    String? cat; // null => Uncategorized
     const categories = <String>[
       'Groceries',
       'Dining',
@@ -236,88 +236,100 @@ class _ExpensesCardState extends State<ExpensesCard> {
       'Home',
       'Other',
     ];
-    String? cat; // null = Uncategorized
 
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Add expense'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleC,
-              decoration: const InputDecoration(
-                hintText: 'Title (e.g., Groceries)',
-                prefixIcon: Icon(Icons.edit_note),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          return AlertDialog(
+            title: const Text('Add expense'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: titleC,
+                    decoration: const InputDecoration(
+                      hintText: 'Title (e.g., Groceries)',
+                      prefixIcon: Icon(Icons.edit_note),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: amountC,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      hintText: 'Amount (e.g., 24.90)',
+                      prefixIcon: Icon(Icons.euro),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: assign,
+                    isExpanded: true,
+                    items: family
+                        .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                        .toList(),
+                    onChanged: (v) => setLocal(() => assign = v ?? member),
+                    decoration: const InputDecoration(
+                      labelText: 'Assign to',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String?>(
+                    value: cat,
+                    isExpanded: true,
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Uncategorized'),
+                      ),
+                      ...categories.map(
+                        (c) =>
+                            DropdownMenuItem<String?>(value: c, child: Text(c)),
+                      ),
+                    ],
+                    onChanged: (v) => setLocal(() => cat = v),
+                    decoration: const InputDecoration(
+                      labelText: 'Category',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: amountC,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
               ),
-              decoration: const InputDecoration(
-                hintText: 'Amount (e.g., 24.90)',
-                prefixIcon: Icon(Icons.euro),
+              FilledButton(
+                onPressed: () {
+                  final t = titleC.text.trim();
+                  final a = double.tryParse(amountC.text.replaceAll(',', '.'));
+                  if (t.isEmpty || a == null || a <= 0) return;
+
+                  // YÖNTEM 1: Provider'ın addExpense(...) metodu
+                  context.read<ExpenseProvider>().addExpense(
+                    title: t,
+                    amount: a,
+                    date: DateTime.now(),
+                    assignedTo: assign,
+                    category:
+                        cat, // ✅ seçilen kategori (null ise provider 'Uncategorized' set eder)
+                  );
+                  Navigator.pop(context);
+                },
+                child: const Text('Add'),
               ),
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: assign,
-              isExpanded: true,
-              items: family
-                  .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                  .toList(),
-              onChanged: (v) => assign = v ?? member,
-              decoration: const InputDecoration(
-                labelText: 'Assign to',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String?>(
-              value: cat,
-              isExpanded: true,
-              items: [
-                const DropdownMenuItem<String?>(
-                  value: null,
-                  child: Text('Uncategorized'),
-                ),
-                ...categories.map(
-                  (c) => DropdownMenuItem<String?>(value: c, child: Text(c)),
-                ),
-              ],
-              onChanged: (v) => cat = v,
-              decoration: const InputDecoration(
-                labelText: 'Category',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final t = titleC.text.trim();
-              final a =
-                  double.tryParse(amountC.text.replaceAll(',', '.')) ?? 0.0;
-              if (t.isEmpty || a <= 0) return;
-              context.read<ExpenseProvider>().add(
-                Expense(t, a, assignedTo: assign),
-              );
-              Navigator.pop(context);
-            },
-            child: const Text('Add'),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }

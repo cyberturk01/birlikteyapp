@@ -298,6 +298,7 @@ void _showChangeCategorySheet(BuildContext context, Expense e) {
   const categories = <String>[
     'Groceries',
     'Dining',
+    'Clothing',
     'Transport',
     'Utilities',
     'Health',

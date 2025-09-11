@@ -28,24 +28,23 @@ class ConfigurationPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configuration'),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await context.read<UiProvider>().resetSettings();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Settings reset to defaults')),
-                );
-              }
-            },
-            child: const Text(
-              'Reset',
-              style: TextStyle(fontWeight: FontWeight.bold),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Configuration',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
-          ),
-        ],
+            Text(
+              'Customize theme, reminders, and family filters.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
+
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [

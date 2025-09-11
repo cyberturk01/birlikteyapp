@@ -5,10 +5,12 @@ import '../../models/view_section.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_provider.dart';
 import '../../providers/task_provider.dart';
+import '../../providers/weekly_provider.dart';
 import '../config/config_page.dart';
 import '../expenses/expenses_card.dart';
 import '../manage/manage_page.dart';
 import '../weekly/weekly_page.dart';
+import 'dashboard_summary.dart';
 import 'family_manager.dart';
 import 'member_card.dart';
 
@@ -33,9 +35,12 @@ class _HomePageState extends State<HomePage> {
       initialPage: _activeIndex,
     );
     // initialFilterMember geldiyse index’e çevir
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final family = context.read<FamilyProvider>().familyMembers;
       final target = widget.initialFilterMember;
+      final weekly = context.read<WeeklyProvider>();
+      final taskProv = context.read<TaskProvider>();
+      await weekly.ensureTodaySynced(taskProv);
       if (target != null && target.isNotEmpty) {
         final idx = family.indexOf(target);
         if (idx >= 0) {
@@ -136,32 +141,33 @@ class _HomePageState extends State<HomePage> {
               )
             : Column(
                 children: [
-                  // Global toggle
-                  SegmentedButton<HomeSection>(
-                    segments: const [
-                      ButtonSegment(
-                        value: HomeSection.tasks,
-                        icon: Icon(Icons.task, size: 16),
-                        label: Text('Tasks', style: TextStyle(fontSize: 12)),
-                      ),
-                      ButtonSegment(
-                        value: HomeSection.items,
-                        icon: Icon(Icons.shopping_cart, size: 16),
-                        label: Text('Market', style: TextStyle(fontSize: 12)),
-                      ),
-                      ButtonSegment(
-                        value: HomeSection.expenses,
-                        icon: Icon(Icons.account_balance_wallet),
-                        label: Text('Expenses'),
-                      ),
-                    ],
-                    selected: {_section},
-                    onSelectionChanged: (s) =>
-                        setState(() => _section = s.first),
-                    showSelectedIcon: false,
+                  // HomePage build > body > Column children başına ekle
+                  DashboardSummaryBar(
+                    onTap: (dest) {
+                      switch (dest) {
+                        case SummaryDest.tasks:
+                          setState(() => _section = HomeSection.tasks);
+                          break;
+                        case SummaryDest.items:
+                          setState(() => _section = HomeSection.items);
+                          break;
+                        case SummaryDest.weekly:
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const WeeklyPage(),
+                            ),
+                          );
+                          break;
+                        case SummaryDest.expenses:
+                          setState(() => _section = HomeSection.expenses);
+                          // Burada ExpenseAnalyticsPage veya ExpensesPage'e yönlendirin:
+                          // Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpensesHubPage()));
+                          break;
+                      }
+                    },
                   ),
-                  const SizedBox(height: 12),
-
+                  const SizedBox(height: 4),
                   Expanded(
                     child: PageView.builder(
                       controller: _pageController,

@@ -131,7 +131,7 @@ class _TemplatesPageState extends State<TemplatesPage> {
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Text(
-                      'You don’t have any templates yet.\nTap “New Template” to create one.',
+                      'You don’t have any templates yet.\nTap “Create Template” to create one.',
                       textAlign: TextAlign.center,
                     ),
                   ),
