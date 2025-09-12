@@ -13,5 +13,7 @@ class Task extends HiveObject {
   @HiveField(2)
   String? assignedTo;
 
-  Task(this.name, {this.completed = false, this.assignedTo});
+  String? remoteId;
+
+  Task(this.name, {this.completed = false, this.assignedTo, this.remoteId});
 }

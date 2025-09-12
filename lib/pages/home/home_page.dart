@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../models/view_section.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_provider.dart';
+import '../../providers/task_cloud_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/weekly_provider.dart';
 import '../config/config_page.dart';
@@ -74,7 +75,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final family = context.watch<FamilyProvider>().familyMembers;
-    final tasks = context.watch<TaskProvider>().tasks;
+    final tasks = context.watch<TaskCloudProvider>().tasks;
     final items = context.watch<ItemProvider>().items;
 
     // Liste değişmişse index sınırını koru

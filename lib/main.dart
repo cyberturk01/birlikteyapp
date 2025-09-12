@@ -1,8 +1,11 @@
 import 'package:birlikteyapp/pages/home/home_page.dart';
 import 'package:birlikteyapp/providers/expense_provider.dart';
+import 'package:birlikteyapp/providers/task_cloud_provider.dart';
 import 'package:birlikteyapp/providers/templates_provider.dart';
 import 'package:birlikteyapp/providers/ui_provider.dart';
+import 'package:birlikteyapp/services/auth_service.dart';
 import 'package:birlikteyapp/services/notification_service.dart';
+import 'package:birlikteyapp/services/task_service.dart';
 import 'package:birlikteyapp/theme/app_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -27,12 +30,6 @@ import 'providers/weekly_provider.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // // Activate App Check
-  // await FirebaseAppCheck.instance.activate(
-  //   // You can also use a debug provider for local testing
-  //   androidProvider: AndroidProvider.playIntegrity,
-  // );
 
   final view = WidgetsBinding.instance.platformDispatcher.views.first;
   final shortestLogical =
@@ -109,6 +106,21 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => ExpenseProvider()),
         ChangeNotifierProvider(create: (_) => UiProvider()..loadPrefs()),
         ChangeNotifierProvider.value(value: ui),
+        Provider<AuthService>(create: (_) => AuthService()),
+        Provider<TaskService>(create: (_) => TaskService()),
+        ChangeNotifierProxyProvider2<
+          AuthService,
+          TaskService,
+          TaskCloudProvider
+        >(
+          create: (ctx) => TaskCloudProvider(
+            ctx.read<AuthService>(),
+            ctx.read<TaskService>(),
+          ),
+          // Auth/Service değişirse ve önceki yoksa yeniden oluştur.
+          update: (ctx, auth, service, previous) =>
+              previous ?? TaskCloudProvider(auth, service),
+        ),
       ],
       child: FamilyApp(),
     ),

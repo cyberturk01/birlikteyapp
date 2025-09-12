@@ -7,7 +7,7 @@ import '../../models/item.dart';
 import '../../models/task.dart';
 import '../../models/view_section.dart';
 import '../../providers/item_provider.dart';
-import '../../providers/task_provider.dart';
+import '../../providers/task_cloud_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../widgets/muted_text.dart';
 import '../../widgets/swipe_bg.dart';
@@ -44,7 +44,7 @@ class _MemberCardState extends State<MemberCard> {
 
   void _toggleTask(Task task) {
     final newVal = !task.completed;
-    context.read<TaskProvider>().toggleTask(task, newVal);
+    context.read<TaskCloudProvider>().toggleTask(task, newVal);
     setState(() {});
   }
 
@@ -324,7 +324,7 @@ class _MemberCardState extends State<MemberCard> {
   }
 
   void _clearCompletedForMember(BuildContext context, String member) {
-    final prov = context.read<TaskProvider>();
+    final prov = context.read<TaskCloudProvider>();
 
     // Undo için anlık snapshot
     final removed = prov.tasks
@@ -343,7 +343,7 @@ class _MemberCardState extends State<MemberCard> {
           label: 'Undo',
           onPressed: () {
             for (final t in removed) {
-              context.read<TaskProvider>().addTask(t);
+              context.read<TaskCloudProvider>().addTask(t);
             }
           },
         ),
@@ -382,7 +382,7 @@ class _MemberCardState extends State<MemberCard> {
   // ===== Quick add sheets (assign OR create) =====
 
   void _openQuickAddTaskSheet(BuildContext context, String member) {
-    final taskProv = context.read<TaskProvider>();
+    final taskProv = context.read<TaskCloudProvider>();
 
     const defaultTasks = AppLists.defaultTasks;
 
@@ -660,19 +660,13 @@ class _TasksSubsection extends StatelessWidget {
             final isDone = task.completed;
             return Dismissible(
               key: ValueKey(
-                task.key,
+                task.remoteId ?? '${task.name}|${task.assignedTo ?? ""}',
               ), // HiveObject.key (Task, HiveObject'tan türemeli)
               background: const SwipeBg(
                 color: Colors.green,
                 icon: Icons.check,
                 align: Alignment.centerLeft,
               ),
-              // Container(
-              //   color: Colors.green.withValues(alpha: 0.85),
-              //   padding: const EdgeInsets.symmetric(horizontal: 16),
-              //   alignment: Alignment.centerLeft,
-              //   child: const Icon(Icons.check, color: Colors.white),
-              // ),
               secondaryBackground: const SwipeBg(
                 color: Colors.red,
                 icon: Icons.delete,
@@ -689,7 +683,7 @@ class _TasksSubsection extends StatelessWidget {
                   // SAĞ → SOL : Delete — dismiss ET
                   final removed = task;
                   // Önce Hive’dan sil
-                  context.read<TaskProvider>().removeTask(task);
+                  context.read<TaskCloudProvider>().removeTask(task);
 
                   // Undo SnackBar
                   ScaffoldMessenger.of(context).clearSnackBars();
@@ -700,7 +694,7 @@ class _TasksSubsection extends StatelessWidget {
                         label: 'Undo',
                         onPressed: () {
                           // Not: yeniden eklenir (yeni key alır); sıra üstte olur
-                          context.read<TaskProvider>().addTask(removed);
+                          context.read<TaskCloudProvider>().addTask(removed);
                         },
                       ),
                     ),
@@ -736,7 +730,7 @@ class _TasksSubsection extends StatelessWidget {
                   tooltip: S.delete,
                   icon: const Icon(Icons.delete, color: Colors.redAccent),
                   onPressed: () =>
-                      context.read<TaskProvider>().removeTask(task),
+                      context.read<TaskCloudProvider>().removeTask(task),
                 ),
               ),
             );
@@ -880,7 +874,7 @@ class _ItemsSubsection extends StatelessWidget {
 void _handleToggleTask(BuildContext context, Task t) {
   final ui = context.read<UiProvider>();
   final newVal = !t.completed;
-  context.read<TaskProvider>().toggleTask(t, newVal);
+  context.read<TaskCloudProvider>().toggleTask(t, newVal);
 
   if (newVal && ui.taskFilter == TaskViewFilter.pending) {
     context.read<UiProvider>().setTaskFilter(TaskViewFilter.completed);
@@ -952,13 +946,13 @@ Item? _pickItemByName(List<Item> list, String name) {
 }
 
 void _assignOrCreateTask(BuildContext context, String name, String member) {
-  final prov = context.read<TaskProvider>();
+  final prov = context.read<TaskCloudProvider>();
   final trimmed = name.trim();
   if (trimmed.isEmpty) return;
 
   final existing = _pickTaskByName(prov.tasks, trimmed);
   if (existing != null) {
-    context.read<TaskProvider>().updateAssignment(existing, member);
+    context.read<TaskCloudProvider>().updateAssignment(existing, member);
   } else {
     prov.addTask(Task(trimmed, assignedTo: member));
   }
@@ -978,48 +972,6 @@ void _assignOrCreateItem(BuildContext context, String name, String member) {
   }
   Navigator.pop(context);
 }
-
-// void _submitTask(
-//   TaskProvider prov,
-//   String text,
-//   String member,
-//   BuildContext ctx,
-// ) {
-//   final t = text.trim();
-//   if (t.isEmpty) return;
-//   final exists = prov.tasks.any(
-//     (task) => task.name.toLowerCase() == t.toLowerCase(),
-//   );
-//   if (exists) {
-//     ScaffoldMessenger.of(
-//       ctx,
-//     ).showSnackBar(const SnackBar(content: Text('This task already exists')));
-//     return;
-//   }
-//   prov.addTask(Task(t, assignedTo: member));
-//   Navigator.pop(ctx);
-// }
-//
-// void _submitItem(
-//   ItemProvider prov,
-//   String text,
-//   String member,
-//   BuildContext ctx,
-// ) {
-//   final t = text.trim();
-//   if (t.isEmpty) return;
-//   final exists = prov.items.any(
-//     (task) => task.name.toLowerCase() == t.toLowerCase(),
-//   );
-//   if (exists) {
-//     ScaffoldMessenger.of(
-//       ctx,
-//     ).showSnackBar(const SnackBar(content: Text('This item already exists')));
-//     return;
-//   }
-//   prov.addItem(Item(t, assignedTo: member));
-//   Navigator.pop(ctx);
-// }
 
 class EmptyFamilyCard extends StatelessWidget {
   final VoidCallback onAdd;
