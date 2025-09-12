@@ -21,6 +21,9 @@ dependencies:
   csv: ^5.0.2
   share_plus: ^7.2.1
   path_provider: ^2.1.3
+  firebase_core: ^4.1.0
+  firebase_auth: ^6.0.2
+#  firebase_app_check: ^0.4.0
 
   cupertino_icons: ^1.0.8
 

@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -130,6 +131,11 @@ class _HomePageState extends State<HomePage> {
                 MaterialPageRoute(builder: (_) => const ConfigurationPage()),
               );
             },
+          ),
+          IconButton(
+            tooltip: 'Sign out',
+            icon: const Icon(Icons.logout),
+            onPressed: () => FirebaseAuth.instance.signOut(),
           ),
         ],
       ),
