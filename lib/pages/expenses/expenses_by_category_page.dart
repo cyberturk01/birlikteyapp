@@ -16,6 +16,7 @@ class ExpensesByCategoryPage extends StatefulWidget {
 class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
   String? _member;
   ExpenseDateFilter _filter = ExpenseDateFilter.thisMonth;
+  static const _allKey = '__ALL__';
 
   @override
   void initState() {
@@ -28,7 +29,11 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
     final family = context.watch<FamilyProvider>().familyMembers;
     final expProv = context.watch<ExpenseProvider>();
 
-    final map = expProv.totalsByCategory(member: _member, filter: _filter);
+    final memberForFilter = (_member == _allKey) ? null : _member;
+    final map = expProv.totalsByCategory(
+      member: memberForFilter,
+      filter: _filter,
+    );
     final entries = map.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value)); // büyükten küçüğe
 
@@ -46,25 +51,40 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
             children: [
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 280),
-                child: DropdownButtonFormField<String?>(
-                  value: _member,
-                  isExpanded: true,
-                  items: [
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('All members'),
-                    ),
-                    ...family.map(
-                      (m) =>
-                          DropdownMenuItem<String?>(value: m, child: Text(m)),
-                    ),
-                  ],
-                  onChanged: (v) => setState(() => _member = v),
-                  decoration: const InputDecoration(
-                    labelText: 'Member',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
+                child: StreamBuilder<List<String>>(
+                  stream: context.read<FamilyProvider>().watchMemberLabels(),
+                  builder: (context, snap) {
+                    final labels = (snap.data ?? const <String>[]).toList();
+                    String? current = _member ?? _allKey;
+                    if (current.isNotEmpty &&
+                        current != _allKey &&
+                        !labels.contains(current)) {
+                      current = labels.isNotEmpty ? labels.first : _allKey;
+                    }
+                    return DropdownButtonFormField<String?>(
+                      value: current,
+                      isExpanded: true,
+                      items: [
+                        const DropdownMenuItem(
+                          value: _allKey,
+                          child: Text('All members'),
+                        ),
+                        const DropdownMenuItem(
+                          value: '',
+                          child: Text('Unassigned'),
+                        ),
+                        ...labels.map(
+                          (m) => DropdownMenuItem(value: m, child: Text(m)),
+                        ),
+                      ],
+                      onChanged: (v) => setState(() => _member = v),
+                      decoration: const InputDecoration(
+                        labelText: 'Member',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    );
+                  },
                 ),
               ),
               SegmentedButton<ExpenseDateFilter>(

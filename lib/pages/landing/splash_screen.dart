@@ -20,12 +20,13 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _decideRoute() async {
-    await Future.delayed(const Duration(milliseconds: 1000)); // küçük bekleme
+    // Küçük bekleme (opsiyonel)
+    await Future.delayed(const Duration(milliseconds: 500));
 
-    final members = Provider.of<FamilyProvider>(
-      context,
-      listen: false,
-    ).familyMembers;
+    final fam = context.read<FamilyProvider>();
+
+    // 🔽 Üye display name akışını bir defa oku
+    final members = await fam.watchMemberDisplayNames().first;
 
     if (!mounted) return;
 

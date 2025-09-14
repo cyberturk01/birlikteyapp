@@ -38,10 +38,20 @@ class _LoginPageState extends State<LoginPage> {
       }
     } on FirebaseAuthException catch (e) {
       final msg = _friendlyError(e);
+      debugPrint(
+        "❌ FirebaseAuthException: code=${e.code}, message=${e.message}",
+      );
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } catch (e, st) {
+      debugPrint("❌ Unknown auth error: $e\n$st");
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Unknown error: $e')));
       }
     } finally {
       if (mounted) setState(() => _loading = false);

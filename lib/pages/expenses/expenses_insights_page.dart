@@ -21,24 +21,22 @@ class ExpensesInsightsPage extends StatefulWidget {
 }
 
 class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
-  String? _member; // null = All members
+  // _member: dropdown seçimi. Özel anahtar: __ALL__ => tüm üyeler
+  static const String _allKey = '__ALL__';
+
+  String? _member; // label | '' (unassigned) | __ALL__
   ExpenseDateFilter _filter = ExpenseDateFilter.thisMonth;
 
   @override
   void initState() {
     super.initState();
-    _member = widget.initialMember; // aktif üye ile başla
+    // initialMember gelebilir (örn: "You (yigitgokhan1)")
+    _member = widget.initialMember; // normalize'ı build içinde yapacağız
   }
 
   @override
   Widget build(BuildContext context) {
-    final family = context.watch<FamilyProvider>().familyMembers;
     final expProv = context.watch<ExpenseProvider>();
-
-    final expenses = expProv.forMemberFiltered(_member, _filter);
-    final total = expProv.totalForMember(_member, filter: _filter);
-    final year = DateTime.now().year;
-    final monthly = expProv.monthlyTotals(year: year, member: _member);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Expenses — Insights')),
@@ -51,148 +49,212 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              // Member seçici
+              // Member seçici (CANLI: Firestore labels)
               ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 280),
-                child: DropdownButtonFormField<String?>(
-                  value: _member, // null = All
-                  isExpanded: true,
-                  items: [
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('All members'),
-                    ),
-                    ...family.map(
-                      (m) =>
-                          DropdownMenuItem<String?>(value: m, child: Text(m)),
-                    ),
-                  ],
-                  onChanged: (v) => setState(() => _member = v),
-                  decoration: const InputDecoration(
-                    labelText: 'Member',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                ),
-              ),
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: StreamBuilder<List<String>>(
+                  stream: context.read<FamilyProvider>().watchMemberLabels(),
+                  builder: (context, snap) {
+                    final labels = (snap.data ?? const <String>[]).toList();
 
-              // Tarih filtresi
-              SegmentedButton<ExpenseDateFilter>(
-                segments: const [
-                  ButtonSegment(
-                    value: ExpenseDateFilter.thisMonth,
-                    label: Text('This month'),
-                    icon: Icon(Icons.today),
-                  ),
-                  ButtonSegment(
-                    value: ExpenseDateFilter.lastMonth,
-                    label: Text('Last month'),
-                    icon: Icon(Icons.calendar_today_outlined),
-                  ),
-                  ButtonSegment(
-                    value: ExpenseDateFilter.all,
-                    label: Text('All'),
-                    icon: Icon(Icons.all_inclusive),
-                  ),
-                ],
-                selected: {_filter},
-                onSelectionChanged: (s) => setState(() => _filter = s.first),
-                showSelectedIcon: false,
-              ),
+                    // __ALL__ anahtarı ve normalize
+                    const allKey = '__ALL__';
+                    String? current = _member;
+                    if (current == null) {
+                      current = allKey;
+                    } else if (current.isNotEmpty &&
+                        !labels.contains(current)) {
+                      current = labels.isNotEmpty ? labels.first : allKey;
+                    }
+                    final memberForFilter = (current == allKey)
+                        ? null
+                        : current;
 
-              // Export / Share
-              const SizedBox(width: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              ExpensesByCategoryPage(initialMember: _member),
+                    // Hesaplamalar (artık StreamBuilder içinde; labels’a göre)
+                    final expProv = context.watch<ExpenseProvider>();
+                    final expenses = expProv.forMemberFiltered(
+                      memberForFilter,
+                      _filter,
+                    );
+                    final total = expProv.totalForMember(
+                      memberForFilter,
+                      filter: _filter,
+                    );
+                    final year = DateTime.now().year;
+                    final monthly = expProv.monthlyTotals(
+                      year: year,
+                      member: memberForFilter,
+                    );
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            // 1) Üye seçici sadece 280px ile sınırlı
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 280),
+                              child: DropdownButtonFormField<String?>(
+                                value: current,
+                                isExpanded: true,
+                                items: [
+                                  const DropdownMenuItem<String?>(
+                                    value: allKey,
+                                    child: Text('All members'),
+                                  ),
+                                  const DropdownMenuItem<String?>(
+                                    value: '',
+                                    child: Text('Unassigned'),
+                                  ),
+                                  ...labels.map(
+                                    (m) => DropdownMenuItem<String?>(
+                                      value: m,
+                                      child: Text(m),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (v) => setState(() => _member = v),
+                                decoration: const InputDecoration(
+                                  labelText: 'Member',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                              ),
+                            ),
+
+                            // 2) Tarih filtresi — wrap içinde serbest
+                            SegmentedButton<ExpenseDateFilter>(
+                              segments: const [
+                                ButtonSegment(
+                                  value: ExpenseDateFilter.thisMonth,
+                                  label: Text('This month'),
+                                  icon: Icon(Icons.today),
+                                ),
+                                ButtonSegment(
+                                  value: ExpenseDateFilter.lastMonth,
+                                  label: Text('Last month'),
+                                  icon: Icon(Icons.calendar_today_outlined),
+                                ),
+                                ButtonSegment(
+                                  value: ExpenseDateFilter.all,
+                                  label: Text('All'),
+                                  icon: Icon(Icons.all_inclusive),
+                                ),
+                              ],
+                              selected: {_filter},
+                              onSelectionChanged: (s) =>
+                                  setState(() => _filter = s.first),
+                              showSelectedIcon: false,
+                            ),
+
+                            // 3) Aksiyonlar — ROW DEĞİL, WRAP!
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                TextButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => ExpensesByCategoryPage(
+                                          initialMember: memberForFilter,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.pie_chart_outline),
+                                  label: const Text('By category'),
+                                ),
+                                TextButton.icon(
+                                  onPressed: () =>
+                                      _exportCsv(context, expenses),
+                                  icon: const Icon(Icons.download),
+                                  label: const Text('Export CSV'),
+                                ),
+                                TextButton.icon(
+                                  onPressed: () => _shareCsv(context, expenses),
+                                  icon: const Icon(Icons.share),
+                                  label: const Text('Share'),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                      );
-                    },
-                    icon: const Icon(Icons.pie_chart_outline),
-                    label: const Text('By category'),
-                  ),
-                  TextButton.icon(
-                    onPressed: () => _exportCsv(context, expenses),
-                    icon: const Icon(Icons.download),
-                    label: const Text('Export CSV'),
-                  ),
-                  TextButton.icon(
-                    onPressed: () => _shareCsv(context, expenses),
-                    icon: const Icon(Icons.share),
-                    label: const Text('Share'),
-                  ),
-                ],
-              ),
-            ],
-          ),
 
-          const SizedBox(height: 12),
+                        const SizedBox(height: 12),
 
-          // === Toplam & Ay etiketi ===
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _titleWithMonth(_filter),
-                  style: Theme.of(context).textTheme.titleMedium,
+                        // Toplam başlık
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _titleWithMonth(_filter),
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ),
+                            Text(
+                              '€ ${total.toStringAsFixed(2)}',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 8),
+                        _MonthlyBarChart(data: monthly),
+                        const SizedBox(height: 16),
+
+                        // Liste
+                        Card(
+                          elevation: 2,
+                          child: Column(
+                            children: [
+                              ListTile(
+                                title: const Text('Transactions'),
+                                subtitle: Text(
+                                  '${expenses.length} record${expenses.length == 1 ? '' : 's'}',
+                                ),
+                              ),
+                              const Divider(height: 1),
+                              if (expenses.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Text(
+                                    'No expenses for selected range.',
+                                  ),
+                                )
+                              else
+                                ...expenses.map(
+                                  (e) => ListTile(
+                                    dense: true,
+                                    title: Text(
+                                      e.title,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    subtitle: Text(
+                                      '${_fmtDate(e.date)} • ${e.assignedTo ?? 'Unassigned'}'
+                                      '${e.category == null ? '' : ' • ${e.category}'}',
+                                    ),
+                                    trailing: Text(
+                                      '€ ${e.amount.toStringAsFixed(2)}',
+                                    ),
+                                    onLongPress: () =>
+                                        _showChangeCategorySheet(context, e),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
-              Text(
-                '€ ${total.toStringAsFixed(2)}',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
             ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // === Bar Chart (yıllık) ===
-          _MonthlyBarChart(data: monthly),
-
-          const SizedBox(height: 16),
-
-          // === Liste (filtrelenmiş, yeni → eski) ===
-          Card(
-            elevation: 2,
-            child: Column(
-              children: [
-                ListTile(
-                  title: const Text('Transactions'),
-                  subtitle: Text(
-                    '${expenses.length} record${expenses.length == 1 ? '' : 's'}',
-                  ),
-                ),
-                const Divider(height: 1),
-
-                if (expenses.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('No expenses for selected range.'),
-                  )
-                else
-                  ...expenses.map(
-                    (e) => ListTile(
-                      dense: true,
-                      title: Text(e.title, overflow: TextOverflow.ellipsis),
-                      subtitle: Text(
-                        '${_fmtDate(e.date)} • ${e.assignedTo ?? 'Unassigned'}'
-                        '${e.category == null ? '' : ' • ${e.category}'}',
-                      ), // geçici görünürlük
-                      trailing: Text('€ ${e.amount.toStringAsFixed(2)}'),
-                      onLongPress: () => _showChangeCategorySheet(context, e),
-                    ),
-                  ),
-              ],
-            ),
           ),
         ],
       ),

@@ -38,21 +38,20 @@ class _HomePageState extends State<HomePage> {
     );
     // initialFilterMember geldiyse index’e çevir
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final family = context.read<FamilyProvider>().familyMembers;
-      final target = widget.initialFilterMember;
+      // final target = widget.initialFilterMember;
       final weekly = context.read<WeeklyProvider>();
       final taskProv = context.read<TaskProvider>();
       await weekly.ensureTodaySynced(taskProv);
-      if (target != null && target.isNotEmpty) {
-        final idx = family.indexOf(target);
-        if (idx >= 0) {
-          _activeIndex = idx;
-          if (_pageController.hasClients) {
-            _pageController.jumpToPage(idx);
-          }
-          setState(() {}); // aktif index’i yansıt
-        }
-      }
+      // if (target != null && target.isNotEmpty) {
+      //   final idx = family.indexOf(target);
+      //   if (idx >= 0) {
+      //     _activeIndex = idx;
+      //     if (_pageController.hasClients) {
+      //       _pageController.jumpToPage(idx);
+      //     }
+      //     setState(() {}); // aktif index’i yansıt
+      //   }
+      // }
     });
   }
 
@@ -67,96 +66,131 @@ class _HomePageState extends State<HomePage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final family = context.watch<FamilyProvider>().familyMembers;
-    // İlk kez: aktif yoksa ilk kişiyi seç
-    _activeMember ??= family.isNotEmpty ? family.first : null;
+    // final family = context.watch<FamilyProvider>().familyMembers;
+    // // İlk kez: aktif yoksa ilk kişiyi seç
+    // _activeMember ??= family.isNotEmpty ? family.first : null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final family = context.watch<FamilyProvider>().familyMembers;
-    final tasks = context.watch<TaskCloudProvider>().tasks;
-    final items = context.watch<ItemProvider>().items;
+    final famProv = context.watch<FamilyProvider>();
+    final familyId = famProv.familyId;
 
-    // Liste değişmişse index sınırını koru
-    if (_activeIndex >= family.length) {
-      _activeIndex = family.isEmpty ? 0 : family.length - 1;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_pageController.hasClients) {
-          _pageController.jumpToPage(_activeIndex);
-        }
-      });
+    if (familyId == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: const [
-            Icon(Icons.family_restroom),
-            SizedBox(width: 8),
-            Text('Togetherly'),
-          ],
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Manage family',
-            icon: const Icon(Icons.group),
-            onPressed: () => showFamilyManager(context),
+    // initialFilterMember'ı ilk kez uyguladık mı?
+    bool _appliedInitial = false;
+
+    return StreamBuilder<List<String>>(
+      stream: famProv.watchMemberLabels(),
+      builder: (context, snap) {
+        final labels = snap.data ?? const <String>[];
+        final safeFamily = labels.isEmpty ? <String>['You'] : labels;
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        // initialFilterMember geldiyse ve henüz uygulamadıysak, burada uygula
+        if (!_appliedInitial && widget.initialFilterMember != null) {
+          final target = widget.initialFilterMember!;
+          final idx = safeFamily.indexOf(target);
+          if (idx >= 0) {
+            _activeIndex = idx;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_pageController.hasClients) {
+                _pageController.jumpToPage(idx);
+              }
+              setState(() {});
+            });
+          }
+          _appliedInitial = true;
+        }
+
+        // _activeIndex sınırı
+        if (_activeIndex >= safeFamily.length) {
+          _activeIndex = safeFamily.length - 1;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_pageController.hasClients) {
+              _pageController.jumpToPage(_activeIndex);
+            }
+            setState(() {});
+          });
+        }
+
+        final tasks = context.watch<TaskCloudProvider>().tasks;
+        final items = context.watch<ItemProvider>().items;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Row(
+              children: const [
+                Icon(Icons.family_restroom),
+                SizedBox(width: 8),
+                Text('Togetherly'),
+              ],
+            ),
+            actions: [
+              IconButton(
+                tooltip: 'Manage family',
+                icon: const Icon(Icons.group),
+                onPressed: () => showFamilyManager(context),
+              ),
+              IconButton(
+                tooltip: 'Weekly plan',
+                icon: const Icon(Icons.calendar_today),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const WeeklyPage()),
+                  );
+                },
+              ),
+              IconButton(
+                tooltip: 'Add Center',
+                icon: const Icon(Icons.add_circle_outline),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ManagePage()),
+                  );
+                },
+              ),
+              IconButton(
+                tooltip: 'Configuration',
+                icon: const Icon(Icons.tune),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ConfigurationPage(),
+                    ),
+                  );
+                },
+              ),
+              IconButton(
+                tooltip: 'Sign out',
+                icon: const Icon(Icons.logout),
+                onPressed: () => FirebaseAuth.instance.signOut(),
+              ),
+            ],
           ),
-          IconButton(
-            tooltip: 'Weekly plan',
-            icon: const Icon(Icons.calendar_today),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const WeeklyPage()),
-              );
-            },
-          ),
-          IconButton(
-            tooltip: 'Add Center',
-            icon: const Icon(Icons.add_circle_outline),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ManagePage()),
-              );
-            },
-          ),
-          IconButton(
-            tooltip: 'Configuration',
-            icon: const Icon(Icons.tune),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ConfigurationPage()),
-              );
-            },
-          ),
-          IconButton(
-            tooltip: 'Sign out',
-            icon: const Icon(Icons.logout),
-            onPressed: () => FirebaseAuth.instance.signOut(),
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(12),
-        child: family.isEmpty
-            ? Center(
-                child: EmptyFamilyCard(onAdd: () => showFamilyManager(context)),
-              )
-            : Column(
-                children: [
-                  // HomePage build > body > Column children başına ekle
-                  DashboardSummaryBar(
-                    onTap: (dest) {
+          body: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                DashboardSummaryBar(
+                  onTap: (dest) {
+                    setState(() {
                       switch (dest) {
                         case SummaryDest.tasks:
-                          setState(() => _section = HomeSection.tasks);
+                          _section = HomeSection.tasks;
                           break;
                         case SummaryDest.items:
-                          setState(() => _section = HomeSection.items);
+                          _section = HomeSection.items;
                           break;
                         case SummaryDest.weekly:
                           Navigator.push(
@@ -165,100 +199,107 @@ class _HomePageState extends State<HomePage> {
                               builder: (_) => const WeeklyPage(),
                             ),
                           );
-                          break;
+                          return;
                         case SummaryDest.expenses:
-                          setState(() => _section = HomeSection.expenses);
-                          // Burada ExpenseAnalyticsPage veya ExpensesPage'e yönlendirin:
-                          // Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpensesHubPage()));
+                          _section = HomeSection.expenses;
                           break;
                       }
-                    },
-                  ),
-                  const SizedBox(height: 4),
-                  Expanded(
-                    child: PageView.builder(
-                      controller: _pageController,
-                      physics: const BouncingScrollPhysics(),
-                      onPageChanged: (i) {
-                        setState(() => _activeIndex = i);
-                      },
-                      itemCount: family.length,
-                      itemBuilder: (context, i) {
-                        final name = family[i];
-                        final memberTasks = tasks
-                            .where((t) => t.assignedTo == name)
-                            .toList();
-                        final memberItems = items
-                            .where((it) => it.assignedTo == name)
-                            .toList();
+                    });
+                  },
+                ),
+                const SizedBox(height: 4),
 
-                        // aktif sayfayı büyült, diğerlerini hafif küçült
-                        return AnimatedBuilder(
-                          animation: _pageController,
-                          builder: (context, child) {
-                            double scale = 1.0;
-                            double opacity = 1.0;
+                Expanded(
+                  child: PageView.builder(
+                    controller: _pageController,
+                    physics: const BouncingScrollPhysics(),
+                    onPageChanged: (i) => setState(() => _activeIndex = i),
+                    itemCount: safeFamily.length,
+                    itemBuilder: (context, i) {
+                      final name = safeFamily[i];
+                      final memberTasks = tasks
+                          .where((t) => t.assignedTo == name)
+                          .toList();
+                      final memberItems = items
+                          .where((it) => it.assignedTo == name)
+                          .toList();
 
-                            if (_pageController.position.haveDimensions) {
-                              final page =
-                                  _pageController.page ??
-                                  _activeIndex.toDouble();
-                              final dist = (page - i).abs().clamp(0.0, 1.0);
-                              scale = 1.0 - dist * 0.06; // 6% küçülme
-                              opacity = 1.0 - dist * 0.20; // %20 solma
-                            }
+                      return AnimatedBuilder(
+                        animation: _pageController,
+                        builder: (context, child) {
+                          double scale = 1.0, opacity = 1.0;
+                          if (_pageController.position.haveDimensions) {
+                            final page =
+                                _pageController.page ?? _activeIndex.toDouble();
+                            final dist = (page - i).abs().clamp(0.0, 1.0);
+                            scale = 1.0 - dist * 0.06;
+                            opacity = 1.0 - dist * 0.20;
+                          }
 
-                            return Center(
-                              child: AnimatedOpacity(
-                                duration: const Duration(milliseconds: 150),
-                                opacity: opacity,
-                                child: Transform.scale(
-                                  scale: scale,
-                                  child: _MemberPageKeepAlive(
-                                    key: PageStorageKey('member-page-$i'),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 8,
+                          // 🔑 sadece kart içini sekmeye göre değiştiriyoruz
+                          final card = (_section == HomeSection.expenses)
+                              ? ExpensesCard(memberName: name)
+                              : MemberCard(
+                                  memberName: name,
+                                  tasks: memberTasks,
+                                  items: memberItems,
+                                  section: _section,
+                                );
+
+                          return Center(
+                            child: AnimatedOpacity(
+                              duration: const Duration(milliseconds: 150),
+                              opacity: opacity,
+                              child: Transform.scale(
+                                scale: scale,
+                                child: _MemberPageKeepAlive(
+                                  key: PageStorageKey('member-page-$i'),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                    ),
+                                    child: AnimatedSwitcher(
+                                      duration: const Duration(
+                                        milliseconds: 180,
                                       ),
-                                      // section'a göre kartı seç
-                                      child: (_section == HomeSection.expenses)
-                                          ? ExpensesCard(memberName: name)
-                                          : MemberCard(
-                                              memberName: name,
-                                              tasks: memberTasks,
-                                              items: memberItems,
-                                              section: _section,
-                                            ),
+                                      switchInCurve: Curves.easeOutCubic,
+                                      switchOutCurve: Curves.easeInCubic,
+                                      child: KeyedSubtree(
+                                        key: ValueKey(_section),
+                                        child: card,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // MİNİ ÜYE BAR (diğerleri)
-                  MiniMembersBar(
-                    names: family,
-                    activeIndex: _activeIndex,
-                    onPickIndex: (i) {
-                      setState(() => _activeIndex = i);
-                      _pageController.animateToPage(
-                        i,
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
+                            ),
+                          );
+                        },
                       );
                     },
                   ),
-                  const SizedBox(height: 36),
-                ],
-              ),
-      ),
+                ),
+
+                const SizedBox(height: 12),
+
+                MiniMembersBar(
+                  names: safeFamily, // 👈 sadece String listesi
+                  activeIndex: _activeIndex,
+                  onPickIndex: (i) {
+                    setState(() => _activeIndex = i);
+                    _pageController.animateToPage(
+                      i,
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOutCubic,
+                    );
+                  },
+                ),
+                const SizedBox(height: 36),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

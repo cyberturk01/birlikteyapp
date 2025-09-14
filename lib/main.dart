@@ -1,41 +1,57 @@
-import 'package:birlikteyapp/pages/home/home_page.dart';
+import 'package:birlikteyapp/constants/app_lists.dart';
+import 'package:birlikteyapp/firebase_options.dart';
+import 'package:birlikteyapp/models/expense.dart';
+import 'package:birlikteyapp/models/item.dart';
+import 'package:birlikteyapp/models/task.dart';
+import 'package:birlikteyapp/models/user_template.dart';
+import 'package:birlikteyapp/models/weekly_task.dart';
+import 'package:birlikteyapp/pages/family/family_onboarding_page.dart';
+import 'package:birlikteyapp/pages/landing/splash_screen.dart';
 import 'package:birlikteyapp/providers/expense_provider.dart';
+import 'package:birlikteyapp/providers/family_provider.dart';
+import 'package:birlikteyapp/providers/item_provider.dart';
 import 'package:birlikteyapp/providers/task_cloud_provider.dart';
+import 'package:birlikteyapp/providers/task_provider.dart';
 import 'package:birlikteyapp/providers/templates_provider.dart';
 import 'package:birlikteyapp/providers/ui_provider.dart';
+import 'package:birlikteyapp/providers/weekly_provider.dart';
 import 'package:birlikteyapp/services/auth_service.dart';
 import 'package:birlikteyapp/services/notification_service.dart';
 import 'package:birlikteyapp/services/task_service.dart';
 import 'package:birlikteyapp/theme/app_theme.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 
 import 'auth/login_page.dart';
-import 'constants/app_lists.dart';
-import 'firebase_options.dart';
-import 'models/expense.dart';
-import 'models/item.dart';
-import 'models/task.dart';
-import 'models/user_template.dart';
-import 'models/weekly_task.dart';
-import 'providers/family_provider.dart';
-import 'providers/item_provider.dart';
-import 'providers/task_provider.dart';
-import 'providers/weekly_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  final view = WidgetsBinding.instance.platformDispatcher.views.first;
-  final shortestLogical =
-      view.physicalSize.shortestSide / view.devicePixelRatio;
+  // Emülatör (debug)
+  if (kDebugMode) {
+    FirebaseAuth.instance.useAuthEmulator('10.0.2.2', 9099);
+    FirebaseFirestore.instance.useFirestoreEmulator('10.0.2.2', 8080);
+  }
 
-  // 600+ logical px → tablet kabul (Material breakpoint)
+  // Firestore offline cache açık kalsın
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+  );
+
+  // Ekran yönü
+  final views = WidgetsBinding.instance.platformDispatcher.views;
+  final shortestLogical = views.isNotEmpty
+      ? views.first.physicalSize.shortestSide / views.first.devicePixelRatio
+      : 600;
   final isTablet = shortestLogical >= 600;
 
   await SystemChrome.setPreferredOrientations(
@@ -51,99 +67,136 @@ Future<void> main() async {
             DeviceOrientation.portraitDown,
           ],
   );
-  await NotificationService.init();
 
-  final defaultTasks = AppLists.defaultTasks;
-
-  final defaultItems = AppLists.defaultItems;
-
-  await Hive.initFlutter();
-
-  // Register Hive adapters
-  Hive.registerAdapter(TaskAdapter());
-  Hive.registerAdapter(ItemAdapter());
-  Hive.registerAdapter(WeeklyTaskAdapter());
-  Hive.registerAdapter(UserTemplateAdapter());
-  Hive.registerAdapter(WeeklyEntryAdapter());
-  Hive.registerAdapter(ExpenseAdapter());
-
-  // Open boxes
-  await Hive.openBox<String>('familyBox');
-  await Hive.openBox<Task>('taskBox');
-  await Hive.openBox<Item>('itemBox');
-  await Hive.openBox<int>('taskCountBox');
-  await Hive.openBox<int>('itemCountBox');
-  await Hive.openBox<WeeklyTask>('weeklyBox');
-  await Hive.openBox<int>('weeklyNotifBox');
-  await Hive.openBox<UserTemplate>('userTemplates');
-  await Hive.openBox<Expense>('expenseBox');
-
-  final taskBox = Hive.box<Task>('taskBox');
-  if (taskBox.isEmpty) {
-    for (var t in defaultTasks) {
-      taskBox.add(Task(t));
-    }
-  }
-
-  final itemBox = Hive.box<Item>('itemBox');
-  if (itemBox.isEmpty) {
-    for (var i in defaultItems) {
-      itemBox.add(Item(i));
-    }
-  }
-  final ui = UiProvider();
-  await ui.loadPrefs();
-
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => FamilyProvider()),
-        ChangeNotifierProvider(create: (_) => TaskProvider()),
-        ChangeNotifierProvider(create: (_) => ItemProvider()),
-        ChangeNotifierProvider(create: (_) => WeeklyProvider()),
-        ChangeNotifierProvider(create: (_) => UiProvider()),
-        ChangeNotifierProvider(create: (_) => TemplatesProvider()),
-        ChangeNotifierProvider(create: (_) => ExpenseProvider()),
-        ChangeNotifierProvider(create: (_) => UiProvider()..loadPrefs()),
-        ChangeNotifierProvider.value(value: ui),
-        Provider<AuthService>(create: (_) => AuthService()),
-        Provider<TaskService>(create: (_) => TaskService()),
-        ChangeNotifierProxyProvider2<
-          AuthService,
-          TaskService,
-          TaskCloudProvider
-        >(
-          create: (ctx) => TaskCloudProvider(
-            ctx.read<AuthService>(),
-            ctx.read<TaskService>(),
-          ),
-          // Auth/Service değişirse ve önceki yoksa yeniden oluştur.
-          update: (ctx, auth, service, previous) =>
-              previous ?? TaskCloudProvider(auth, service),
-        ),
-      ],
-      child: FamilyApp(),
-    ),
-  );
+  runApp(const _Root());
 }
 
-class FamilyApp extends StatelessWidget {
-  const FamilyApp({super.key});
+class _Root extends StatefulWidget {
+  const _Root({super.key});
+  @override
+  State<_Root> createState() => _RootState();
+}
+
+class _RootState extends State<_Root> {
+  late final Future<void> _init;
+
+  @override
+  void initState() {
+    super.initState();
+    _init = _initApp();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final ui = context.watch<UiProvider>();
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Togetherly',
-      themeMode: ui.themeMode,
-      theme: AppTheme.light(ui.brand), // ✅ brand buradan
-      darkTheme: AppTheme.dark(ui.brand),
-      home: const AuthGate(),
+    // Splash + tek runApp mimarisi
+    return FutureBuilder<void>(
+      future: _init,
+      builder: (_, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(useMaterial3: true),
+            home: const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
+
+        // Init bitti → gerçek uygulama
+        final ui = UiProvider();
+        return MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => FamilyProvider()),
+            ChangeNotifierProvider(create: (_) => TaskProvider()),
+            ChangeNotifierProvider(create: (_) => ItemProvider()),
+            ChangeNotifierProvider(create: (_) => WeeklyProvider()),
+            ChangeNotifierProvider(create: (_) => TemplatesProvider()),
+            ChangeNotifierProvider(create: (_) => ExpenseProvider()),
+            ChangeNotifierProvider(create: (_) => ui..loadPrefs()),
+            Provider<AuthService>(create: (_) => AuthService()),
+            Provider<TaskService>(create: (_) => TaskService()),
+            ChangeNotifierProxyProvider3<
+              AuthService,
+              TaskService,
+              FamilyProvider,
+              TaskCloudProvider
+            >(
+              create: (ctx) => TaskCloudProvider(
+                ctx.read<AuthService>(),
+                ctx.read<TaskService>(),
+              ),
+              update: (ctx, auth, service, family, prev) {
+                final p = prev ?? TaskCloudProvider(auth, service);
+                p.update(auth, service);
+                p.setFamilyId(family.familyId);
+                return p;
+              },
+            ),
+          ],
+          child: Consumer<UiProvider>(
+            builder: (_, ui, __) => MaterialApp(
+              debugShowCheckedModeBanner: false,
+              title: 'Togetherly',
+              themeMode: ui.themeMode,
+              theme: AppTheme.light(ui.brand),
+              darkTheme: AppTheme.dark(ui.brand),
+              home: const AuthGate(),
+            ),
+          ),
+        );
+      },
     );
+  }
+
+  Future<void> _initApp() async {
+    // Bildirim servisi
+    await NotificationService.init();
+
+    // Hive
+    await Hive.initFlutter();
+    _safeRegister(TaskAdapter());
+    _safeRegister(ItemAdapter());
+    _safeRegister(WeeklyTaskAdapter());
+    _safeRegister(UserTemplateAdapter());
+    _safeRegister(WeeklyEntryAdapter());
+    _safeRegister(ExpenseAdapter());
+
+    // Gerekli kutular
+    await Future.wait([
+      Hive.openBox<String>('familyBox'),
+      Hive.openBox<Task>('taskBox'),
+      Hive.openBox<Item>('itemBox'),
+      Hive.openBox<UserTemplate>('userTemplates'),
+      Hive.openBox<Expense>('expenseBox'),
+      Hive.openBox<int>('taskCountBox'),
+      Hive.openBox<int>('itemCountBox'),
+      Hive.openBox<WeeklyTask>('weeklyBox'),
+      Hive.openBox<int>('weeklyNotifBox'),
+    ]);
+
+    // İlk seed (sadece boşsa)
+    final taskBox = Hive.box<Task>('taskBox');
+    if (taskBox.isEmpty) {
+      for (final t in AppLists.defaultTasks) {
+        taskBox.add(Task(t));
+      }
+    }
+    final itemBox = Hive.box<Item>('itemBox');
+    if (itemBox.isEmpty) {
+      for (final i in AppLists.defaultItems) {
+        itemBox.add(Item(i));
+      }
+    }
+  }
+
+  void _safeRegister<T>(TypeAdapter<T> a) {
+    try {
+      Hive.registerAdapter(a);
+    } catch (_) {}
   }
 }
 
+/// === Auth akışı ===
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -151,17 +204,35 @@ class AuthGate extends StatelessWidget {
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (_, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+      builder: (_, authSnap) {
+        final user = authSnap.data;
+        if (user == null) return const LoginPage();
+
+        final famProv = context.watch<FamilyProvider>();
+        if (famProv.familyId != null) {
+          // ⬇️ daha önce HomePage döndürüyorduk —> SplashScreen'e dön
+          return const SplashScreen();
         }
-        final user = snap.data;
-        if (user == null) {
-          return const LoginPage();
-        }
-        return const HomePage(); // mevcut ana sayfan
+
+        final usersRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid);
+
+        return StreamBuilder<String?>(
+          stream: usersRef
+              .snapshots()
+              .map((s) => (s.data()?['activeFamilyId'] as String?)?.trim())
+              .distinct(),
+          builder: (_, idSnap) {
+            final activeFam = idSnap.data;
+            if ((activeFam != null && activeFam.isNotEmpty)) {
+              famProv.adoptActiveFromCloud(activeFam);
+              // ⬇️ yine SplashScreen
+              return const SplashScreen();
+            }
+            return const FamilyOnboardingPage();
+          },
+        );
       },
     );
   }

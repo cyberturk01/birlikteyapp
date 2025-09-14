@@ -6,7 +6,7 @@ import '../../providers/family_provider.dart';
 import 'expenses_insights_page.dart';
 
 class ExpensesCard extends StatefulWidget {
-  final String memberName; // aktif üye
+  final String memberName; // aktif üye label'ı (ör. "You (yigitgokhan1)")
   const ExpensesCard({super.key, required this.memberName});
 
   @override
@@ -19,7 +19,9 @@ class _ExpensesCardState extends State<ExpensesCard> {
   @override
   Widget build(BuildContext context) {
     final expProv = context.watch<ExpenseProvider>();
-    final family = context.watch<FamilyProvider>().familyMembers;
+    // HATA KAYNAĞI: familyMembers (Hive) kullanma!
+    // final family = context.watch<FamilyProvider>().familyMembers;
+
     final expenses = expProv.forMemberFiltered(widget.memberName, _filter);
     final total = expProv.totalForMember(widget.memberName, filter: _filter);
 
@@ -87,7 +89,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
 
             const SizedBox(height: 8),
 
-            // Liste (yeni: zaten newest first geliyor)
+            // Liste
             Expanded(
               child: expenses.isEmpty
                   ? const Center(child: Text('No expenses'))
@@ -157,8 +159,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
                 FilledButton.tonalIcon(
                   icon: const Icon(Icons.add),
                   label: const Text('Add expense'),
-                  onPressed: () =>
-                      _openAddDialog(context, widget.memberName, family),
+                  onPressed: () => _openAddDialog(context, widget.memberName),
                 ),
                 const SizedBox(width: 8),
                 TextButton.icon(
@@ -218,13 +219,12 @@ class _ExpensesCardState extends State<ExpensesCard> {
 
   void _openAddDialog(
     BuildContext context,
-    String member,
-    List<String> family,
+    String member, // varsayılan atama
   ) {
     final titleC = TextEditingController();
     final amountC = TextEditingController();
 
-    String assign = member; // varsayılan atanacak kişi
+    String assign = member; // default değer: aktif karttaki üye
     String? cat; // null => Uncategorized
     const categories = <String>[
       'Groceries',
@@ -266,31 +266,82 @@ class _ExpensesCardState extends State<ExpensesCard> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: assign,
-                    isExpanded: true,
-                    items: family
-                        .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                        .toList(),
-                    onChanged: (v) => setLocal(() => assign = v ?? member),
-                    decoration: const InputDecoration(
-                      labelText: 'Assign to',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
+
+                  // 🔽 AİLE ETİKETLERİ — FIRESTORE STREAM
+                  StreamBuilder<List<String>>(
+                    stream: context.read<FamilyProvider>().watchMemberLabels(),
+                    builder: (ctx, snap) {
+                      final labels = (snap.data ?? const <String>[]);
+                      final unique = labels.toSet().toList();
+
+                      // dropdown null değeri kabul etmediği için "Unassigned"ı '' (empty string) ile temsil ediyoruz.
+                      final items = <DropdownMenuItem<String>>[
+                        const DropdownMenuItem(
+                          value: '',
+                          child: Text('Unassigned'),
+                        ),
+                        ...unique.map(
+                          (m) => DropdownMenuItem(value: m, child: Text(m)),
+                        ),
+                      ];
+
+                      // Value mutlaka items içinde olmalı:
+                      final value = unique.contains(assign) ? assign : '';
+
+                      return DropdownButtonFormField<String>(
+                        value: value,
+                        isExpanded: true,
+                        items: items,
+                        onChanged: (v) => setLocal(() => assign = v ?? ''),
+                        decoration: const InputDecoration(
+                          labelText: 'Assign to',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                      );
+                    },
                   ),
+
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String?>(
                     value: cat,
                     isExpanded: true,
-                    items: [
-                      const DropdownMenuItem<String?>(
+                    items: const [
+                      DropdownMenuItem<String?>(
                         value: null,
                         child: Text('Uncategorized'),
                       ),
-                      ...categories.map(
-                        (c) =>
-                            DropdownMenuItem<String?>(value: c, child: Text(c)),
+                      DropdownMenuItem<String?>(
+                        value: 'Groceries',
+                        child: Text('Groceries'),
+                      ),
+                      DropdownMenuItem<String?>(
+                        value: 'Dining',
+                        child: Text('Dining'),
+                      ),
+                      DropdownMenuItem<String?>(
+                        value: 'Transport',
+                        child: Text('Transport'),
+                      ),
+                      DropdownMenuItem<String?>(
+                        value: 'Utilities',
+                        child: Text('Utilities'),
+                      ),
+                      DropdownMenuItem<String?>(
+                        value: 'Health',
+                        child: Text('Health'),
+                      ),
+                      DropdownMenuItem<String?>(
+                        value: 'Kids',
+                        child: Text('Kids'),
+                      ),
+                      DropdownMenuItem<String?>(
+                        value: 'Home',
+                        child: Text('Home'),
+                      ),
+                      DropdownMenuItem<String?>(
+                        value: 'Other',
+                        child: Text('Other'),
                       ),
                     ],
                     onChanged: (v) => setLocal(() => cat = v),
@@ -311,17 +362,18 @@ class _ExpensesCardState extends State<ExpensesCard> {
               FilledButton(
                 onPressed: () {
                   final t = titleC.text.trim();
-                  final a = double.tryParse(amountC.text.replaceAll(',', '.'));
+                  final a = double.tryParse(
+                    amountC.text.trim().replaceAll(',', '.'),
+                  );
+
                   if (t.isEmpty || a == null || a <= 0) return;
 
-                  // YÖNTEM 1: Provider'ın addExpense(...) metodu
                   context.read<ExpenseProvider>().addExpense(
                     title: t,
                     amount: a,
                     date: DateTime.now(),
-                    assignedTo: assign,
-                    category:
-                        cat, // ✅ seçilen kategori (null ise provider 'Uncategorized' set eder)
+                    assignedTo: assign.isEmpty ? null : assign, // '' => null
+                    category: cat,
                   );
                   Navigator.pop(context);
                 },

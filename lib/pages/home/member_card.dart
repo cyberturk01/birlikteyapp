@@ -660,7 +660,9 @@ class _TasksSubsection extends StatelessWidget {
             final isDone = task.completed;
             return Dismissible(
               key: ValueKey(
-                task.remoteId ?? '${task.name}|${task.assignedTo ?? ""}',
+                task.remoteId ??
+                    '${task.name}|${task.assignedTo ?? // direction: DismissDirection.endToStart,
+                        ""}',
               ), // HiveObject.key (Task, HiveObject'tan türemeli)
               background: const SwipeBg(
                 color: Colors.green,

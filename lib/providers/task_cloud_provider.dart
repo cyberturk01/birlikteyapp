@@ -2,126 +2,183 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/task.dart';
 import '../services/auth_service.dart';
 import '../services/task_service.dart';
 
 class TaskCloudProvider extends ChangeNotifier {
-  final _col = FirebaseFirestore.instance
-      .collection('users')
-      .doc(FirebaseAuth.instance.currentUser!.uid)
-      .collection('tasks');
+  AuthService _auth;
+  TaskService _service;
 
-  final AuthService auth;
-  final TaskService service;
+  User? _currentUser;
+  String? _familyId; // <— eklendi
+  CollectionReference<Map<String, dynamic>>? _col;
 
+  // Ekranda gösterilen liste
   final List<Task> _tasks = [];
   List<Task> get tasks => List.unmodifiable(_tasks);
 
-  StreamSubscription? _authSub;
-  StreamSubscription? _taskSub;
-  StreamSubscription? _sub;
+  // Abonelikler
+  StreamSubscription<User?>? _authSub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _taskSub;
 
-  TaskCloudProvider(this.auth, this.service) {
-    _sub = _col.orderBy('createdAt', descending: true).snapshots().listen((qs) {
-      _tasks
-        ..clear()
-        ..addAll(
-          qs.docs.map((d) {
-            final data = d.data();
-            final t = Task(
-              data['name'] as String,
-              completed: data['completed'] as bool? ?? false,
-              assignedTo: (data['assignedTo'] as String?)?.trim(),
-            );
-            t.remoteId = d.id; // 🔑 UI'da Dismissible key için
-            return t;
-          }),
-        );
-      notifyListeners();
+  TaskCloudProvider(this._auth, this._service) {
+    _bindAuth();
+  }
+
+  /// ProxyProvider.update(...) çağrısından gelir.
+  void update(AuthService newAuth, TaskService newService) {
+    var changed = false;
+    if (!identical(_auth, newAuth)) {
+      _auth = newAuth;
+      changed = true;
+    }
+    if (!identical(_service, newService)) {
+      _service = newService;
+      changed = true;
+    }
+    if (changed) {
+      // Auth/Service değiştiyse auth dinleyicisini yeniden kur
+      _rebindAuth();
+    }
+  }
+
+  // === Binding ===
+  // <<< AİLE ID SETTERI
+  void setFamilyId(String? id) {
+    if (_familyId == id) return;
+    _familyId = id;
+    _rebindTasks();
+  }
+
+  void _bindAuth() {
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+      _currentUser = user;
+      _rebindTasks(); // kullanıcı değişti: task akışını yeniden bağla
     });
   }
 
-  // void _bindAuth() {
-  //   _authSub?.cancel();
-  //   _authSub = auth.authState().listen((user) {
-  //     _taskSub?.cancel();
-  //     _tasks = [];
-  //     notifyListeners();
-  //
-  //     if (user == null) return;
-  //     _taskSub = service.watch(user.uid).listen((list) {
-  //       _tasks = list;
-  //       notifyListeners();
-  //     });
-  //   });
-  // }
+  void _rebindAuth() {
+    _authSub?.cancel();
+    _authSub = null;
+    _bindAuth();
+  }
+
+  void _rebindTasks() {
+    _taskSub?.cancel();
+    _taskSub = null;
+    _tasks.clear();
+    notifyListeners();
+
+    final user = _currentUser;
+    // 👇 Kullanıcı YOKSA veya familyId YOKSA bağlanma!
+    if (user == null || _familyId == null || _familyId!.isEmpty) {
+      _col = null;
+      return;
+    }
+
+    _col = FirebaseFirestore.instance
+        .collection('families')
+        .doc(_familyId!)
+        .collection('tasks');
+
+    _taskSub = _col!
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .listen(
+          (qs) {
+            _tasks
+              ..clear()
+              ..addAll(
+                qs.docs.map((d) {
+                  final data = d.data();
+                  final t = Task(
+                    (data['name'] as String?)?.trim() ?? '',
+                    completed: (data['completed'] as bool?) ?? false,
+                    assignedTo: (data['assignedTo'] as String?)?.trim(),
+                  );
+                  t.remoteId = d.id;
+                  return t;
+                }),
+              );
+            debugPrint('rebindTasks: user=$_currentUser, familyId=$_familyId');
+            notifyListeners();
+          },
+          onError: (e, st) {
+            debugPrint('Task stream error: $e');
+            notifyListeners();
+          },
+        );
+  }
+
+  // === Public API ===
 
   List<String> get suggestedTasks {
-    final names = _tasks.map((e) => e.name).toSet().toList();
+    final names = _tasks.map((e) => e.name).where((s) => s.isNotEmpty).toSet();
     return names.take(5).toList();
   }
 
   Future<void> addTask(Task t) async {
-    final doc = await _col.add({
+    final col = _ensureCol();
+    final doc = await col.add({
       'name': t.name,
       'completed': t.completed,
       'assignedTo': t.assignedTo,
       'createdAt': FieldValue.serverTimestamp(),
     });
-    t.remoteId = doc.id; // runtime’da sakla
+    t.remoteId = doc.id;
   }
 
-  // === facade ===
-  // Future<void> addTask(String name, {String? assignedTo}) async {
-  //   final uid = auth.currentUser?.uid;
-  //   if (uid == null) return;
-  //   await service.add(uid, name: name, assignedTo: assignedTo);
-  // }
-
   Future<void> toggleTask(Task t, bool value) async {
-    final id = await _ensureId(t);
-    await _col.doc(id).update({'completed': value});
+    final col = _ensureCol();
+    final id = await _ensureId(col, t);
+    await col.doc(id).update({'completed': value});
   }
 
   Future<void> updateAssignment(Task t, String? member) async {
-    final id = await _ensureId(t);
-    await _col.doc(id).update({'assignedTo': member});
+    final col = _ensureCol();
+    final id = await _ensureId(col, t);
+    await col.doc(id).update({'assignedTo': member});
   }
 
   Future<void> removeTask(Task t) async {
-    final id = await _ensureId(t);
-    await _col.doc(id).delete();
+    final col = _ensureCol();
+    final id = await _ensureId(col, t);
+    await col.doc(id).delete();
   }
 
   Future<void> clearCompleted({String? forMember}) async {
-    final q = forMember == null
-        ? _col.where('completed', isEqualTo: true)
-        : _col
-              .where('completed', isEqualTo: true)
-              .where('assignedTo', isEqualTo: forMember);
+    final col = _ensureCol();
+    Query<Map<String, dynamic>> q = col.where('completed', isEqualTo: true);
+    if (forMember != null) {
+      q = q.where('assignedTo', isEqualTo: forMember);
+    }
     final snap = await q.get();
     for (final d in snap.docs) {
       await d.reference.delete();
     }
   }
-  //
-  // List<String> get suggestedTasks {
-  //   // örnek: en son eklenenlerden adlar (tekrarsız) + sabit öneriler
-  //   final names = <String>{};
-  //   for (final t in _tasks) {
-  //     if (t.name.trim().isNotEmpty) names.add(t.name.trim());
-  //     if (names.length >= 10) break;
-  //   }
-  //   return names.toList();
-  // }
 
-  Future<String> _ensureId(Task t) async {
+  // === Helpers ===
+
+  CollectionReference<Map<String, dynamic>> _ensureCol() {
+    final col = _col;
+    if (col == null) {
+      throw StateError(
+        'No authenticated user / Firestore collection not bound.',
+      );
+    }
+    return col;
+  }
+
+  Future<String> _ensureId(
+    CollectionReference<Map<String, dynamic>> col,
+    Task t,
+  ) async {
     if (t.remoteId != null) return t.remoteId!;
-    // yedek: name+assignedTo ile arama (tam eşleşme)
-    final q = await _col
+    final q = await col
         .where('name', isEqualTo: t.name)
         .where('assignedTo', isEqualTo: t.assignedTo)
         .limit(1)
@@ -130,44 +187,13 @@ class TaskCloudProvider extends ChangeNotifier {
       t.remoteId = q.docs.first.id;
       return t.remoteId!;
     }
-    // bulunamazsa yeni oluşturmamak için error fırlat
     throw StateError('Cloud doc not found for task "${t.name}"');
   }
 
   @override
   void dispose() {
-    _sub?.cancel();
+    _authSub?.cancel();
+    _taskSub?.cancel();
     super.dispose();
   }
-
-  // Future<void> toggleTask(RemoteTask t, bool value) async {
-  //   final uid = auth.currentUser?.uid;
-  //   if (uid == null) return;
-  //   await service.toggle(uid, t.id, value);
-  // }
-  //
-  // Future<void> removeTask(RemoteTask t) async {
-  //   final uid = auth.currentUser?.uid;
-  //   if (uid == null) return;
-  //   await service.remove(uid, t.id);
-  // }
-  //
-  // Future<void> updateAssignment(RemoteTask t, String? member) async {
-  //   final uid = auth.currentUser?.uid;
-  //   if (uid == null) return;
-  //   await service.updateAssignment(uid, t.id, member);
-  // }
-  //
-  // Future<void> clearCompleted({String? forMember}) async {
-  //   final uid = auth.currentUser?.uid;
-  //   if (uid == null) return;
-  //   await service.clearCompleted(uid, forMember: forMember);
-  // }
-  //
-  // @override
-  // void dispose() {
-  //   _authSub?.cancel();
-  //   _taskSub?.cancel();
-  //   super.dispose();
-  // }
 }
