@@ -1,0 +1,24 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+
+    // Kullanıcı kendi belgesini okuyup/yazabilir
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Aile ve alt koleksiyonları (dev için geniş)
+    match /families/{familyId} {
+      allow read, write: if signedIn();
+      match /{sub=**} {
+        allow read, write: if signedIn();
+      }
+    }
+
+    // Davet kodları (uygulama bunu yazıyor)
+    match /invites/{code} {
+      allow read, write: if signedIn();
+    }
+  }
+}
