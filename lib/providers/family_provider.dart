@@ -35,6 +35,14 @@ class FamilyProvider extends ChangeNotifier {
       }
     });
   }
+  List<String> get memberLabelsOrFallback {
+    if (_labelsCache.isNotEmpty) return _labelsCache;
+    final me = FirebaseAuth.instance.currentUser;
+    final base = (me?.displayName?.trim().isNotEmpty == true)
+        ? me!.displayName!.trim()
+        : (me?.email?.split('@').first ?? 'Me');
+    return ['You ($base)'];
+  }
 
   Future<void> loadActiveFamily() async {
     try {
@@ -193,16 +201,12 @@ class FamilyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Bunu çağıran yardımcı:
   Future<void> adoptActiveFromCloud(String famId) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
     await _persistActive(famId, ownerUid: uid);
   }
-  // FamilyProvider içine ekle
 
-  /// Aile üyelerinin GÖRÜNÜR isimlerini döner (users/{uid}.displayName).
-  /// Kendi kullanıcını "You (displayName)" olarak etiketler.
   Stream<List<String>> watchMemberDisplayNames() {
     final famId = _familyId;
     if (famId == null || famId.isEmpty) return Stream.value(const []);
@@ -269,33 +273,87 @@ class FamilyProvider extends ChangeNotifier {
         });
   }
 
-  // FamilyProvider
   Stream<List<String>> watchMemberLabels() {
     final famId = _familyId;
     if (famId == null || famId.isEmpty) return Stream.value(const []);
+
     final me = FirebaseAuth.instance.currentUser;
+    final meUid = me?.uid;
     final myLabel = 'You (${(me?.email ?? 'me').split('@').first})';
 
     return FirebaseFirestore.instance
         .collection('families')
         .doc(famId)
         .snapshots()
-        .map((doc) {
+        .asyncMap((doc) async {
           if (!doc.exists) {
             _familyId = null;
-            _familyBox.delete(_kActiveFamilyKey);
+            await _familyBox.delete(_kActiveFamilyKey);
             notifyListeners();
             return <String>[];
           }
+
           final data = doc.data() ?? {};
-          final members = (data['members'] as Map<String, dynamic>? ?? {});
-          final uids = members.keys.toList();
-          final labels = uids.map((uid) {
-            if (uid == me?.uid) return myLabel;
-            return 'Member • ${uid.substring(0, 6)}';
-          }).toList();
+          final membersMap = (data['members'] as Map<String, dynamic>? ?? {});
+          final uids = membersMap.keys.toList();
+
+          if (uids.isEmpty) {
+            _labelsCache = const [];
+            notifyListeners();
+            return const <String>[];
+          }
+          final others = <String>[];
+          for (final uid in uids) {
+            if (uid == me?.uid) continue;
+            others.add('Member • ${uid.substring(0, 6)}');
+          }
+          others.sort((a, b) => a.compareTo(b));
+
+          final labels = <String>[];
+          if (uids.contains(me?.uid)) labels.add(myLabel);
+          labels.addAll(others);
+
+          // users/{uid} -> displayName veya email@öncesi
+          Future<Map<String, String>> fetchNames(List<String> ids) async {
+            final names = <String, String>{};
+            const chunk = 10;
+            for (var i = 0; i < ids.length; i += chunk) {
+              final part = ids.sublist(i, (i + chunk).clamp(0, ids.length));
+              final qs = await FirebaseFirestore.instance
+                  .collection('users')
+                  .where(FieldPath.documentId, whereIn: part)
+                  .get();
+              for (final d in qs.docs) {
+                final disp = (d.data()['displayName'] as String?)?.trim();
+                final email = (d.data()['email'] as String?)?.trim();
+                final labelBase = (disp != null && disp.isNotEmpty)
+                    ? disp
+                    : (email?.contains('@') == true
+                          ? email!.split('@').first
+                          : (email ?? d.id));
+                names[d.id] = labelBase;
+              }
+              // whereIn’de dönmeyenler için fallback
+              for (final id in part) {
+                names[id] ??= id.substring(0, 6);
+              }
+            }
+            return names;
+          }
+
+          final namesMap = await fetchNames(uids);
+
+          for (final id in uids) {
+            final base = namesMap[id] ?? id.substring(0, 6);
+            if (id == meUid) {
+              labels.add('You ($base)');
+            } else {
+              labels.add(base);
+            }
+          }
 
           _labelsCache = labels;
+          notifyListeners();
           return labels;
         });
   }

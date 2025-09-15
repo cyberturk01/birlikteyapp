@@ -28,6 +28,7 @@ class _HomePageState extends State<HomePage> {
   HomeSection _section = HomeSection.tasks;
   late final PageController _pageController;
   int _activeIndex = 0;
+  bool _appliedInitial = false;
 
   @override
   void initState() {
@@ -42,16 +43,6 @@ class _HomePageState extends State<HomePage> {
       final weekly = context.read<WeeklyProvider>();
       final taskProv = context.read<TaskProvider>();
       await weekly.ensureTodaySynced(taskProv);
-      // if (target != null && target.isNotEmpty) {
-      //   final idx = family.indexOf(target);
-      //   if (idx >= 0) {
-      //     _activeIndex = idx;
-      //     if (_pageController.hasClients) {
-      //       _pageController.jumpToPage(idx);
-      //     }
-      //     setState(() {}); // aktif index’i yansıt
-      //   }
-      // }
     });
   }
 
@@ -80,43 +71,41 @@ class _HomePageState extends State<HomePage> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // initialFilterMember'ı ilk kez uyguladık mı?
-    bool _appliedInitial = false;
-
     return StreamBuilder<List<String>>(
       stream: famProv.watchMemberLabels(),
       builder: (context, snap) {
         final labels = snap.data ?? const <String>[];
-        final safeFamily = labels.isEmpty ? <String>['You'] : labels;
-        if (snap.connectionState == ConnectionState.waiting) {
+        // güçlü fallback: stream boşsa bari kendimizi gösterelim
+        final safeFamily = labels.isEmpty
+            ? <String>[
+                'You (${(FirebaseAuth.instance.currentUser?.email ?? 'me').split('@').first})',
+              ]
+            : labels;
+
+        if (snap.connectionState == ConnectionState.waiting && labels.isEmpty) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        // initialFilterMember geldiyse ve henüz uygulamadıysak, burada uygula
+        // initialFilterMember'i SADECE BİR KEZ uygula
         if (!_appliedInitial && widget.initialFilterMember != null) {
-          final target = widget.initialFilterMember!;
-          final idx = safeFamily.indexOf(target);
+          final idx = safeFamily.indexOf(widget.initialFilterMember!);
           if (idx >= 0) {
             _activeIndex = idx;
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (_pageController.hasClients) {
-                _pageController.jumpToPage(idx);
-              }
+              if (_pageController.hasClients) _pageController.jumpToPage(idx);
               setState(() {});
             });
           }
-          _appliedInitial = true;
+          _appliedInitial = true; // <<< önemli
         }
 
-        // _activeIndex sınırı
         if (_activeIndex >= safeFamily.length) {
           _activeIndex = safeFamily.length - 1;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_pageController.hasClients) {
+            if (_pageController.hasClients)
               _pageController.jumpToPage(_activeIndex);
-            }
             setState(() {});
           });
         }
@@ -174,7 +163,11 @@ class _HomePageState extends State<HomePage> {
               IconButton(
                 tooltip: 'Sign out',
                 icon: const Icon(Icons.logout),
-                onPressed: () => FirebaseAuth.instance.signOut(),
+                onPressed: () async {
+                  await FirebaseAuth.instance.signOut();
+                  if (!context.mounted) return;
+                  Navigator.of(context).popUntil((r) => r.isFirst);
+                },
               ),
             ],
           ),
@@ -207,16 +200,18 @@ class _HomePageState extends State<HomePage> {
                     });
                   },
                 ),
+
                 const SizedBox(height: 4),
 
+                // === ANA SWIPER ===
                 Expanded(
                   child: PageView.builder(
                     controller: _pageController,
                     physics: const BouncingScrollPhysics(),
                     onPageChanged: (i) => setState(() => _activeIndex = i),
-                    itemCount: safeFamily.length,
+                    itemCount: safeFamily.length, // <<< BURASI LISTEDEN
                     itemBuilder: (context, i) {
-                      final name = safeFamily[i];
+                      final name = safeFamily[i]; // <<< ETİKET
                       final memberTasks = tasks
                           .where((t) => t.assignedTo == name)
                           .toList();
@@ -224,57 +219,29 @@ class _HomePageState extends State<HomePage> {
                           .where((it) => it.assignedTo == name)
                           .toList();
 
-                      return AnimatedBuilder(
-                        animation: _pageController,
-                        builder: (context, child) {
-                          double scale = 1.0, opacity = 1.0;
-                          if (_pageController.position.haveDimensions) {
-                            final page =
-                                _pageController.page ?? _activeIndex.toDouble();
-                            final dist = (page - i).abs().clamp(0.0, 1.0);
-                            scale = 1.0 - dist * 0.06;
-                            opacity = 1.0 - dist * 0.20;
-                          }
+                      final card = (_section == HomeSection.expenses)
+                          ? ExpensesCard(memberName: name)
+                          : MemberCard(
+                              memberName: name,
+                              tasks: memberTasks,
+                              items: memberItems,
+                              section: _section,
+                            );
 
-                          // 🔑 sadece kart içini sekmeye göre değiştiriyoruz
-                          final card = (_section == HomeSection.expenses)
-                              ? ExpensesCard(memberName: name)
-                              : MemberCard(
-                                  memberName: name,
-                                  tasks: memberTasks,
-                                  items: memberItems,
-                                  section: _section,
-                                );
-
-                          return Center(
-                            child: AnimatedOpacity(
-                              duration: const Duration(milliseconds: 150),
-                              opacity: opacity,
-                              child: Transform.scale(
-                                scale: scale,
-                                child: _MemberPageKeepAlive(
-                                  key: PageStorageKey('member-page-$i'),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 8,
-                                    ),
-                                    child: AnimatedSwitcher(
-                                      duration: const Duration(
-                                        milliseconds: 180,
-                                      ),
-                                      switchInCurve: Curves.easeOutCubic,
-                                      switchOutCurve: Curves.easeInCubic,
-                                      child: KeyedSubtree(
-                                        key: ValueKey(_section),
-                                        child: card,
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                      return Center(
+                        child: _MemberPageKeepAlive(
+                          key: PageStorageKey('member-page-$i'),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 180),
+                              child: KeyedSubtree(
+                                key: ValueKey(_section),
+                                child: card,
                               ),
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       );
                     },
                   ),
@@ -282,8 +249,9 @@ class _HomePageState extends State<HomePage> {
 
                 const SizedBox(height: 12),
 
+                // === MİNİ BAR ===
                 MiniMembersBar(
-                  names: safeFamily, // 👈 sadece String listesi
+                  names: safeFamily, // <<< AYNI KAYNAK
                   activeIndex: _activeIndex,
                   onPickIndex: (i) {
                     setState(() => _activeIndex = i);
@@ -294,6 +262,7 @@ class _HomePageState extends State<HomePage> {
                     );
                   },
                 ),
+
                 const SizedBox(height: 36),
               ],
             ),
@@ -301,6 +270,243 @@ class _HomePageState extends State<HomePage> {
         );
       },
     );
+
+    // return StreamBuilder<List<String>>(
+    //   stream: famProv.watchMemberLabels(),
+    //   builder: (context, snap) {
+    //     final u = FirebaseAuth.instance.currentUser;
+    //     final base = (u?.displayName?.trim().isNotEmpty == true)
+    //         ? u!.displayName!.trim()
+    //         : (u?.email?.split('@').first ?? 'Me');
+    //     final fallbackLabel = 'You ($base)';
+    //
+    //     final labels = snap.data ?? const <String>[];
+    //     final visible = labels.isEmpty ? <String>[fallbackLabel] : labels;
+    //
+    //     // if (snap.hasError) {
+    //     //   return Scaffold(
+    //     //     body: Center(child: Text('Family stream error: ${snap.error}')),
+    //     //   );
+    //     // }
+    //
+    //     if (snap.connectionState == ConnectionState.waiting && labels.isEmpty) {
+    //       return const Scaffold(
+    //         body: Center(child: CircularProgressIndicator()),
+    //       );
+    //     }
+    //
+    //     // initialFilterMember geldiyse ve henüz uygulamadıysak, burada uygula
+    //     if (!_appliedInitial &&
+    //         (widget.initialFilterMember?.isNotEmpty ?? false)) {
+    //       final target = widget.initialFilterMember!;
+    //       final idx = visible.indexOf(target);
+    //       if (idx >= 0) {
+    //         _activeIndex = idx;
+    //         WidgetsBinding.instance.addPostFrameCallback((_) {
+    //           if (_pageController.hasClients) {
+    //             _pageController.jumpToPage(idx);
+    //           }
+    //           if (mounted) setState(() {});
+    //         });
+    //       }
+    //       _appliedInitial = true;
+    //     }
+    //
+    //     // activeIndex sınır koruması
+    //     if (_activeIndex >= visible.length) {
+    //       _activeIndex = visible.length - 1;
+    //       WidgetsBinding.instance.addPostFrameCallback((_) {
+    //         if (_pageController.hasClients) {
+    //           _pageController.jumpToPage(_activeIndex);
+    //         }
+    //         if (mounted) setState(() {});
+    //       });
+    //     }
+    //
+    //     final tasks = context.watch<TaskCloudProvider>().tasks;
+    //     final items = context.watch<ItemProvider>().items;
+    //
+    //     return Scaffold(
+    //       appBar: AppBar(
+    //         title: Row(
+    //           children: const [
+    //             Icon(Icons.family_restroom),
+    //             SizedBox(width: 8),
+    //             Text('Togetherly'),
+    //           ],
+    //         ),
+    //         actions: [
+    //           IconButton(
+    //             tooltip: 'Manage family',
+    //             icon: const Icon(Icons.group),
+    //             onPressed: () => showFamilyManager(context),
+    //           ),
+    //           IconButton(
+    //             tooltip: 'Weekly plan',
+    //             icon: const Icon(Icons.calendar_today),
+    //             onPressed: () {
+    //               Navigator.push(
+    //                 context,
+    //                 MaterialPageRoute(builder: (_) => const WeeklyPage()),
+    //               );
+    //             },
+    //           ),
+    //           IconButton(
+    //             tooltip: 'Add Center',
+    //             icon: const Icon(Icons.add_circle_outline),
+    //             onPressed: () {
+    //               Navigator.push(
+    //                 context,
+    //                 MaterialPageRoute(builder: (_) => const ManagePage()),
+    //               );
+    //             },
+    //           ),
+    //           IconButton(
+    //             tooltip: 'Configuration',
+    //             icon: const Icon(Icons.tune),
+    //             onPressed: () {
+    //               Navigator.push(
+    //                 context,
+    //                 MaterialPageRoute(
+    //                   builder: (_) => const ConfigurationPage(),
+    //                 ),
+    //               );
+    //             },
+    //           ),
+    //           IconButton(
+    //             tooltip: 'Sign out',
+    //             icon: const Icon(Icons.logout),
+    //             onPressed: () async {
+    //               await FirebaseAuth.instance.signOut();
+    //               if (!context.mounted) return;
+    //               Navigator.of(context).popUntil((r) => r.isFirst);
+    //             },
+    //           ),
+    //         ],
+    //       ),
+    //       body: Padding(
+    //         padding: const EdgeInsets.all(12),
+    //         child: Column(
+    //           children: [
+    //             DashboardSummaryBar(
+    //               onTap: (dest) {
+    //                 setState(() {
+    //                   switch (dest) {
+    //                     case SummaryDest.tasks:
+    //                       _section = HomeSection.tasks;
+    //                       break;
+    //                     case SummaryDest.items:
+    //                       _section = HomeSection.items;
+    //                       break;
+    //                     case SummaryDest.weekly:
+    //                       Navigator.push(
+    //                         context,
+    //                         MaterialPageRoute(
+    //                           builder: (_) => const WeeklyPage(),
+    //                         ),
+    //                       );
+    //                       return;
+    //                     case SummaryDest.expenses:
+    //                       _section = HomeSection.expenses;
+    //                       break;
+    //                   }
+    //                 });
+    //               },
+    //             ),
+    //             const SizedBox(height: 4),
+    //
+    //             Expanded(
+    //               child: PageView.builder(
+    //                 controller: _pageController,
+    //                 physics: const BouncingScrollPhysics(),
+    //                 onPageChanged: (i) => setState(() => _activeIndex = i),
+    //                 itemCount: visible.length,
+    //                 itemBuilder: (context, i) {
+    //                   final name = visible[i];
+    //                   final memberTasks = tasks
+    //                       .where((t) => t.assignedTo == name)
+    //                       .toList();
+    //                   final memberItems = items
+    //                       .where((it) => it.assignedTo == name)
+    //                       .toList();
+    //
+    //                   return AnimatedBuilder(
+    //                     animation: _pageController,
+    //                     builder: (context, child) {
+    //                       double scale = 1.0, opacity = 1.0;
+    //                       if (_pageController.position.haveDimensions) {
+    //                         final page =
+    //                             _pageController.page ?? _activeIndex.toDouble();
+    //                         final dist = (page - i).abs().clamp(0.0, 1.0);
+    //                         scale = 1.0 - dist * 0.06;
+    //                         opacity = 1.0 - dist * 0.20;
+    //                       }
+    //
+    //                       // 🔑 sadece kart içini sekmeye göre değiştiriyoruz
+    //                       final card = (_section == HomeSection.expenses)
+    //                           ? ExpensesCard(memberName: name)
+    //                           : MemberCard(
+    //                               memberName: name,
+    //                               tasks: memberTasks,
+    //                               items: memberItems,
+    //                               section: _section,
+    //                             );
+    //
+    //                       return Center(
+    //                         child: AnimatedOpacity(
+    //                           duration: const Duration(milliseconds: 150),
+    //                           opacity: opacity,
+    //                           child: Transform.scale(
+    //                             scale: scale,
+    //                             child: _MemberPageKeepAlive(
+    //                               key: PageStorageKey('member-page-$i'),
+    //                               child: Padding(
+    //                                 padding: const EdgeInsets.symmetric(
+    //                                   vertical: 8,
+    //                                 ),
+    //                                 child: AnimatedSwitcher(
+    //                                   duration: const Duration(
+    //                                     milliseconds: 180,
+    //                                   ),
+    //                                   switchInCurve: Curves.easeOutCubic,
+    //                                   switchOutCurve: Curves.easeInCubic,
+    //                                   child: KeyedSubtree(
+    //                                     key: ValueKey(_section),
+    //                                     child: card,
+    //                                   ),
+    //                                 ),
+    //                               ),
+    //                             ),
+    //                           ),
+    //                         ),
+    //                       );
+    //                     },
+    //                   );
+    //                 },
+    //               ),
+    //             ),
+    //
+    //             const SizedBox(height: 12),
+    //
+    //             MiniMembersBar(
+    //               names: visible, // 👈 sadece String listesi
+    //               activeIndex: _activeIndex,
+    //               onPickIndex: (i) {
+    //                 setState(() => _activeIndex = i);
+    //                 _pageController.animateToPage(
+    //                   i,
+    //                   duration: const Duration(milliseconds: 250),
+    //                   curve: Curves.easeOutCubic,
+    //                 );
+    //               },
+    //             ),
+    //             const SizedBox(height: 36),
+    //           ],
+    //         ),
+    //       ),
+    //     );
+    //   },
+    // );
   }
 }
 

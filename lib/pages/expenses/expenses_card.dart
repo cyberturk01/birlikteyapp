@@ -20,7 +20,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
   Widget build(BuildContext context) {
     final expProv = context.watch<ExpenseProvider>();
     // HATA KAYNAĞI: familyMembers (Hive) kullanma!
-    // final family = context.watch<FamilyProvider>().familyMembers;
+    final family = context.watch<FamilyProvider>().memberLabelsOrFallback;
 
     final expenses = expProv.forMemberFiltered(widget.memberName, _filter);
     final total = expProv.totalForMember(widget.memberName, filter: _filter);
@@ -241,6 +241,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setLocal) {
+          bool normalizedOnce = false;
           return AlertDialog(
             title: const Text('Add expense'),
             content: SingleChildScrollView(
@@ -273,6 +274,12 @@ class _ExpensesCardState extends State<ExpensesCard> {
                     builder: (ctx, snap) {
                       final labels = (snap.data ?? const <String>[]);
                       final unique = labels.toSet().toList();
+
+                      // ↓ İlk build’te assign listede yoksa fallback'i ayarla
+                      if (!normalizedOnce) {
+                        if (!unique.contains(assign)) assign = '';
+                        normalizedOnce = true;
+                      }
 
                       // dropdown null değeri kabul etmediği için "Unassigned"ı '' (empty string) ile temsil ediyoruz.
                       final items = <DropdownMenuItem<String>>[

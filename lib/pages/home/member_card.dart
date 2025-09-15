@@ -659,9 +659,10 @@ class _TasksSubsection extends StatelessWidget {
           ...visible.map((task) {
             final isDone = task.completed;
             return Dismissible(
+              direction: DismissDirection.endToStart,
               key: ValueKey(
                 task.remoteId ??
-                    '${task.name}|${task.assignedTo ?? // direction: DismissDirection.endToStart,
+                    '${task.name}|${task.assignedTo ?? //
                         ""}',
               ), // HiveObject.key (Task, HiveObject'tan türemeli)
               background: const SwipeBg(

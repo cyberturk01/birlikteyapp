@@ -6,7 +6,7 @@ import 'package:birlikteyapp/models/task.dart';
 import 'package:birlikteyapp/models/user_template.dart';
 import 'package:birlikteyapp/models/weekly_task.dart';
 import 'package:birlikteyapp/pages/family/family_onboarding_page.dart';
-import 'package:birlikteyapp/pages/landing/splash_screen.dart';
+import 'package:birlikteyapp/pages/home/home_page.dart';
 import 'package:birlikteyapp/providers/expense_provider.dart';
 import 'package:birlikteyapp/providers/family_provider.dart';
 import 'package:birlikteyapp/providers/item_provider.dart';
@@ -204,16 +204,21 @@ class AuthGate extends StatelessWidget {
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (_, authSnap) {
-        final user = authSnap.data;
-        if (user == null) return const LoginPage();
-
-        final famProv = context.watch<FamilyProvider>();
-        if (famProv.familyId != null) {
-          // ⬇️ daha önce HomePage döndürüyorduk —> SplashScreen'e dön
-          return const SplashScreen();
+      builder: (_, snap) {
+        // 1) Önce veriye bak
+        final user = snap.data;
+        if (user == null) {
+          // Çıkış yapıldı → hemen Login
+          return const LoginPage();
         }
 
+        // 2) familyId local state'te varsa direkt Home
+        final famProv = context.watch<FamilyProvider>();
+        if (famProv.familyId != null) {
+          return const HomePage();
+        }
+
+        // 3) users/{uid}.activeFamilyId dinle (ilk snapshot gelene kadar küçük loader)
         final usersRef = FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid);
@@ -224,12 +229,21 @@ class AuthGate extends StatelessWidget {
               .map((s) => (s.data()?['activeFamilyId'] as String?)?.trim())
               .distinct(),
           builder: (_, idSnap) {
-            final activeFam = idSnap.data;
-            if ((activeFam != null && activeFam.isNotEmpty)) {
-              famProv.adoptActiveFromCloud(activeFam);
-              // ⬇️ yine SplashScreen
-              return const SplashScreen();
+            if (idSnap.connectionState == ConnectionState.waiting &&
+                !idSnap.hasData) {
+              // Native splash varsa bu çok kısa görünecek
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
             }
+
+            final activeFam = idSnap.data;
+            if (activeFam != null && activeFam.isNotEmpty) {
+              famProv.adoptActiveFromCloud(activeFam);
+              return const HomePage();
+            }
+
+            // aktif aile yok → onboarding
             return const FamilyOnboardingPage();
           },
         );
@@ -237,3 +251,47 @@ class AuthGate extends StatelessWidget {
     );
   }
 }
+
+// class AuthGate extends StatelessWidget {
+//   const AuthGate({super.key});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return StreamBuilder<User?>(
+//       stream: FirebaseAuth.instance.authStateChanges(),
+//       builder: (_, authSnap) {
+//         final user = authSnap.data;
+//         if (user == null) return const LoginPage();
+//
+//         final famProv = context.watch<FamilyProvider>();
+//         if (famProv.familyId != null) {
+//           return const SplashScreen();
+//         }
+//
+//         final usersRef = FirebaseFirestore.instance
+//             .collection('users')
+//             .doc(user.uid);
+//
+//         return StreamBuilder<String?>(
+//           stream: usersRef
+//               .snapshots()
+//               .map((s) => (s.data()?['activeFamilyId'] as String?)?.trim())
+//               .distinct(),
+//           builder: (_, idSnap) {
+//             final activeFam = idSnap.data;
+//             if (idSnap.connectionState == ConnectionState.waiting &&
+//                 !idSnap.hasData) {
+//               return const SplashScreen();
+//             }
+//             if ((activeFam != null && activeFam.isNotEmpty)) {
+//               famProv.adoptActiveFromCloud(activeFam);
+//               // ⬇️ yine SplashScreen
+//               return const SplashScreen();
+//             }
+//             return const FamilyOnboardingPage();
+//           },
+//         );
+//       },
+//     );
+//   }
+// }
