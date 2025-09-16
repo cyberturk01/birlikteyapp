@@ -81,6 +81,9 @@ class _HomePageState extends State<HomePage> {
                 'You (${(FirebaseAuth.instance.currentUser?.email ?? 'me').split('@').first})',
               ]
             : labels;
+        final names = labels.isEmpty
+            ? context.read<FamilyProvider>().memberLabelsOrFallback
+            : labels;
 
         if (snap.connectionState == ConnectionState.waiting && labels.isEmpty) {
           return const Scaffold(
@@ -101,18 +104,20 @@ class _HomePageState extends State<HomePage> {
           _appliedInitial = true; // <<< önemli
         }
 
-        if (_activeIndex >= safeFamily.length) {
-          _activeIndex = safeFamily.length - 1;
+        // _activeIndex güvenliği
+        if (_activeIndex >= names.length) {
+          _activeIndex = names.length - 1;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_pageController.hasClients)
+            if (_pageController.hasClients) {
               _pageController.jumpToPage(_activeIndex);
+            }
             setState(() {});
           });
         }
 
         final tasks = context.watch<TaskCloudProvider>().tasks;
         final items = context.watch<ItemProvider>().items;
-
+        debugPrint('Home labels=$labels');
         return Scaffold(
           appBar: AppBar(
             title: Row(
@@ -227,6 +232,12 @@ class _HomePageState extends State<HomePage> {
                               items: memberItems,
                               section: _section,
                             );
+                      final versionKey = ValueKey<String>(
+                        'member-$i'
+                        '-t${memberTasks.length}'
+                        '-i${memberItems.length}'
+                        '-s${_section.name}',
+                      );
 
                       return Center(
                         child: _MemberPageKeepAlive(
@@ -235,10 +246,7 @@ class _HomePageState extends State<HomePage> {
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             child: AnimatedSwitcher(
                               duration: const Duration(milliseconds: 180),
-                              child: KeyedSubtree(
-                                key: ValueKey(_section),
-                                child: card,
-                              ),
+                              child: KeyedSubtree(key: versionKey, child: card),
                             ),
                           ),
                         ),
@@ -587,13 +595,14 @@ class MiniMembersBar extends StatelessWidget {
   Widget build(BuildContext context) {
     if (names.length <= 1) return const SizedBox.shrink();
 
-    // Aktif dışındakiler (index bazlı)
+    // Sadece aktif olmayanlar
     final others = <(int, String)>[];
     for (var i = 0; i < names.length; i++) {
       if (i == activeIndex) continue;
       others.add((i, names[i]));
     }
 
+    if (others.isEmpty) return const SizedBox.shrink();
     return SafeArea(
       // alt çentik / nav bar ile çakışmayı önler
       top: false,

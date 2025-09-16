@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../models/expense.dart';
 import '../../providers/expense_provider.dart';
 import '../../providers/family_provider.dart';
+import '../../widgets/member_dropdown.dart';
 import 'expenses_by_category_page.dart';
 
 class ExpensesInsightsPage extends StatefulWidget {
@@ -97,32 +98,38 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                             // 1) Üye seçici sadece 280px ile sınırlı
                             ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 280),
-                              child: DropdownButtonFormField<String?>(
-                                value: current,
-                                isExpanded: true,
-                                items: [
-                                  const DropdownMenuItem<String?>(
-                                    value: allKey,
-                                    child: Text('All members'),
-                                  ),
-                                  const DropdownMenuItem<String?>(
-                                    value: '',
-                                    child: Text('Unassigned'),
-                                  ),
-                                  ...labels.map(
-                                    (m) => DropdownMenuItem<String?>(
-                                      value: m,
-                                      child: Text(m),
-                                    ),
-                                  ),
-                                ],
+                              child: MemberDropdown(
+                                value: _member,
                                 onChanged: (v) => setState(() => _member = v),
-                                decoration: const InputDecoration(
-                                  labelText: 'Member',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                ),
+                                label: 'Member',
+                                nullLabel: 'All members',
                               ),
+                              // DropdownButtonFormField<String?>(
+                              //   value: current,
+                              //   isExpanded: true,
+                              //   items: [
+                              //     const DropdownMenuItem<String?>(
+                              //       value: allKey,
+                              //       child: Text('All members'),
+                              //     ),
+                              //     const DropdownMenuItem<String?>(
+                              //       value: '',
+                              //       child: Text('Unassigned'),
+                              //     ),
+                              //     ...labels.map(
+                              //       (m) => DropdownMenuItem<String?>(
+                              //         value: m,
+                              //         child: Text(m),
+                              //       ),
+                              //     ),
+                              //   ],
+                              //   onChanged: (v) => setState(() => _member = v),
+                              //   decoration: const InputDecoration(
+                              //     labelText: 'Member',
+                              //     border: OutlineInputBorder(),
+                              //     isDense: true,
+                              //   ),
+                              // ),
                             ),
 
                             // 2) Tarih filtresi — wrap içinde serbest

@@ -35,13 +35,20 @@ class FamilyProvider extends ChangeNotifier {
       }
     });
   }
+  // List<String> get memberLabelsOrFallback {
+  //   if (_labelsCache.isNotEmpty) return _labelsCache;
+  //   final me = FirebaseAuth.instance.currentUser;
+  //   final base = (me?.displayName?.trim().isNotEmpty == true)
+  //       ? me!.displayName!.trim()
+  //       : (me?.email?.split('@').first ?? 'Me');
+  //   return ['You ($base)'];
+  // }
+  // Güvenli getter (UI “assign” dropdown’ları için pratik)
   List<String> get memberLabelsOrFallback {
     if (_labelsCache.isNotEmpty) return _labelsCache;
     final me = FirebaseAuth.instance.currentUser;
-    final base = (me?.displayName?.trim().isNotEmpty == true)
-        ? me!.displayName!.trim()
-        : (me?.email?.split('@').first ?? 'Me');
-    return ['You ($base)'];
+    final my = 'You (${(me?.email ?? 'me').split('@').first})';
+    return [my];
   }
 
   Future<void> loadActiveFamily() async {
@@ -98,8 +105,12 @@ class FamilyProvider extends ChangeNotifier {
   Future<void> createFamily(String name) async {
     if ((_familyId ?? '').isNotEmpty) return;
 
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final u = FirebaseAuth.instance.currentUser!;
+    final uid = u.uid;
     final db = FirebaseFirestore.instance;
+    final display = (u.displayName?.trim().isNotEmpty == true)
+        ? u.displayName!.trim()
+        : (u.email?.split('@').first ?? 'You');
 
     final famRef = db.collection('families').doc();
     final userRef = db.collection('users').doc(uid);
@@ -113,6 +124,7 @@ class FamilyProvider extends ChangeNotifier {
       'nameLower': name.trim().toLowerCase(),
       'ownerUid': uid,
       'members': {uid: 'owner'},
+      'memberNames': {uid: display},
       'inviteCode': code,
       'createdAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: false));
@@ -136,9 +148,13 @@ class FamilyProvider extends ChangeNotifier {
   }
 
   Future<bool> joinWithCode(String raw) async {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final u = FirebaseAuth.instance.currentUser!;
+    final uid = u.uid;
     final code = raw.trim().toUpperCase();
     final db = FirebaseFirestore.instance;
+    final display = (u.displayName?.trim().isNotEmpty == true)
+        ? u.displayName!.trim()
+        : (u.email?.split('@').first ?? 'Member');
 
     // invites koleksiyonunu gerçekten kullanıyorsan:
     final inviteSnap = await db
@@ -163,6 +179,7 @@ class FamilyProvider extends ChangeNotifier {
           .limit(1)
           .get();
       if (q.docs.isEmpty) return false;
+
       famRef = q.docs.first.reference;
     }
 
@@ -172,6 +189,7 @@ class FamilyProvider extends ChangeNotifier {
     // üyelik rolü merge
     batch.set(famRef, {
       'members': {uid: 'editor'},
+      'memberNames': {uid: display},
     }, SetOptions(merge: true));
 
     batch.set(userRef, {
@@ -273,88 +291,60 @@ class FamilyProvider extends ChangeNotifier {
         });
   }
 
+  // import 'package:flutter/foundation.dart';  // listEquals için (opsiyonel)
+
   Stream<List<String>> watchMemberLabels() {
     final famId = _familyId;
-    if (famId == null || famId.isEmpty) return Stream.value(const []);
+    if (famId == null || famId.isEmpty) return Stream.value(const <String>[]);
 
     final me = FirebaseAuth.instance.currentUser;
-    final meUid = me?.uid;
     final myLabel = 'You (${(me?.email ?? 'me').split('@').first})';
 
     return FirebaseFirestore.instance
         .collection('families')
         .doc(famId)
         .snapshots()
-        .asyncMap((doc) async {
+        .map((doc) {
           if (!doc.exists) {
+            // family silinmiş → local temizle (ama burada notify etme)
             _familyId = null;
-            await _familyBox.delete(_kActiveFamilyKey);
-            notifyListeners();
+            _familyBox.delete(_kActiveFamilyKey);
             return <String>[];
           }
 
           final data = doc.data() ?? {};
-          final membersMap = (data['members'] as Map<String, dynamic>? ?? {});
-          final uids = membersMap.keys.toList();
+          final members = (data['members'] as Map<String, dynamic>? ?? {});
+          final namesMap = (data['memberNames'] as Map<String, dynamic>? ?? {});
 
-          if (uids.isEmpty) {
-            _labelsCache = const [];
-            notifyListeners();
-            return const <String>[];
-          }
-          final others = <String>[];
-          for (final uid in uids) {
-            if (uid == me?.uid) continue;
-            others.add('Member • ${uid.substring(0, 6)}');
-          }
-          others.sort((a, b) => a.compareTo(b));
+          // UID’leri tekilleştir + sıralı
+          final uids = members.keys.toSet().toList()..sort();
 
+          // Etiketleri üret
           final labels = <String>[];
-          if (uids.contains(me?.uid)) labels.add(myLabel);
-          labels.addAll(others);
-
-          // users/{uid} -> displayName veya email@öncesi
-          Future<Map<String, String>> fetchNames(List<String> ids) async {
-            final names = <String, String>{};
-            const chunk = 10;
-            for (var i = 0; i < ids.length; i += chunk) {
-              final part = ids.sublist(i, (i + chunk).clamp(0, ids.length));
-              final qs = await FirebaseFirestore.instance
-                  .collection('users')
-                  .where(FieldPath.documentId, whereIn: part)
-                  .get();
-              for (final d in qs.docs) {
-                final disp = (d.data()['displayName'] as String?)?.trim();
-                final email = (d.data()['email'] as String?)?.trim();
-                final labelBase = (disp != null && disp.isNotEmpty)
-                    ? disp
-                    : (email?.contains('@') == true
-                          ? email!.split('@').first
-                          : (email ?? d.id));
-                names[d.id] = labelBase;
-              }
-              // whereIn’de dönmeyenler için fallback
-              for (final id in part) {
-                names[id] ??= id.substring(0, 6);
-              }
-            }
-            return names;
-          }
-
-          final namesMap = await fetchNames(uids);
-
-          for (final id in uids) {
-            final base = namesMap[id] ?? id.substring(0, 6);
-            if (id == meUid) {
-              labels.add('You ($base)');
+          for (final uid in uids) {
+            if (uid == me?.uid) {
+              labels.add(myLabel);
             } else {
-              labels.add(base);
+              final nm = (namesMap[uid] as String?)?.trim();
+              labels.add(
+                (nm != null && nm.isNotEmpty)
+                    ? nm
+                    : 'Member • ${uid.substring(0, 6)}',
+              );
             }
           }
 
+          // Cache’i sessiz güncelle
           _labelsCache = labels;
-          notifyListeners();
           return labels;
+        })
+        // Aynı liste tekrar gelirse StreamBuilder’ı boşuna tetikleme
+        .distinct((a, b) {
+          if (a.length != b.length) return false;
+          for (var i = 0; i < a.length; i++) {
+            if (a[i] != b[i]) return false;
+          }
+          return true;
         });
   }
 

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/expense_provider.dart';
 import '../../providers/family_provider.dart';
+import '../../widgets/member_dropdown.dart';
 
 class ExpensesByCategoryPage extends StatefulWidget {
   final String? initialMember;
@@ -51,41 +52,47 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
             children: [
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 280),
-                child: StreamBuilder<List<String>>(
-                  stream: context.read<FamilyProvider>().watchMemberLabels(),
-                  builder: (context, snap) {
-                    final labels = (snap.data ?? const <String>[]).toList();
-                    String? current = _member ?? _allKey;
-                    if (current.isNotEmpty &&
-                        current != _allKey &&
-                        !labels.contains(current)) {
-                      current = labels.isNotEmpty ? labels.first : _allKey;
-                    }
-                    return DropdownButtonFormField<String?>(
-                      value: current,
-                      isExpanded: true,
-                      items: [
-                        const DropdownMenuItem(
-                          value: _allKey,
-                          child: Text('All members'),
-                        ),
-                        const DropdownMenuItem(
-                          value: '',
-                          child: Text('Unassigned'),
-                        ),
-                        ...labels.map(
-                          (m) => DropdownMenuItem(value: m, child: Text(m)),
-                        ),
-                      ],
-                      onChanged: (v) => setState(() => _member = v),
-                      decoration: const InputDecoration(
-                        labelText: 'Member',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                    );
-                  },
+                child: MemberDropdown(
+                  value: _member,
+                  onChanged: (v) => setState(() => _member = v),
+                  label: 'Member',
+                  nullLabel: 'All members',
                 ),
+                // StreamBuilder<List<String>>(
+                //   stream: context.read<FamilyProvider>().watchMemberLabels(),
+                //   builder: (context, snap) {
+                //     final labels = (snap.data ?? const <String>[]).toList();
+                //     String? current = _member ?? _allKey;
+                //     if (current.isNotEmpty &&
+                //         current != _allKey &&
+                //         !labels.contains(current)) {
+                //       current = labels.isNotEmpty ? labels.first : _allKey;
+                //     }
+                //     return DropdownButtonFormField<String?>(
+                //       value: current,
+                //       isExpanded: true,
+                //       items: [
+                //         const DropdownMenuItem(
+                //           value: _allKey,
+                //           child: Text('All members'),
+                //         ),
+                //         const DropdownMenuItem(
+                //           value: '',
+                //           child: Text('Unassigned'),
+                //         ),
+                //         ...labels.map(
+                //           (m) => DropdownMenuItem(value: m, child: Text(m)),
+                //         ),
+                //       ],
+                //       onChanged: (v) => setState(() => _member = v),
+                //       decoration: const InputDecoration(
+                //         labelText: 'Member',
+                //         border: OutlineInputBorder(),
+                //         isDense: true,
+                //       ),
+                //     );
+                //   },
+                // ),
               ),
               SegmentedButton<ExpenseDateFilter>(
                 segments: const [

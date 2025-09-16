@@ -7,13 +7,15 @@ import '../../models/item.dart';
 import '../../models/task.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_provider.dart';
+import '../../providers/task_cloud_provider.dart';
 import '../../providers/task_provider.dart';
+import '../../widgets/member_dropdown.dart';
 import '../../widgets/swipe_bg.dart';
 
 enum _ManageTab { tasks, items }
 
 class ManagePage extends StatefulWidget {
-  const ManagePage({Key? key}) : super(key: key);
+  const ManagePage({super.key});
 
   @override
   State<ManagePage> createState() => _ManagePageState();
@@ -33,7 +35,6 @@ class _ManagePageState extends State<ManagePage> {
   Widget build(BuildContext context) {
     final taskProv = context.watch<TaskProvider>();
     final itemProv = context.watch<ItemProvider>();
-    String? assignTo;
 
     // --- Hazır listeler ---
     const defaultTasks = AppLists.defaultTasks;
@@ -449,59 +450,6 @@ class _ItemListView extends StatelessWidget {
       ),
     );
   }
-
-  void _showAssignItemSheet(BuildContext context, Item item) {
-    final family = context.read<FamilyProvider>().familyMembers;
-    String? selected = item.assignedTo;
-
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Assign item',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: selected,
-              isExpanded: true,
-              items: [
-                const DropdownMenuItem(value: null, child: Text('No one')),
-                ...family.map(
-                  (m) => DropdownMenuItem(value: m, child: Text(m)),
-                ),
-              ],
-              onChanged: (v) => selected = v,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                  context.read<ItemProvider>().updateAssignment(
-                    item,
-                    (selected != null && selected!.trim().isNotEmpty)
-                        ? selected
-                        : null,
-                  );
-                  Navigator.pop(context);
-                },
-                child: const Text('Save'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 void _showRenameTaskDialog(BuildContext context, Task task) {
@@ -540,9 +488,9 @@ void _showRenameTaskDialog(BuildContext context, Task task) {
   );
 }
 
-void _showAssignTaskSheet(BuildContext context, Task task) {
-  final family = context.read<FamilyProvider>().familyMembers;
-  String? selected = task.assignedTo;
+// ITEM
+void _showAssignItemSheet(BuildContext context, Item item) {
+  String? selected = item.assignedTo;
 
   showModalBottomSheet(
     context: context,
@@ -552,30 +500,43 @@ void _showAssignTaskSheet(BuildContext context, Task task) {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
-            'Assign task',
+            'Assign item',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            value: selected,
-            isExpanded: true,
-            items: [
-              const DropdownMenuItem(value: null, child: Text('No one')),
-              ...family.map((m) => DropdownMenuItem(value: m, child: Text(m))),
-            ],
-            onChanged: (v) => selected = v,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
+
+          StreamBuilder<List<String>>(
+            stream: context.read<FamilyProvider>().watchMemberLabels(),
+            builder: (ctx, snap) {
+              final labels = (snap.data ?? const <String>[]).toSet().toList();
+              final items = <DropdownMenuItem<String>>[
+                const DropdownMenuItem(value: '', child: Text('No one')),
+                ...labels.map(
+                  (m) => DropdownMenuItem(value: m, child: Text(m)),
+                ),
+              ];
+              final value = labels.contains(selected) ? selected! : '';
+
+              return DropdownButtonFormField<String>(
+                value: value,
+                isExpanded: true,
+                items: items,
+                onChanged: (v) => selected = v ?? '',
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              );
+            },
           ),
+
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
               onPressed: () {
-                context.read<TaskProvider>().updateAssignment(
-                  task,
+                context.read<ItemProvider>().updateAssignment(
+                  item,
                   (selected != null && selected!.trim().isNotEmpty)
                       ? selected
                       : null,
@@ -590,3 +551,157 @@ void _showAssignTaskSheet(BuildContext context, Task task) {
     ),
   );
 }
+
+// TASK
+void _showAssignTaskSheet(BuildContext context, Task task) {
+  String? selected = task.assignedTo;
+  final taskCloud = context.read<TaskCloudProvider>();
+
+  showModalBottomSheet(
+    context: context,
+    builder: (_) => Padding(
+      padding: const EdgeInsets.all(16),
+      child: StatefulBuilder(
+        builder: (ctx, setLocal) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Assign task',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+
+              MemberDropdown(
+                value: selected,
+                onChanged: (v) => setLocal(() => selected = v),
+                label: 'Assign to',
+                nullLabel: 'No one',
+              ),
+
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () async {
+                    await taskCloud.updateAssignment(
+                      task,
+                      (selected != null && selected!.trim().isNotEmpty)
+                          ? selected
+                          : null,
+                    );
+                    taskCloud.refreshNow();
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  child: const Text('Save'),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    ),
+  );
+}
+
+// void _showAssignItemSheet(BuildContext context, Item item) {
+//   final family = context.read<FamilyProvider>().familyMembers;
+//   String? selected = item.assignedTo;
+//
+//   showModalBottomSheet(
+//     context: context,
+//     builder: (_) => Padding(
+//       padding: const EdgeInsets.all(16),
+//       child: Column(
+//         mainAxisSize: MainAxisSize.min,
+//         children: [
+//           const Text(
+//             'Assign item',
+//             style: TextStyle(fontWeight: FontWeight.bold),
+//           ),
+//           const SizedBox(height: 12),
+//           DropdownButtonFormField<String>(
+//             value: selected,
+//             isExpanded: true,
+//             items: [
+//               const DropdownMenuItem(value: null, child: Text('No one')),
+//               ...family.map((m) => DropdownMenuItem(value: m, child: Text(m))),
+//             ],
+//             onChanged: (v) => selected = v,
+//             decoration: const InputDecoration(
+//               border: OutlineInputBorder(),
+//               isDense: true,
+//             ),
+//           ),
+//           const SizedBox(height: 12),
+//           SizedBox(
+//             width: double.infinity,
+//             child: FilledButton(
+//               onPressed: () {
+//                 context.read<ItemProvider>().updateAssignment(
+//                   item,
+//                   (selected != null && selected!.trim().isNotEmpty)
+//                       ? selected
+//                       : null,
+//                 );
+//                 Navigator.pop(context);
+//               },
+//               child: const Text('Save'),
+//             ),
+//           ),
+//         ],
+//       ),
+//     ),
+//   );
+// }
+//
+// void _showAssignTaskSheet(BuildContext context, Task task) {
+//   final family = context.read<FamilyProvider>().familyMembers;
+//   String? selected = task.assignedTo;
+//
+//   showModalBottomSheet(
+//     context: context,
+//     builder: (_) => Padding(
+//       padding: const EdgeInsets.all(16),
+//       child: Column(
+//         mainAxisSize: MainAxisSize.min,
+//         children: [
+//           const Text(
+//             'Assign task',
+//             style: TextStyle(fontWeight: FontWeight.bold),
+//           ),
+//           const SizedBox(height: 12),
+//           DropdownButtonFormField<String>(
+//             value: selected,
+//             isExpanded: true,
+//             items: [
+//               const DropdownMenuItem(value: null, child: Text('No one')),
+//               ...family.map((m) => DropdownMenuItem(value: m, child: Text(m))),
+//             ],
+//             onChanged: (v) => selected = v,
+//             decoration: const InputDecoration(
+//               border: OutlineInputBorder(),
+//               isDense: true,
+//             ),
+//           ),
+//           const SizedBox(height: 12),
+//           SizedBox(
+//             width: double.infinity,
+//             child: FilledButton(
+//               onPressed: () {
+//                 context.read<TaskProvider>().updateAssignment(
+//                   task,
+//                   (selected != null && selected!.trim().isNotEmpty)
+//                       ? selected
+//                       : null,
+//                 );
+//                 Navigator.pop(context);
+//               },
+//               child: const Text('Save'),
+//             ),
+//           ),
+//         ],
+//       ),
+//     ),
+//   );
+// }

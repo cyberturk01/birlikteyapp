@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/expense_provider.dart';
 import '../../providers/family_provider.dart';
+import '../../widgets/member_dropdown.dart';
 import 'expenses_insights_page.dart';
 
 class ExpensesCard extends StatefulWidget {
@@ -224,8 +225,9 @@ class _ExpensesCardState extends State<ExpensesCard> {
     final titleC = TextEditingController();
     final amountC = TextEditingController();
 
-    String assign = member; // default değer: aktif karttaki üye
+    String? assign = member; // default değer: aktif karttaki üye
     String? cat; // null => Uncategorized
+    bool normalizedOnce = false;
     const categories = <String>[
       'Groceries',
       'Dining',
@@ -273,15 +275,13 @@ class _ExpensesCardState extends State<ExpensesCard> {
                     stream: context.read<FamilyProvider>().watchMemberLabels(),
                     builder: (ctx, snap) {
                       final labels = (snap.data ?? const <String>[]);
-                      final unique = labels.toSet().toList();
+                      final unique = labels.toSet().toList()..sort();
 
-                      // ↓ İlk build’te assign listede yoksa fallback'i ayarla
                       if (!normalizedOnce) {
                         if (!unique.contains(assign)) assign = '';
                         normalizedOnce = true;
                       }
 
-                      // dropdown null değeri kabul etmediği için "Unassigned"ı '' (empty string) ile temsil ediyoruz.
                       final items = <DropdownMenuItem<String>>[
                         const DropdownMenuItem(
                           value: '',
@@ -292,19 +292,11 @@ class _ExpensesCardState extends State<ExpensesCard> {
                         ),
                       ];
 
-                      // Value mutlaka items içinde olmalı:
-                      final value = unique.contains(assign) ? assign : '';
-
-                      return DropdownButtonFormField<String>(
-                        value: value,
-                        isExpanded: true,
-                        items: items,
-                        onChanged: (v) => setLocal(() => assign = v ?? ''),
-                        decoration: const InputDecoration(
-                          labelText: 'Assign to',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
+                      return MemberDropdown(
+                        value: assign, // String? (null = Unassigned)
+                        onChanged: (v) => setLocal(() => assign = v),
+                        label: 'Assign to',
+                        nullLabel: 'Unassigned',
                       );
                     },
                   ),
@@ -379,7 +371,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
                     title: t,
                     amount: a,
                     date: DateTime.now(),
-                    assignedTo: assign.isEmpty ? null : assign, // '' => null
+                    assignedTo: assign, // null olabilir
                     category: cat,
                   );
                   Navigator.pop(context);

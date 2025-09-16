@@ -113,8 +113,6 @@ class TaskCloudProvider extends ChangeNotifier {
         );
   }
 
-  // === Public API ===
-
   List<String> get suggestedTasks {
     final names = _tasks.map((e) => e.name).where((s) => s.isNotEmpty).toSet();
     return names.take(5).toList();
@@ -129,18 +127,6 @@ class TaskCloudProvider extends ChangeNotifier {
       'createdAt': FieldValue.serverTimestamp(),
     });
     t.remoteId = doc.id;
-  }
-
-  Future<void> toggleTask(Task t, bool value) async {
-    final col = _ensureCol();
-    final id = await _ensureId(col, t);
-    await col.doc(id).update({'completed': value});
-  }
-
-  Future<void> updateAssignment(Task t, String? member) async {
-    final col = _ensureCol();
-    final id = await _ensureId(col, t);
-    await col.doc(id).update({'assignedTo': member});
   }
 
   Future<void> removeTask(Task t) async {
@@ -173,21 +159,59 @@ class TaskCloudProvider extends ChangeNotifier {
     return col;
   }
 
+  // TaskCloudProvider.dart
+
   Future<String> _ensureId(
     CollectionReference<Map<String, dynamic>> col,
     Task t,
   ) async {
     if (t.remoteId != null) return t.remoteId!;
-    final q = await col
+
+    // Yalnızca isme göre en yeni kaydı ara
+    final byName = await col
         .where('name', isEqualTo: t.name)
-        .where('assignedTo', isEqualTo: t.assignedTo)
+        // createdAt tüm kayıtlarda yoksa şu satırı kaldırabilirsiniz:
+        .orderBy('createdAt', descending: true)
         .limit(1)
         .get();
-    if (q.docs.isNotEmpty) {
-      t.remoteId = q.docs.first.id;
+
+    if (byName.docs.isNotEmpty) {
+      t.remoteId = byName.docs.first.id;
       return t.remoteId!;
     }
-    throw StateError('Cloud doc not found for task "${t.name}"');
+
+    // Bulunamadı → yeni doküman oluştur
+    final doc = await col.add({
+      'name': t.name,
+      'completed': t.completed,
+      'assignedTo': t.assignedTo, // null olabilir
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    t.remoteId = doc.id;
+    return doc.id;
+  }
+
+  // TaskCloudProvider.updateAssignment(...)
+  Future<void> updateAssignment(Task t, String? member) async {
+    final col = _ensureCol();
+    final id = await _ensureId(col, t);
+    await col.doc(id).update({'assignedTo': member});
+
+    // 👇 Optimistic local update
+    final idx = _tasks.indexWhere((x) => x.remoteId == id);
+    if (idx != -1) {
+      _tasks[idx] = Task(t.name, completed: t.completed, assignedTo: member)
+        ..remoteId = id;
+      notifyListeners();
+    }
+  }
+
+  Future<void> toggleTask(Task t, bool value) async {
+    final col = _ensureCol();
+    final id = await _ensureId(col, t);
+    await col.doc(id).update({'completed': value});
+    t.completed = value;
+    notifyListeners();
   }
 
   @override
@@ -195,5 +219,9 @@ class TaskCloudProvider extends ChangeNotifier {
     _authSub?.cancel();
     _taskSub?.cancel();
     super.dispose();
+  }
+
+  void refreshNow() {
+    _rebindTasks(); // mevcut stream'i iptal edip yeniden bağlar, _tasks'ı temizleyip yeniden doldurur
   }
 }

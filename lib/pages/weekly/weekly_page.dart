@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/weekly_task.dart';
-import '../../providers/family_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/weekly_provider.dart';
+import '../../widgets/member_dropdown.dart';
 
 class WeeklyPage extends StatefulWidget {
   const WeeklyPage({Key? key}) : super(key: key);
@@ -32,7 +32,6 @@ class _WeeklyPageState extends State<WeeklyPage> {
   @override
   Widget build(BuildContext context) {
     final weekly = context.watch<WeeklyProvider>();
-    final family = context.watch<FamilyProvider>().familyMembers;
     final todayWd = DateTime.now().weekday;
 
     // Seçili gün için weekly listesi
@@ -60,11 +59,8 @@ class _WeeklyPageState extends State<WeeklyPage> {
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
         label: Text('Add to ${_labels[_selectedWeekday]}'),
-        onPressed: () => _openAddDialog(
-          context: context,
-          weekday: _selectedWeekday,
-          family: family,
-        ),
+        onPressed: () =>
+            _openAddDialog(context: context, weekday: _selectedWeekday),
       ),
       body: Padding(
         padding: const EdgeInsets.all(12),
@@ -155,7 +151,6 @@ class _WeeklyPageState extends State<WeeklyPage> {
   Future<void> _openAddDialog({
     required BuildContext context,
     required int weekday,
-    required List<String> family,
   }) async {
     final weekly = context.read<WeeklyProvider>();
     final taskProv = context.read<TaskProvider>();
@@ -196,24 +191,11 @@ class _WeeklyPageState extends State<WeeklyPage> {
                 onSubmitted: (_) => Navigator.of(context).pop('submit'),
               ),
               const SizedBox(height: 20),
-              DropdownButtonFormField<String?>(
-                value: assign,
-                isExpanded: true,
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('Unassigned'),
-                  ),
-                  ...family.map(
-                    (m) => DropdownMenuItem<String?>(value: m, child: Text(m)),
-                  ),
-                ],
-                onChanged: (v) => assign = v,
-                decoration: const InputDecoration(
-                  labelText: 'Assign to (optional)',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
+              MemberDropdown(
+                value: assign, // null olabilir
+                onChanged: (v) => assign = v, // v null => Unassigned
+                label: 'Assign to (optional)',
+                nullLabel: 'Unassigned',
               ),
               const SizedBox(height: 12),
 
