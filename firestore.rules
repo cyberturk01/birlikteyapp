@@ -10,9 +10,9 @@ service cloud.firestore {
 
     // Aile ve alt koleksiyonları (dev için geniş)
     match /families/{familyId} {
-      allow read, write: if signedIn();
+      allow read, write, create: if signedIn();
       match /{sub=**} {
-        allow read, write: if signedIn();
+        allow read, write, create: if signedIn();
       }
     }
 

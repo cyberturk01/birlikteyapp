@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../services/notification_service.dart';
 import '../../theme/brand_seed.dart';
+import '../../widgets/invite_code_card.dart';
 import '../templates/templates_page.dart';
 
 class ConfigurationPage extends StatelessWidget {
@@ -48,6 +49,14 @@ class ConfigurationPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          Text(
+            'Family Invitation Code',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          const InviteCodeCard(),
+          const SizedBox(height: 8),
+          const Divider(height: 24),
           Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 6),
           SegmentedButton<ThemeMode>(
@@ -73,8 +82,9 @@ class ConfigurationPage extends StatelessWidget {
                 context.read<UiProvider>().setThemeMode(s.first),
             showSelectedIcon: false,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
           const Divider(height: 24),
+
           // === Theme ===
           Text('App color', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),

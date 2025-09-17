@@ -9,6 +9,7 @@ import 'package:birlikteyapp/pages/family/family_onboarding_page.dart';
 import 'package:birlikteyapp/pages/home/home_page.dart';
 import 'package:birlikteyapp/providers/expense_provider.dart';
 import 'package:birlikteyapp/providers/family_provider.dart';
+import 'package:birlikteyapp/providers/item_cloud_provider.dart';
 import 'package:birlikteyapp/providers/item_provider.dart';
 import 'package:birlikteyapp/providers/task_cloud_provider.dart';
 import 'package:birlikteyapp/providers/task_provider.dart';
@@ -20,6 +21,7 @@ import 'package:birlikteyapp/services/notification_service.dart';
 import 'package:birlikteyapp/services/task_service.dart';
 import 'package:birlikteyapp/theme/app_theme.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
@@ -41,11 +43,31 @@ Future<void> main() async {
     FirebaseFirestore.instance.useFirestoreEmulator('10.0.2.2', 8080);
   }
 
+  await FirebaseAppCheck.instance.activate(
+    androidProvider: AndroidProvider.debug,
+    appleProvider: AppleProvider.debug,
+  );
+
   // Firestore offline cache açık kalsın
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
+  ErrorWidget.builder = (details) {
+    return Material(
+      color: Colors.black,
+      child: Center(
+        child: Text(
+          '💥 UI error:\n${details.exception}',
+          style: const TextStyle(color: Colors.white),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  };
+  FlutterError.onError = (details) {
+    FlutterError.dumpErrorToConsole(details);
+  };
 
   // Ekran yönü
   final views = WidgetsBinding.instance.platformDispatcher.views;
@@ -72,7 +94,7 @@ Future<void> main() async {
 }
 
 class _Root extends StatefulWidget {
-  const _Root({super.key});
+  const _Root();
   @override
   State<_Root> createState() => _RootState();
 }
@@ -127,6 +149,23 @@ class _RootState extends State<_Root> {
               ),
               update: (ctx, auth, service, family, prev) {
                 final p = prev ?? TaskCloudProvider(auth, service);
+                p.update(auth, service);
+                p.setFamilyId(family.familyId);
+                return p;
+              },
+            ),
+            ChangeNotifierProxyProvider3<
+              AuthService,
+              TaskService,
+              FamilyProvider,
+              ItemCloudProvider
+            >(
+              create: (ctx) => ItemCloudProvider(
+                ctx.read<AuthService>(),
+                ctx.read<TaskService>(),
+              ),
+              update: (ctx, auth, service, family, previous) {
+                final p = previous ?? ItemCloudProvider(auth, service);
                 p.update(auth, service);
                 p.setFamilyId(family.familyId);
                 return p;

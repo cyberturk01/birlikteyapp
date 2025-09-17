@@ -7,33 +7,51 @@ class AuthService {
   User? get currentUser => _auth.currentUser;
   Future<void> signOut() => _auth.signOut();
 
-  Future<UserCredential> signInWithEmail(String email, String password) async {
-    final cred = await _auth.signInWithEmailAndPassword(
+  Future<void> signUpWithEmail({
+    required String email,
+    required String password,
+    required String username,
+  }) async {
+    final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
       email: email,
       password: password,
     );
-    await _upsertUserDoc(cred.user); // 🔔 login’de de yaz/merge
-    return cred;
+
+    // 1) Auth profiline yaz
+    await cred.user!.updateDisplayName(username);
+    await cred.user!.reload();
+
+    // 2) users/{uid} belgesine yaz
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(cred.user!.uid)
+        .set({
+          'email': email,
+          'displayName': username,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
   }
 
-  Future<UserCredential> signUpWithEmail(String email, String password) async {
-    final cred = await _auth.createUserWithEmailAndPassword(
+  Future<void> signInWithEmail(String email, String password) async {
+    final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
       email: email,
       password: password,
     );
 
-    final uid = cred.user!.uid;
-    await FirebaseFirestore.instance.collection('users').doc(uid).set({
-      'email': email,
-      'displayName': email.split('@').first,
-      'families': <String>[], // 👈 boş dizi
-      'activeFamilyId': null, // 👈 açıkça null
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
-    // (opsiyonel) doğrulama
-    await cred.user?.sendEmailVerification();
-    return cred;
+    // Auth.displayName boşsa users/{uid}.displayName’den doldur
+    final u = cred.user!;
+    if ((u.displayName ?? '').trim().isEmpty) {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(u.uid)
+          .get();
+      final dn = (doc.data()?['displayName'] as String?)?.trim();
+      if (dn != null && dn.isNotEmpty) {
+        await u.updateDisplayName(dn);
+        await u.reload();
+      }
+    }
   }
 
   Future<void> sendResetEmail(String email) =>

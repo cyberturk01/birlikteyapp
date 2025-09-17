@@ -1,0 +1,196 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+
+import '../models/item.dart';
+import '../services/auth_service.dart';
+import '../services/task_service.dart'; // Eğer gerekmiyorsa kaldırabilirsiniz
+
+class ItemCloudProvider extends ChangeNotifier {
+  AuthService _auth;
+  TaskService _service; // opsiyonel; simetri için duruyor
+
+  User? _currentUser;
+  String? _familyId;
+  CollectionReference<Map<String, dynamic>>? _col;
+
+  final List<Item> _items = [];
+  List<Item> get items => List.unmodifiable(_items);
+
+  StreamSubscription<User?>? _authSub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _itemSub;
+
+  ItemCloudProvider(this._auth, this._service) {
+    _bindAuth();
+  }
+
+  void update(AuthService newAuth, TaskService newService) {
+    var changed = false;
+    if (!identical(_auth, newAuth)) {
+      _auth = newAuth;
+      changed = true;
+    }
+    if (!identical(_service, newService)) {
+      _service = newService;
+      changed = true;
+    }
+    if (changed) _rebindAuth();
+  }
+
+  // Aile id'si App boot’ta/FamilyProvider’dan gelir
+  void setFamilyId(String? id) {
+    if (_familyId == id) return;
+    _familyId = id;
+    _rebindItems();
+  }
+
+  // ==== Bindings ====
+  void _bindAuth() {
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+      _currentUser = user;
+      _rebindItems();
+    });
+  }
+
+  void _rebindAuth() {
+    _authSub?.cancel();
+    _authSub = null;
+    _bindAuth();
+  }
+
+  void _rebindItems() {
+    _itemSub?.cancel();
+    _itemSub = null;
+    _items.clear();
+    notifyListeners();
+
+    final user = _currentUser;
+    if (user == null || _familyId == null || _familyId!.isEmpty) {
+      _col = null;
+      return;
+    }
+
+    _col = FirebaseFirestore.instance
+        .collection('families')
+        .doc(_familyId!)
+        .collection('items');
+
+    _itemSub = _col!
+        // .orderBy('createdAt', descending: true) // <-- ŞİMDİLİK KALDIR
+        .orderBy(FieldPath.documentId, descending: true)
+        .snapshots()
+        .listen(
+          (qs) {
+            _items
+              ..clear()
+              ..addAll(
+                qs.docs.map((d) {
+                  final data = d.data();
+                  final it = Item(
+                    (data['name'] as String?)?.trim() ?? '',
+                    bought: (data['bought'] as bool?) ?? false,
+                    assignedTo: (data['assignedTo'] as String?)?.trim(),
+                  );
+                  it.remoteId = d.id;
+                  return it;
+                }),
+              );
+            notifyListeners();
+          },
+          onError: (e, _) {
+            debugPrint('Item stream error: $e');
+          },
+        );
+  }
+
+  // İsteğe bağlı: dışarıdan manuel tetiklemek için
+  Future<void> refreshNow() async {
+    _rebindItems();
+  }
+
+  // ==== Public API ====
+  List<String> get frequentItems {
+    final names = _items.map((e) => e.name).where((s) => s.isNotEmpty).toSet();
+    return names.take(5).toList();
+  }
+
+  Future<void> addItem(Item it) async {
+    final col = _ensureCol();
+    final doc = await col.add({
+      'name': it.name,
+      'bought': it.bought,
+      'assignedTo': it.assignedTo,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    it.remoteId = doc.id;
+  }
+
+  Future<void> toggleItem(Item it, bool bought) async {
+    final col = _ensureCol();
+    final id = await _ensureId(col, it);
+    await col.doc(id).update({'bought': bought});
+  }
+
+  Future<void> updateAssignment(Item it, String? member) async {
+    final col = _ensureCol();
+    final id = await _ensureId(col, it);
+    await col.doc(id).update({'assignedTo': member});
+  }
+
+  Future<void> renameItem(Item it, String newName) async {
+    final col = _ensureCol();
+    final id = await _ensureId(col, it);
+    await col.doc(id).update({'name': newName.trim()});
+  }
+
+  Future<void> removeItem(Item it) async {
+    final col = _ensureCol();
+    final id = await _ensureId(col, it);
+    await col.doc(id).delete();
+  }
+
+  Future<void> clearBought({String? forMember}) async {
+    final col = _ensureCol();
+    Query<Map<String, dynamic>> q = col.where('bought', isEqualTo: true);
+    if (forMember != null) q = q.where('assignedTo', isEqualTo: forMember);
+    final snap = await q.get();
+    for (final d in snap.docs) {
+      await d.reference.delete();
+    }
+  }
+
+  // ==== Helpers ====
+  CollectionReference<Map<String, dynamic>> _ensureCol() {
+    final col = _col;
+    if (col == null) {
+      throw StateError('No authenticated user / items collection not bound.');
+    }
+    return col;
+  }
+
+  Future<String> _ensureId(
+    CollectionReference<Map<String, dynamic>> col,
+    Item it,
+  ) async {
+    if (it.remoteId != null) return it.remoteId!;
+    final q = await col
+        .where('name', isEqualTo: it.name)
+        .where('assignedTo', isEqualTo: it.assignedTo)
+        .limit(1)
+        .get();
+    if (q.docs.isNotEmpty) {
+      it.remoteId = q.docs.first.id;
+      return it.remoteId!;
+    }
+    throw StateError('Cloud doc not found for item "${it.name}"');
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    _itemSub?.cancel();
+    super.dispose();
+  }
+}

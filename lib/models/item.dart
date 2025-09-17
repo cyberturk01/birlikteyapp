@@ -13,5 +13,7 @@ class Item extends HiveObject {
   @HiveField(2)
   String? assignedTo;
 
-  Item(this.name, {this.bought = false, this.assignedTo});
+  String? remoteId;
+
+  Item(this.name, {this.bought = false, this.assignedTo, this.remoteId});
 }
