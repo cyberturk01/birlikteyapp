@@ -29,6 +29,7 @@ class _HomePageState extends State<HomePage> {
   late final PageController _pageController;
   int _activeIndex = 0;
   bool _appliedInitial = false;
+  bool _cloudBound = false;
 
   @override
   void initState() {
@@ -52,8 +53,6 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  String? _activeMember;
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -72,16 +71,19 @@ class _HomePageState extends State<HomePage> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    if (!_cloudBound) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<TaskCloudProvider>().setFamilyId(familyId);
+        context.read<ItemCloudProvider>().setFamilyId(familyId);
+      });
+      _cloudBound = true;
+    }
+
     return StreamBuilder<List<String>>(
       stream: famProv.watchMemberLabels(),
       builder: (context, snap) {
         final labels = snap.data ?? const <String>[];
-        // güçlü fallback: stream boşsa bari kendimizi gösterelim
-        final safeFamily = labels.isEmpty
-            ? <String>[
-                'You (${(FirebaseAuth.instance.currentUser?.email ?? 'me').split('@').first})',
-              ]
-            : labels;
+
         final names = labels.isEmpty
             ? context.read<FamilyProvider>().memberLabelsOrFallback
             : labels;
@@ -91,19 +93,30 @@ class _HomePageState extends State<HomePage> {
             body: Center(child: CircularProgressIndicator()),
           );
         }
+        // ❷ Giriş yapanı en başa taşı (aşağıda kod var)
+        final ordered = _orderWithMeFirst(labels);
 
-        // initialFilterMember'i SADECE BİR KEZ uygula
-        if (!_appliedInitial && widget.initialFilterMember != null) {
-          final idx = safeFamily.indexOf(widget.initialFilterMember!);
-          if (idx >= 0) {
-            _activeIndex = idx;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (_pageController.hasClients) _pageController.jumpToPage(idx);
-              setState(() {});
-            });
-          }
-          _appliedInitial = true; // <<< önemli
+        // ❸ sadece ilk kez aktif index’i set et
+        if (!_appliedInitial) {
+          _activeIndex = 0; // me first
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_pageController.hasClients) _pageController.jumpToPage(0);
+            setState(() {});
+          });
+          _appliedInitial = true;
         }
+        // // initialFilterMember'i SADECE BİR KEZ uygula
+        // if (!_appliedInitial && widget.initialFilterMember != null) {
+        //   final idx = safeFamily.indexOf(widget.initialFilterMember!);
+        //   if (idx >= 0) {
+        //     _activeIndex = idx;
+        //     WidgetsBinding.instance.addPostFrameCallback((_) {
+        //       if (_pageController.hasClients) _pageController.jumpToPage(idx);
+        //       setState(() {});
+        //     });
+        //   }
+        //   _appliedInitial = true; // <<< önemli
+        // }
 
         // _activeIndex güvenliği
         if (_activeIndex >= names.length) {
@@ -215,9 +228,9 @@ class _HomePageState extends State<HomePage> {
                     controller: _pageController,
                     physics: const BouncingScrollPhysics(),
                     onPageChanged: (i) => setState(() => _activeIndex = i),
-                    itemCount: safeFamily.length, // <<< BURASI LISTEDEN
+                    itemCount: ordered.length, // <<< BURASI LISTEDEN
                     itemBuilder: (context, i) {
-                      final name = safeFamily[i]; // <<< ETİKET
+                      final name = ordered[i];
                       final memberTasks = tasks
                           .where((t) => _matchesAssignee(t.assignedTo, name))
                           .toList();
@@ -260,7 +273,7 @@ class _HomePageState extends State<HomePage> {
 
                 // === MİNİ BAR ===
                 MiniMembersBar(
-                  names: safeFamily,
+                  names: ordered,
                   activeIndex: _activeIndex,
                   onPickIndex: (i) {
                     setState(() => _activeIndex = i);
@@ -340,6 +353,16 @@ class _MiniMemberTile extends StatelessWidget {
       ),
     );
   }
+}
+
+List<String> _orderWithMeFirst(List<String> labels) {
+  // FamilyProvider.watchMemberLabels() şu cihazdaki kullanıcıyı hep "You (...)" olarak döndürür.
+  final idx = labels.indexWhere((s) => s.startsWith('You ('));
+  if (idx <= 0) return labels;
+  final copy = [...labels];
+  final me = copy.removeAt(idx);
+  copy.insert(0, me);
+  return copy;
 }
 
 bool _matchesAssignee(String? assignedTo, String cardLabel) {
