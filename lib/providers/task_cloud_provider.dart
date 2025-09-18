@@ -67,16 +67,16 @@ class TaskCloudProvider extends ChangeNotifier {
   }
 
   void _rebindTasks() {
+    debugPrint('[TaskCloud] REBIND → user=${_currentUser?.uid} fam=$_familyId');
+
     _taskSub?.cancel();
     _taskSub = null;
     _tasks.clear();
     notifyListeners();
-    debugPrint('[TaskCloud] bind user=${_currentUser?.uid} fam=$_familyId');
 
-    final user = _currentUser;
-    // 👇 Kullanıcı YOKSA veya familyId YOKSA bağlanma!
-    if (user == null || _familyId == null || _familyId!.isEmpty) {
+    if (_currentUser == null || _familyId == null || _familyId!.isEmpty) {
       _col = null;
+      debugPrint('[TaskCloud] SKIP (user/family null)');
       return;
     }
 
@@ -85,37 +85,87 @@ class TaskCloudProvider extends ChangeNotifier {
         .doc(_familyId!)
         .collection('tasks');
 
+    debugPrint('[TaskCloud] PATH = ${_col!.path}');
+
+    // TEST: orderBy'ı geçici kaldır → snapshot geliyor mu görelim
     _taskSub = _col!
-        // .orderBy('createdAt', descending: true) // <-- ŞİMDİLİK KALDIR
-        .orderBy(FieldPath.documentId, descending: true) // güvenli
+        //.orderBy(FieldPath.documentId, descending: true)
         .snapshots()
         .listen(
           (qs) {
+            debugPrint('[TaskCloud] SNAP size=${qs.size}');
             _tasks
               ..clear()
               ..addAll(
                 qs.docs.map((d) {
                   final data = d.data();
+                  debugPrint('[TaskCloud] doc ${d.id} => $data');
                   final t = Task(
                     (data['name'] as String?)?.trim() ?? '',
                     completed: (data['completed'] as bool?) ?? false,
                     assignedTo: (data['assignedTo'] as String?)?.trim(),
                   );
                   t.remoteId = d.id;
-                  debugPrint(
-                    '[TaskCloud] snapshot size=${qs.size} fam=$_familyId',
-                  );
                   return t;
                 }),
               );
             notifyListeners();
           },
           onError: (e, st) {
-            debugPrint('Task stream error: $e');
-            // Listeyi boşaltmayın; mevcut UI çökmesin
+            debugPrint('[TaskCloud] STREAM ERROR: $e');
           },
         );
   }
+
+  // void _rebindTasks() {
+  //   debugPrint('[TaskCloud] REBIND → user=${_currentUser?.uid} fam=$_familyId');
+  //   _taskSub?.cancel();
+  //   _taskSub = null;
+  //   _tasks.clear();
+  //   notifyListeners();
+  //
+  //   final user = _currentUser;
+  //   // 👇 Kullanıcı YOKSA veya familyId YOKSA bağlanma!
+  //   if (user == null || _familyId == null || _familyId!.isEmpty) {
+  //     _col = null;
+  //     debugPrint('[TaskCloud] SKIP (user/family null)');
+  //     return;
+  //   }
+  //
+  //   _col = FirebaseFirestore.instance
+  //       .collection('families')
+  //       .doc(_familyId!)
+  //       .collection('tasks');
+  //   debugPrint('[TaskCloud] PATH = families/$_familyId/tasks');
+  //
+  //   _taskSub = _col!
+  //       // .orderBy('createdAt', descending: true) // <-- ŞİMDİLİK KALDIR
+  //       .orderBy(FieldPath.documentId, descending: true) // güvenli
+  //       .snapshots()
+  //       .listen(
+  //         (qs) {
+  //           debugPrint('[TaskCloud] SNAP size=${qs.size}');
+  //           _tasks
+  //             ..clear()
+  //             ..addAll(
+  //               qs.docs.map((d) {
+  //                 final data = d.data();
+  //                 final t = Task(
+  //                   (data['name'] as String?)?.trim() ?? '',
+  //                   completed: (data['completed'] as bool?) ?? false,
+  //                   assignedTo: (data['assignedTo'] as String?)?.trim(),
+  //                 );
+  //                 t.remoteId = d.id;
+  //                 return t;
+  //               }),
+  //             );
+  //           notifyListeners();
+  //         },
+  //         onError: (e, st) {
+  //           debugPrint('[TaskCloud] STREAM ERROR: $e');
+  //         },
+  //       );
+  // }
 
   List<String> get suggestedTasks {
     final names = _tasks.map((e) => e.name).where((s) => s.isNotEmpty).toSet();
@@ -124,12 +174,16 @@ class TaskCloudProvider extends ChangeNotifier {
 
   Future<void> addTask(Task t) async {
     final col = _ensureCol();
+    debugPrint(
+      '[TaskCloud] ADD name=${t.name} fam=$_familyId path=${col.path}',
+    );
     final doc = await col.add({
       'name': t.name,
       'completed': t.completed,
       'assignedTo': t.assignedTo,
       'createdAt': FieldValue.serverTimestamp(),
     });
+    debugPrint('[TaskCloud] ADDED id=${doc.id}');
     t.remoteId = doc.id;
   }
 

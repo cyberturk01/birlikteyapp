@@ -66,6 +66,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final famProv = context.watch<FamilyProvider>();
     final familyId = famProv.familyId;
+    debugPrint('[HomePage] familyId=$familyId');
 
     if (familyId == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));

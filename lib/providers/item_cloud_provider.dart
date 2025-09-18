@@ -61,14 +61,16 @@ class ItemCloudProvider extends ChangeNotifier {
   }
 
   void _rebindItems() {
+    debugPrint('[ItemCloud] REBIND → user=${_currentUser?.uid} fam=$_familyId');
+
     _itemSub?.cancel();
     _itemSub = null;
     _items.clear();
     notifyListeners();
-    debugPrint('[ItemCloud] bind user=${_currentUser?.uid} fam=$_familyId');
-    final user = _currentUser;
-    if (user == null || _familyId == null || _familyId!.isEmpty) {
+
+    if (_currentUser == null || _familyId == null || _familyId!.isEmpty) {
       _col = null;
+      debugPrint('[ItemCloud] SKIP (user/family null)');
       return;
     }
 
@@ -77,35 +79,50 @@ class ItemCloudProvider extends ChangeNotifier {
         .doc(_familyId!)
         .collection('items');
 
+    debugPrint('[ItemCloud] PATH = ${_col!.path}');
+
     _itemSub = _col!
-        // .orderBy('createdAt', descending: true) // <-- ŞİMDİLİK KALDIR
-        .orderBy(FieldPath.documentId, descending: true)
+        //.orderBy(FieldPath.documentId, descending: true) // test için kapalı
         .snapshots()
         .listen(
           (qs) {
+            debugPrint('[ItemCloud] SNAP size=${qs.size}');
             _items
               ..clear()
               ..addAll(
                 qs.docs.map((d) {
                   final data = d.data();
+                  debugPrint('[ItemCloud] doc ${d.id} => $data');
                   final it = Item(
                     (data['name'] as String?)?.trim() ?? '',
                     bought: (data['bought'] as bool?) ?? false,
                     assignedTo: (data['assignedTo'] as String?)?.trim(),
                   );
                   it.remoteId = d.id;
-                  debugPrint(
-                    '[ItemCloud] snapshot size=${qs.size} fam=$_familyId',
-                  );
                   return it;
                 }),
               );
             notifyListeners();
           },
-          onError: (e, _) {
-            debugPrint('Item stream error: $e');
+          onError: (e, st) {
+            debugPrint('[ItemCloud] STREAM ERROR: $e');
           },
         );
+  }
+
+  Future<void> addItem(Item it) async {
+    final col = _ensureCol();
+    debugPrint(
+      '[ItemCloud] ADD name=${it.name} fam=$_familyId path=${col.path}',
+    );
+    final doc = await col.add({
+      'name': it.name,
+      'bought': it.bought,
+      'assignedTo': it.assignedTo,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    debugPrint('[ItemCloud] ADDED id=${doc.id}');
+    it.remoteId = doc.id;
   }
 
   // İsteğe bağlı: dışarıdan manuel tetiklemek için
@@ -117,17 +134,6 @@ class ItemCloudProvider extends ChangeNotifier {
   List<String> get frequentItems {
     final names = _items.map((e) => e.name).where((s) => s.isNotEmpty).toSet();
     return names.take(5).toList();
-  }
-
-  Future<void> addItem(Item it) async {
-    final col = _ensureCol();
-    final doc = await col.add({
-      'name': it.name,
-      'bought': it.bought,
-      'assignedTo': it.assignedTo,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    it.remoteId = doc.id;
   }
 
   Future<void> toggleItem(Item it, bool bought) async {

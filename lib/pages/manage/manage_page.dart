@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -31,6 +32,14 @@ class _ManagePageState extends State<ManagePage> {
 
   @override
   Widget build(BuildContext context) {
+    final famId = context.watch<FamilyProvider>().familyId;
+    final tasksLen = context.select<TaskCloudProvider, int>(
+      (p) => p.tasks.length,
+    );
+    final itemsLen = context.select<ItemCloudProvider, int>(
+      (p) => p.items.length,
+    );
+    debugPrint('[ManagePage] fam=$famId tasks=$tasksLen items=$itemsLen');
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -76,6 +85,29 @@ class _ManagePageState extends State<ManagePage> {
 
           const SizedBox(height: 12),
           const Divider(),
+          //TODO kaldir gecici
+          const Divider(),
+          const SizedBox(height: 8),
+          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: (context.watch<FamilyProvider>().familyId == null)
+                ? const Stream.empty()
+                : FirebaseFirestore.instance
+                      .collection('families')
+                      .doc(context.watch<FamilyProvider>().familyId!)
+                      .collection(
+                        _tab == _ManageTab.tasks || _tab == _ManageTab.items
+                            ? 'tasks'
+                            : 'items',
+                      )
+                      //.orderBy(FieldPath.documentId, descending: true) // test için kapalı
+                      .snapshots(),
+            builder: (_, snap) {
+              final n = snap.data?.docs.length ?? 0;
+              return Text(
+                'RAW ${_tab == _ManageTab.tasks || _tab == _ManageTab.items ? 'tasks' : 'items'} count = $n',
+              );
+            },
+          ),
 
           // Giriş satırı (Assign kaldırıldı)
           const SizedBox(height: 12),
@@ -149,9 +181,6 @@ class _ManagePageState extends State<ManagePage> {
   }
 
   Future<void> _handleAdd(BuildContext context) async {
-    final tCount = context.watch<TaskCloudProvider>().tasks.length;
-    final iCount = context.watch<ItemCloudProvider>().items.length;
-    Text('Cloud: $tCount tasks • $iCount items');
     final taskProv = context.read<TaskCloudProvider>();
     final itemProv = context.read<ItemCloudProvider>();
     final text = _input.text.trim();
