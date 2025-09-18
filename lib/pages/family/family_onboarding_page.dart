@@ -7,6 +7,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../providers/family_provider.dart';
+import '../../widgets/family_name_suggest_field.dart';
 
 class FamilyOnboardingPage extends StatefulWidget {
   const FamilyOnboardingPage({super.key});
@@ -18,33 +19,56 @@ class FamilyOnboardingPage extends StatefulWidget {
 class _FamilyOnboardingPageState extends State<FamilyOnboardingPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tab;
-  final _nameCtrl = TextEditingController();
-  final _codeCtrl = TextEditingController();
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _codeCtrl;
 
   bool _checking = false; // ad uygun mu kontrolü sürüyor
   bool _available = false; // ad uygun mu sonucu
   List<String> _suggestions = [];
   Timer? _debounce;
+  int _reqToken = 0;
 
   bool _loading = false; // create/join işlemi
   String? _error;
+  Timer? _nameDebounce;
+
+  void _onNameChanged() {
+    _nameDebounce?.cancel();
+    final txt = _nameCtrl.text.trim();
+    if (txt.isEmpty) {
+      setState(() {
+        _checking = false;
+        _available = false;
+      });
+      return;
+    }
+    setState(() => _checking = true);
+
+    _nameDebounce = Timer(const Duration(milliseconds: 350), () async {
+      final myToken = ++_reqToken;
+      final ok = !(await context.read<FamilyProvider>().isFamilyNameTaken(txt));
+      if (!mounted || myToken != _reqToken) return;
+      setState(() {
+        _available = ok;
+        _checking = false;
+      });
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     _tab = TabController(length: 2, vsync: this);
-
-    _nameCtrl.addListener(() {
-      _error = null;
-      _debounce?.cancel();
-      _debounce = Timer(const Duration(milliseconds: 350), _checkAvailability);
-      setState(() {});
-    });
+    _nameCtrl = TextEditingController();
+    _codeCtrl = TextEditingController();
+    _nameCtrl.addListener(_onNameChanged);
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _nameDebounce?.cancel();
+    _nameCtrl.removeListener(_onNameChanged);
     _tab.dispose();
     _nameCtrl.dispose();
     _codeCtrl.dispose();
@@ -182,9 +206,12 @@ class _FamilyOnboardingPageState extends State<FamilyOnboardingPage>
                                 ],
                               ),
                               const SizedBox(height: 12),
-                              TextField(
+                              FamilyNameSuggestField(
                                 controller: _nameCtrl,
-                                textCapitalization: TextCapitalization.words,
+                                onPickSuggestion: (picked) {
+                                  // Öneriye tıklandığında availability check’i tetikle
+                                  _onNameChanged();
+                                },
                                 decoration: InputDecoration(
                                   labelText: 'Family name',
                                   hintText: 'e.g., Yigit Family',
@@ -208,8 +235,12 @@ class _FamilyOnboardingPageState extends State<FamilyOnboardingPage>
                                                     : Icons.error_outline,
                                                 color: _available
                                                     ? Colors.green
-                                                    : theme.colorScheme.error,
+                                                    : Theme.of(
+                                                        context,
+                                                      ).colorScheme.error,
                                               )),
+                                  border: const OutlineInputBorder(),
+                                  isDense: true,
                                 ),
                               ),
                               const SizedBox(height: 8),

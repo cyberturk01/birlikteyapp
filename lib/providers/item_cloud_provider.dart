@@ -65,7 +65,7 @@ class ItemCloudProvider extends ChangeNotifier {
     _itemSub = null;
     _items.clear();
     notifyListeners();
-
+    debugPrint('[ItemCloud] bind user=${_currentUser?.uid} fam=$_familyId');
     final user = _currentUser;
     if (user == null || _familyId == null || _familyId!.isEmpty) {
       _col = null;
@@ -94,6 +94,9 @@ class ItemCloudProvider extends ChangeNotifier {
                     assignedTo: (data['assignedTo'] as String?)?.trim(),
                   );
                   it.remoteId = d.id;
+                  debugPrint(
+                    '[ItemCloud] snapshot size=${qs.size} fam=$_familyId',
+                  );
                   return it;
                 }),
               );
@@ -143,6 +146,8 @@ class ItemCloudProvider extends ChangeNotifier {
     final col = _ensureCol();
     final id = await _ensureId(col, it);
     await col.doc(id).update({'name': newName.trim()});
+    it.name = newName.trim();
+    notifyListeners();
   }
 
   Future<void> removeItem(Item it) async {
@@ -175,16 +180,55 @@ class ItemCloudProvider extends ChangeNotifier {
     Item it,
   ) async {
     if (it.remoteId != null) return it.remoteId!;
-    final q = await col
-        .where('name', isEqualTo: it.name)
-        .where('assignedTo', isEqualTo: it.assignedTo)
-        .limit(1)
-        .get();
-    if (q.docs.isNotEmpty) {
-      it.remoteId = q.docs.first.id;
+
+    Query<Map<String, dynamic>> q = col.where('name', isEqualTo: it.name);
+
+    if (it.assignedTo == null || it.assignedTo!.trim().isEmpty) {
+      // null veya boş atama
+      q = q.where('assignedTo', isNull: true);
+    } else {
+      q = q.where('assignedTo', isEqualTo: it.assignedTo);
+    }
+
+    final snap = await q.limit(1).get();
+    if (snap.docs.isNotEmpty) {
+      it.remoteId = snap.docs.first.id;
       return it.remoteId!;
     }
     throw StateError('Cloud doc not found for item "${it.name}"');
+  }
+
+  List<Item> addItemsBulk(
+    List<String> names, {
+    String? assignedTo,
+    bool skipDuplicates = true,
+  }) {
+    final created = <Item>[];
+    final existing = items.map((i) => i.name.toLowerCase()).toSet();
+
+    for (final n in names) {
+      final name = n.trim();
+      if (name.isEmpty) continue;
+      if (skipDuplicates && existing.contains(name.toLowerCase())) continue;
+
+      final it = Item(name, assignedTo: assignedTo);
+      _items.add(it);
+
+      // (İsteğe bağlı) frekans sayacı artırmak istemezsen, burayı atla:
+      // final current = _itemCountBox.get(name, defaultValue: 0)!;
+      // _itemCountBox.put(name, current + 1);
+
+      created.add(it);
+    }
+    if (created.isNotEmpty) notifyListeners();
+    return created;
+  }
+
+  void removeManyItems(Iterable<Item> list) {
+    for (final it in list) {
+      it.delete();
+    }
+    if (list.isNotEmpty) notifyListeners();
   }
 
   @override

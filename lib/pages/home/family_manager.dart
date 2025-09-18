@@ -1,52 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../constants/app_strings.dart';
 import '../../providers/family_provider.dart';
-import '../../providers/item_provider.dart';
-import '../../providers/task_provider.dart';
-import '../../providers/weekly_provider.dart';
 
-class _FamilyManagerSheet extends StatefulWidget {
+class _FamilyManagerSheet extends StatelessWidget {
   const _FamilyManagerSheet();
 
   @override
-  State<_FamilyManagerSheet> createState() => _FamilyManagerSheetState();
-}
-
-class _FamilyManagerSheetState extends State<_FamilyManagerSheet> {
-  final TextEditingController _memberCtrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _memberCtrl.dispose();
-    super.dispose();
-  }
-
-  void _addMember(BuildContext context) {
-    final familyProv = context.read<FamilyProvider>();
-    final name = _memberCtrl.text.trim();
-    if (name.isEmpty) return;
-
-    final exists = familyProv.familyMembers.any(
-      (m) => m.toLowerCase() == name.toLowerCase(),
-    );
-    if (exists) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('This name already exists')));
-      return;
-    }
-
-    familyProv.addMember(name); // void ise await yok
-    _memberCtrl.clear();
-    FocusScope.of(context).unfocus();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final familyProv = context.watch<FamilyProvider>();
-    final members = familyProv.familyMembers;
+    final fam = context.read<FamilyProvider>();
 
     return Padding(
       padding: EdgeInsets.only(
@@ -84,79 +48,85 @@ class _FamilyManagerSheetState extends State<_FamilyManagerSheet> {
           ),
           const SizedBox(height: 8),
 
-          // Üye varsa: üstte tek satır hızlı ekleme
-          if (members.isNotEmpty) ...[
-            _AddMemberRow(
-              controller: _memberCtrl,
-              onAdd: () => _addMember(context),
-            ),
-            const SizedBox(height: 12),
-          ],
+          // Davet kodu kartı
+          _InviteCodeTile(
+            onTapCopy: () async {
+              final code = await fam.getInviteCode();
+              if (code == null) return;
+              await Clipboard.setData(ClipboardData(text: code));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Invite code copied: $code')),
+                );
+              }
+            },
+          ),
 
-          // Liste / Boş durum
+          const SizedBox(height: 12),
+
+          // ÜYE LİSTESİ (Firestore)
           Flexible(
-            child: members.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 480),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.groups_2, size: 48),
-                            const SizedBox(height: 10),
-                            Text(
-                              'No family members yet',
-                              style: Theme.of(context).textTheme.titleMedium,
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 12),
-                            // Boşken sadece burada tek satır ekleme göster
-                            _AddMemberRow(
-                              controller: _memberCtrl,
-                              onAdd: () => _addMember(context),
-                            ),
-                          ],
+            child: StreamBuilder<List<FamilyMemberEntry>>(
+              stream: fam.watchMemberEntries(),
+              builder: (ctx, snap) {
+                final entries = snap.data ?? const <FamilyMemberEntry>[];
+                if (snap.connectionState == ConnectionState.waiting &&
+                    entries.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (entries.isEmpty) {
+                  return const _EmptyMembersHint();
+                }
+                return ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: entries.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final e = entries[i];
+                    final isOwner = e.role == 'owner';
+                    return ListTile(
+                      leading: CircleAvatar(
+                        child: Text(
+                          e.label.isNotEmpty ? e.label[0].toUpperCase() : '?',
                         ),
                       ),
-                    ),
-                  )
-                : ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: members.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (_, i) {
-                      final name = members[i];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          child: Text(
-                            name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      title: Text(e.label, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(isOwner ? 'Owner' : 'Member'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: 'Edit label (this family only)',
+                            icon: const Icon(Icons.edit),
+                            onPressed: () => _showEditLabelDialog(context, e),
                           ),
-                        ),
-                        title: Text(name),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              tooltip: 'Edit name',
-                              icon: const Icon(Icons.edit),
-                              onPressed: () => _showEditDialog(
-                                context,
-                                index: i,
-                                currentName: name,
-                              ),
+                          IconButton(
+                            tooltip: S.delete,
+                            icon: const Icon(
+                              Icons.person_remove,
+                              color: Colors.red,
                             ),
-                            IconButton(
-                              tooltip: S.delete,
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => familyProv.removeMember(i),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                            onPressed: isOwner
+                                ? null
+                                : () async {
+                                    try {
+                                      await fam.removeMemberFromFamily(e.uid);
+                                    } catch (err) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(content: Text(err.toString())),
+                                      );
+                                    }
+                                  },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -164,60 +134,72 @@ class _FamilyManagerSheetState extends State<_FamilyManagerSheet> {
   }
 }
 
-class _AddMemberRow extends StatelessWidget {
-  final TextEditingController controller;
-  final VoidCallback onAdd;
-
-  const _AddMemberRow({required this.controller, required this.onAdd});
+class _InviteCodeTile extends StatelessWidget {
+  final VoidCallback onTapCopy;
+  const _InviteCodeTile({required this.onTapCopy});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              hintText: 'Enter member name',
-              prefixIcon: Icon(Icons.person),
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            onSubmitted: (_) => onAdd(),
-          ),
-        ),
-        const SizedBox(width: 8),
-        FilledButton.icon(
-          icon: const Icon(Icons.person_add_alt_1),
-          label: const Text(S.add),
-          onPressed: onAdd,
-        ),
-      ],
+    return ListTile(
+      tileColor: Theme.of(
+        context,
+      ).colorScheme.surfaceContainerHighest.withOpacity(.4),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      leading: const Icon(Icons.qr_code_2),
+      title: const Text('Invite a member'),
+      subtitle: const Text('Share your family’s invite code'),
+      trailing: FilledButton.icon(
+        icon: const Icon(Icons.copy),
+        label: const Text('Copy code'),
+        onPressed: onTapCopy,
+      ),
     );
   }
 }
 
-void _showEditDialog(
-  BuildContext context, {
-  required int index,
-  required String currentName,
-}) {
-  final fam = context.read<FamilyProvider>();
-  final taskProv = context.read<TaskProvider>();
-  final itemProv = context.read<ItemProvider>();
-  final weeklyProv = context
-      .read<WeeklyProvider?>(); // weekly yoksa null olabilir (optional)
+class _EmptyMembersHint extends StatelessWidget {
+  const _EmptyMembersHint();
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.groups_2, size: 48),
+            const SizedBox(height: 10),
+            Text(
+              'No family members yet',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Use the invite code above to add members.',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-  final c = TextEditingController(text: currentName);
+void _showEditLabelDialog(BuildContext context, FamilyMemberEntry e) async {
+  final fam = context.read<FamilyProvider>();
+  final initial = await fam.getRawLabelFor(e.uid); // <<< ham değer
+  if (!context.mounted) return;
+
+  final c = TextEditingController(text: initial);
 
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text('Edit member'),
+      title: const Text('Edit member label'),
       content: TextField(
         controller: c,
         decoration: const InputDecoration(
-          labelText: 'Name',
+          labelText: 'Label',
           border: OutlineInputBorder(),
           isDense: true,
         ),
@@ -226,41 +208,14 @@ void _showEditDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text(S.cancel),
+          child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: () {
-            final newName = c.text.trim();
-            if (newName.isEmpty) return;
-
-            // Duplicate kontrol
-            final exists = fam.familyMembers.asMap().entries.any(
-              (e) =>
-                  e.key != index &&
-                  e.value.toLowerCase() == newName.toLowerCase(),
-            );
-            if (exists) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('This name already exists')),
-              );
-              return;
-            }
-
-            final oldName = currentName;
-
-            // 1) Family’de değiştir
-            fam.renameMember(index: index, newName: newName);
-
-            // 2) Bağlı atamaları güncelle
-            taskProv.updateAssignmentsOnRename(oldName, newName);
-            itemProv.updateAssignmentsOnRename(oldName, newName);
-            weeklyProv?.updateAssignmentsOnRename(oldName, newName);
-
-            Navigator.pop(context);
-
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('Renamed to "$newName"')));
+          onPressed: () async {
+            final newLabel = c.text.trim();
+            if (newLabel.isEmpty) return;
+            await fam.updateMemberLabel(e.uid, newLabel);
+            if (context.mounted) Navigator.pop(context);
           },
           child: const Text('Save'),
         ),

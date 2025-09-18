@@ -1,4 +1,3 @@
-import 'package:birlikteyapp/constants/app_lists.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,9 +5,8 @@ import '../../constants/app_strings.dart';
 import '../../models/item.dart';
 import '../../models/task.dart';
 import '../../providers/family_provider.dart';
-import '../../providers/item_provider.dart';
+import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
-import '../../providers/task_provider.dart';
 import '../../widgets/member_dropdown.dart';
 import '../../widgets/swipe_bg.dart';
 
@@ -33,26 +31,6 @@ class _ManagePageState extends State<ManagePage> {
 
   @override
   Widget build(BuildContext context) {
-    final taskProv = context.watch<TaskProvider>();
-    final itemProv = context.watch<ItemProvider>();
-
-    // --- Hazır listeler ---
-    const defaultTasks = AppLists.defaultTasks;
-
-    const defaultItems = AppLists.defaultItems;
-
-    // --- Öneriler (dedupe + alfabetik) ---
-    final taskSuggestions = _buildSuggestions(
-      frequent: taskProv.suggestedTasks,
-      defaults: defaultTasks,
-      existing: taskProv.tasks.map((t) => t.name).toList(),
-    );
-    final itemSuggestions = _buildSuggestions(
-      frequent: itemProv.frequentItems,
-      defaults: defaultItems,
-      existing: itemProv.items.map((i) => i.name).toList(),
-    );
-
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -170,9 +148,12 @@ class _ManagePageState extends State<ManagePage> {
     return list;
   }
 
-  void _handleAdd(BuildContext context) {
-    final taskProv = context.read<TaskProvider>();
-    final itemProv = context.read<ItemProvider>();
+  Future<void> _handleAdd(BuildContext context) async {
+    final tCount = context.watch<TaskCloudProvider>().tasks.length;
+    final iCount = context.watch<ItemCloudProvider>().items.length;
+    Text('Cloud: $tCount tasks • $iCount items');
+    final taskProv = context.read<TaskCloudProvider>();
+    final itemProv = context.read<ItemCloudProvider>();
     final text = _input.text.trim();
     if (text.isEmpty) return;
 
@@ -186,7 +167,7 @@ class _ManagePageState extends State<ManagePage> {
         );
         return;
       }
-      taskProv.addTask(Task(text));
+      await taskProv.addTask(Task(text));
     } else {
       final dup = itemProv.items.any(
         (i) => i.name.toLowerCase() == text.toLowerCase(),
@@ -197,7 +178,7 @@ class _ManagePageState extends State<ManagePage> {
         );
         return;
       }
-      itemProv.addItem(Item(text));
+      await itemProv.addItem(Item(text));
     }
 
     _input.clear();
@@ -213,7 +194,7 @@ class _ManagePageState extends State<ManagePage> {
 class _TaskListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final taskProv = context.watch<TaskProvider>();
+    final taskProv = context.watch<TaskCloudProvider>();
     final tasks = taskProv.tasks;
 
     if (tasks.isEmpty) {
@@ -228,7 +209,7 @@ class _TaskListView extends StatelessWidget {
       itemBuilder: (_, i) {
         final t = tasks[i];
         return Dismissible(
-          key: ValueKey('task-${t.key ?? t.name}-${t.hashCode}'),
+          key: ValueKey('task-${t.remoteId ?? t.name}-${t.hashCode}'),
           background: const SwipeBg(
             color: Colors.green,
             icon: Icons.check,
@@ -241,7 +222,7 @@ class _TaskListView extends StatelessWidget {
           ),
           confirmDismiss: (dir) async {
             if (dir == DismissDirection.startToEnd) {
-              context.read<TaskProvider>().toggleTask(t, !t.completed);
+              context.read<TaskCloudProvider>().toggleTask(t, !t.completed);
               return false;
             } else {
               final copy = Task(
@@ -249,13 +230,14 @@ class _TaskListView extends StatelessWidget {
                 completed: t.completed,
                 assignedTo: t.assignedTo,
               );
-              context.read<TaskProvider>().removeTask(t);
+              context.read<TaskCloudProvider>().removeTask(t);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: const Text('Task deleted'),
                   action: SnackBarAction(
                     label: 'Undo',
-                    onPressed: () => context.read<TaskProvider>().addTask(copy),
+                    onPressed: () =>
+                        context.read<TaskCloudProvider>().addTask(copy),
                   ),
                 ),
               );
@@ -268,7 +250,7 @@ class _TaskListView extends StatelessWidget {
             leading: Checkbox(
               value: t.completed,
               onChanged: (v) =>
-                  context.read<TaskProvider>().toggleTask(t, v ?? false),
+                  context.read<TaskCloudProvider>().toggleTask(t, v ?? false),
             ),
             title: Text(
               t.name,
@@ -302,7 +284,8 @@ class _TaskListView extends StatelessWidget {
                   constraints: const BoxConstraints(),
                   tooltip: S.delete,
                   icon: const Icon(Icons.delete, color: Colors.redAccent),
-                  onPressed: () => context.read<TaskProvider>().removeTask(t),
+                  onPressed: () =>
+                      context.read<TaskCloudProvider>().removeTask(t),
                 ),
               ],
             ),
@@ -316,7 +299,7 @@ class _TaskListView extends StatelessWidget {
 class _ItemListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final itemProv = context.watch<ItemProvider>();
+    final itemProv = context.watch<ItemCloudProvider>();
     final items = itemProv.items;
 
     if (items.isEmpty) {
@@ -331,7 +314,7 @@ class _ItemListView extends StatelessWidget {
       itemBuilder: (_, i) {
         final it = items[i];
         return Dismissible(
-          key: ValueKey('item-${it.key ?? it.name}-${it.hashCode}'),
+          key: ValueKey('item-${it.remoteId ?? it.name}-${it.hashCode}'),
           background: const SwipeBg(
             color: Colors.green,
             icon: Icons.check,
@@ -344,7 +327,7 @@ class _ItemListView extends StatelessWidget {
           ),
           confirmDismiss: (dir) async {
             if (dir == DismissDirection.startToEnd) {
-              context.read<ItemProvider>().toggleItem(it, !it.bought);
+              context.read<ItemCloudProvider>().toggleItem(it, !it.bought);
               return false;
             } else {
               final copy = Item(
@@ -352,13 +335,14 @@ class _ItemListView extends StatelessWidget {
                 bought: it.bought,
                 assignedTo: it.assignedTo,
               );
-              context.read<ItemProvider>().removeItem(it);
+              context.read<ItemCloudProvider>().removeItem(it);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: const Text('Item deleted'),
                   action: SnackBarAction(
                     label: 'Undo',
-                    onPressed: () => context.read<ItemProvider>().addItem(copy),
+                    onPressed: () =>
+                        context.read<ItemCloudProvider>().addItem(copy),
                   ),
                 ),
               );
@@ -371,7 +355,7 @@ class _ItemListView extends StatelessWidget {
             leading: Checkbox(
               value: it.bought,
               onChanged: (v) =>
-                  context.read<ItemProvider>().toggleItem(it, v ?? false),
+                  context.read<ItemCloudProvider>().toggleItem(it, v ?? false),
             ),
             title: Text(
               it.name,
@@ -405,7 +389,8 @@ class _ItemListView extends StatelessWidget {
                   constraints: const BoxConstraints(),
                   tooltip: S.delete,
                   icon: const Icon(Icons.delete, color: Colors.redAccent),
-                  onPressed: () => context.read<ItemProvider>().removeItem(it),
+                  onPressed: () =>
+                      context.read<ItemCloudProvider>().removeItem(it),
                 ),
               ],
             ),
@@ -430,7 +415,7 @@ class _ItemListView extends StatelessWidget {
             isDense: true,
           ),
           onSubmitted: (_) {
-            context.read<ItemProvider>().renameItem(item, ctrl.text);
+            context.read<ItemCloudProvider>().renameItem(item, ctrl.text);
             Navigator.pop(context);
           },
         ),
@@ -441,7 +426,7 @@ class _ItemListView extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () {
-              context.read<ItemProvider>().renameItem(item, ctrl.text);
+              context.read<ItemCloudProvider>().renameItem(item, ctrl.text);
               Navigator.pop(context);
             },
             child: const Text('Save'),
@@ -467,7 +452,7 @@ void _showRenameTaskDialog(BuildContext context, Task task) {
           isDense: true,
         ),
         onSubmitted: (_) {
-          context.read<TaskProvider>().renameTask(task, ctrl.text);
+          context.read<TaskCloudProvider>().renameTask(task, ctrl.text);
           Navigator.pop(context);
         },
       ),
@@ -478,7 +463,7 @@ void _showRenameTaskDialog(BuildContext context, Task task) {
         ),
         FilledButton(
           onPressed: () {
-            context.read<TaskProvider>().renameTask(task, ctrl.text);
+            context.read<TaskCloudProvider>().renameTask(task, ctrl.text);
             Navigator.pop(context);
           },
           child: const Text('Save'),
@@ -535,7 +520,7 @@ void _showAssignItemSheet(BuildContext context, Item item) {
             width: double.infinity,
             child: FilledButton(
               onPressed: () {
-                context.read<ItemProvider>().updateAssignment(
+                context.read<ItemCloudProvider>().updateAssignment(
                   item,
                   (selected != null && selected!.trim().isNotEmpty)
                       ? selected
@@ -603,105 +588,3 @@ void _showAssignTaskSheet(BuildContext context, Task task) {
     ),
   );
 }
-
-// void _showAssignItemSheet(BuildContext context, Item item) {
-//   final family = context.read<FamilyProvider>().familyMembers;
-//   String? selected = item.assignedTo;
-//
-//   showModalBottomSheet(
-//     context: context,
-//     builder: (_) => Padding(
-//       padding: const EdgeInsets.all(16),
-//       child: Column(
-//         mainAxisSize: MainAxisSize.min,
-//         children: [
-//           const Text(
-//             'Assign item',
-//             style: TextStyle(fontWeight: FontWeight.bold),
-//           ),
-//           const SizedBox(height: 12),
-//           DropdownButtonFormField<String>(
-//             value: selected,
-//             isExpanded: true,
-//             items: [
-//               const DropdownMenuItem(value: null, child: Text('No one')),
-//               ...family.map((m) => DropdownMenuItem(value: m, child: Text(m))),
-//             ],
-//             onChanged: (v) => selected = v,
-//             decoration: const InputDecoration(
-//               border: OutlineInputBorder(),
-//               isDense: true,
-//             ),
-//           ),
-//           const SizedBox(height: 12),
-//           SizedBox(
-//             width: double.infinity,
-//             child: FilledButton(
-//               onPressed: () {
-//                 context.read<ItemProvider>().updateAssignment(
-//                   item,
-//                   (selected != null && selected!.trim().isNotEmpty)
-//                       ? selected
-//                       : null,
-//                 );
-//                 Navigator.pop(context);
-//               },
-//               child: const Text('Save'),
-//             ),
-//           ),
-//         ],
-//       ),
-//     ),
-//   );
-// }
-//
-// void _showAssignTaskSheet(BuildContext context, Task task) {
-//   final family = context.read<FamilyProvider>().familyMembers;
-//   String? selected = task.assignedTo;
-//
-//   showModalBottomSheet(
-//     context: context,
-//     builder: (_) => Padding(
-//       padding: const EdgeInsets.all(16),
-//       child: Column(
-//         mainAxisSize: MainAxisSize.min,
-//         children: [
-//           const Text(
-//             'Assign task',
-//             style: TextStyle(fontWeight: FontWeight.bold),
-//           ),
-//           const SizedBox(height: 12),
-//           DropdownButtonFormField<String>(
-//             value: selected,
-//             isExpanded: true,
-//             items: [
-//               const DropdownMenuItem(value: null, child: Text('No one')),
-//               ...family.map((m) => DropdownMenuItem(value: m, child: Text(m))),
-//             ],
-//             onChanged: (v) => selected = v,
-//             decoration: const InputDecoration(
-//               border: OutlineInputBorder(),
-//               isDense: true,
-//             ),
-//           ),
-//           const SizedBox(height: 12),
-//           SizedBox(
-//             width: double.infinity,
-//             child: FilledButton(
-//               onPressed: () {
-//                 context.read<TaskProvider>().updateAssignment(
-//                   task,
-//                   (selected != null && selected!.trim().isNotEmpty)
-//                       ? selected
-//                       : null,
-//                 );
-//                 Navigator.pop(context);
-//               },
-//               child: const Text('Save'),
-//             ),
-//           ),
-//         ],
-//       ),
-//     ),
-//   );
-// }

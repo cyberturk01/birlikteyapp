@@ -6,7 +6,7 @@ import '../../constants/app_strings.dart';
 import '../../models/item.dart';
 import '../../models/task.dart';
 import '../../models/view_section.dart';
-import '../../providers/item_provider.dart';
+import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../widgets/muted_text.dart';
@@ -50,7 +50,7 @@ class _MemberCardState extends State<MemberCard> {
 
   void _toggleItem(Item it) {
     final newVal = !it.bought;
-    context.read<ItemProvider>().toggleItem(it, newVal);
+    context.read<ItemCloudProvider>().toggleItem(it, newVal);
     setState(() {});
   }
 
@@ -353,7 +353,7 @@ class _MemberCardState extends State<MemberCard> {
   }
 
   void _clearBoughtForMember(BuildContext context, String member) {
-    final prov = context.read<ItemProvider>();
+    final prov = context.read<ItemCloudProvider>();
 
     // Undo için snapshot
     final removed = prov.items
@@ -370,7 +370,7 @@ class _MemberCardState extends State<MemberCard> {
           label: 'Undo',
           onPressed: () {
             for (final it in removed) {
-              context.read<ItemProvider>().addItem(it);
+              context.read<ItemCloudProvider>().addItem(it);
             }
           },
         ),
@@ -501,9 +501,9 @@ class _MemberCardState extends State<MemberCard> {
   }
 
   void _openQuickAddItemSheet(BuildContext context, String member) {
-    final itemProv = context.read<ItemProvider>();
+    final itemProv = context.read<ItemCloudProvider>();
 
-    const defaultItems = AppLists.defaultTasks;
+    const defaultItems = AppLists.defaultItems;
 
     final frequent = itemProv.frequentItems;
     final existing = itemProv.items.map((i) => i.name).toList();
@@ -789,7 +789,7 @@ class _ItemsSubsection extends StatelessWidget {
           ...visible.map((it) {
             final bought = it.bought;
             return Dismissible(
-              key: ValueKey('item-${it.key ?? it.name}-${it.hashCode}'),
+              key: ValueKey('item-${it.remoteId ?? it.name}-${it.hashCode}'),
               background: const SwipeBg(
                 color: Colors.green,
                 icon: Icons.check,
@@ -813,7 +813,7 @@ class _ItemsSubsection extends StatelessWidget {
                     bought: removed.bought,
                     assignedTo: removed.assignedTo,
                   );
-                  context.read<ItemProvider>().removeItem(removed);
+                  context.read<ItemCloudProvider>().removeItem(removed);
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -821,7 +821,7 @@ class _ItemsSubsection extends StatelessWidget {
                       action: SnackBarAction(
                         label: 'Undo',
                         onPressed: () =>
-                            context.read<ItemProvider>().addItem(copy),
+                            context.read<ItemCloudProvider>().addItem(copy),
                       ),
                       duration: const Duration(seconds: 5),
                     ),
@@ -855,7 +855,8 @@ class _ItemsSubsection extends StatelessWidget {
                 trailing: IconButton(
                   tooltip: S.delete,
                   icon: const Icon(Icons.delete, color: Colors.redAccent),
-                  onPressed: () => context.read<ItemProvider>().removeItem(it),
+                  onPressed: () =>
+                      context.read<ItemCloudProvider>().removeItem(it),
                 ),
               ),
             );
@@ -889,7 +890,7 @@ void _handleToggleTask(BuildContext context, Task t) {
 void _handleToggleItem(BuildContext context, Item it) {
   final ui = context.read<UiProvider>();
   final newVal = !it.bought;
-  context.read<ItemProvider>().toggleItem(it, newVal);
+  context.read<ItemCloudProvider>().toggleItem(it, newVal);
 
   if (newVal && ui.itemFilter == ItemViewFilter.toBuy) {
     context.read<UiProvider>().setItemFilter(ItemViewFilter.bought);
@@ -963,13 +964,13 @@ void _assignOrCreateTask(BuildContext context, String name, String member) {
 }
 
 void _assignOrCreateItem(BuildContext context, String name, String member) {
-  final prov = context.read<ItemProvider>();
+  final prov = context.read<ItemCloudProvider>();
   final trimmed = name.trim();
   if (trimmed.isEmpty) return;
 
   final existing = _pickItemByName(prov.items, trimmed);
   if (existing != null) {
-    context.read<ItemProvider>().updateAssignment(existing, member);
+    context.read<ItemCloudProvider>().updateAssignment(existing, member);
   } else {
     prov.addItem(Item(trimmed, assignedTo: member));
   }

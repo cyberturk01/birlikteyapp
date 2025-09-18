@@ -5,8 +5,8 @@ import 'package:provider/provider.dart';
 import '../../constants/app_templates.dart';
 import '../../models/user_template.dart';
 import '../../providers/family_provider.dart';
-import '../../providers/item_provider.dart';
-import '../../providers/task_provider.dart';
+import '../../providers/item_cloud_provider.dart';
+import '../../providers/task_cloud_provider.dart';
 import '../../providers/templates_provider.dart';
 import '../../providers/weekly_provider.dart';
 
@@ -181,8 +181,8 @@ class _TemplatesPageState extends State<TemplatesPage> {
   }
 
   void _applyUserTemplate(BuildContext context, UserTemplate utpl) {
-    final taskProv = context.read<TaskProvider>();
-    final itemProv = context.read<ItemProvider>();
+    final taskProv = context.read<TaskCloudProvider>();
+    final itemProv = context.read<ItemCloudProvider>();
     final weeklyProv = context.read<WeeklyProvider>();
 
     // Bunlar senin var olan bulk metodlarınla eşleştirilmeli.
@@ -546,8 +546,8 @@ class _TemplatesPageState extends State<TemplatesPage> {
   }
 
   void _applyAll(BuildContext context, TemplatePack tpl) {
-    final taskProv = context.read<TaskProvider>();
-    final itemProv = context.read<ItemProvider>();
+    final taskProv = context.read<TaskCloudProvider>();
+    final itemProv = context.read<ItemCloudProvider>();
     final weeklyProv = context.read<WeeklyProvider>();
 
     final createdTasks = taskProv.addTasksBulk(

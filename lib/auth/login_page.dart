@@ -34,7 +34,11 @@ class _LoginPageState extends State<LoginPage> {
       if (_mode == _AuthMode.signIn) {
         await auth.signInWithEmail(_emailC.text.trim(), _passC.text.trim());
       } else {
-        await auth.signUpWithEmail(_emailC.text.trim(), _passC.text.trim());
+        await auth.signUpWithEmail(
+          email: _emailC.text.trim(),
+          password: _passC.text.trim(),
+          username: '',
+        );
       }
     } on FirebaseAuthException catch (e) {
       final msg = _friendlyError(e);

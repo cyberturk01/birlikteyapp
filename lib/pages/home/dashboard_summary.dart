@@ -5,8 +5,8 @@ import 'package:provider/provider.dart';
 import '../../models/expense.dart';
 import '../../models/weekly_task.dart';
 import '../../providers/expense_provider.dart';
-import '../../providers/item_provider.dart';
-import '../../providers/task_provider.dart';
+import '../../providers/item_cloud_provider.dart';
+import '../../providers/task_cloud_provider.dart';
 import '../../providers/weekly_provider.dart';
 
 enum SummaryDest { tasks, items, weekly, expenses }
@@ -39,8 +39,8 @@ class DashboardSummaryBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tasks = context.watch<TaskProvider>().tasks;
-    final items = context.watch<ItemProvider>().items;
+    final tasks = context.watch<TaskCloudProvider>().tasks;
+    final items = context.watch<ItemCloudProvider>().items;
 
     // BUGÜN'e ait weekly sayısı
     final String todayName = _weekdayName(DateTime.now());
@@ -112,11 +112,6 @@ class DashboardSummaryBar extends StatelessWidget {
                   )
                   .toList(),
             ),
-            // const SizedBox(height: 8),
-
-            // --- Son 2 Harcama mini alanı (opsiyonel) ---
-            // Eğer ExpenseProvider yoksa bu bölümü yorumda bırakabilirsiniz.
-            // _LastExpensesMini(expenses: recent2),
           ],
         );
       },

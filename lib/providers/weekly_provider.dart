@@ -1,4 +1,5 @@
 // lib/providers/weekly_provider.dart
+import 'package:birlikteyapp/providers/task_cloud_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/task.dart';
 import '../models/weekly_task.dart';
 import '../services/notification_service.dart';
-import 'task_provider.dart';
 
 class WeeklyProvider extends ChangeNotifier {
   final Box<WeeklyTask> _weeklyBox = Hive.box<WeeklyTask>('weeklyBox');
@@ -130,7 +130,7 @@ class WeeklyProvider extends ChangeNotifier {
 
   /// Her gün bir kez: haftalık planın BUGÜNKÜ maddelerini TaskProvider’a aktar.
   /// - Aynı isim + assignedTo için “zaten var” kontrolü yapılır (case-insensitive).
-  Future<void> ensureTodaySynced(TaskProvider taskProv) async {
+  Future<void> ensureTodaySynced(TaskCloudProvider taskProv) async {
     final sp = await SharedPreferences.getInstance();
     final last = sp.getString('lastWeeklySync'); // "yyyy-mm-dd"
     final today = _dateKey(DateTime.now());
@@ -142,7 +142,7 @@ class WeeklyProvider extends ChangeNotifier {
   }
 
   /// Bugünkü weekly görevleri tek tek Task olarak ekler (duplicate koruması var).
-  Future<void> syncTodayToTasks(TaskProvider taskProv) async {
+  Future<void> syncTodayToTasks(TaskCloudProvider taskProv) async {
     final today = tasksFor(DateTime.now());
     if (today.isEmpty) return;
 

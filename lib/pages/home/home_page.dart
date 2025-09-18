@@ -4,10 +4,10 @@ import 'package:provider/provider.dart';
 
 import '../../models/view_section.dart';
 import '../../providers/family_provider.dart';
-import '../../providers/item_provider.dart';
+import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
-import '../../providers/task_provider.dart';
 import '../../providers/weekly_provider.dart';
+import '../../widgets/mini_members_bar.dart';
 import '../config/config_page.dart';
 import '../expenses/expenses_card.dart';
 import '../manage/manage_page.dart';
@@ -41,7 +41,7 @@ class _HomePageState extends State<HomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // final target = widget.initialFilterMember;
       final weekly = context.read<WeeklyProvider>();
-      final taskProv = context.read<TaskProvider>();
+      final taskProv = context.read<TaskCloudProvider>();
       await weekly.ensureTodaySynced(taskProv);
     });
   }
@@ -116,7 +116,7 @@ class _HomePageState extends State<HomePage> {
         }
 
         final tasks = context.watch<TaskCloudProvider>().tasks;
-        final items = context.watch<ItemProvider>().items;
+        final items = context.watch<ItemCloudProvider>().items;
         debugPrint('Home labels=$labels');
         return Scaffold(
           appBar: AppBar(
@@ -259,7 +259,7 @@ class _HomePageState extends State<HomePage> {
 
                 // === MİNİ BAR ===
                 MiniMembersBar(
-                  names: safeFamily, // <<< AYNI KAYNAK
+                  names: safeFamily,
                   activeIndex: _activeIndex,
                   onPickIndex: (i) {
                     setState(() => _activeIndex = i);
@@ -270,251 +270,13 @@ class _HomePageState extends State<HomePage> {
                     );
                   },
                 ),
-
-                const SizedBox(height: 36),
+                const SizedBox(height: 26),
               ],
             ),
           ),
         );
       },
     );
-
-    // return StreamBuilder<List<String>>(
-    //   stream: famProv.watchMemberLabels(),
-    //   builder: (context, snap) {
-    //     final u = FirebaseAuth.instance.currentUser;
-    //     final base = (u?.displayName?.trim().isNotEmpty == true)
-    //         ? u!.displayName!.trim()
-    //         : (u?.email?.split('@').first ?? 'Me');
-    //     final fallbackLabel = 'You ($base)';
-    //
-    //     final labels = snap.data ?? const <String>[];
-    //     final visible = labels.isEmpty ? <String>[fallbackLabel] : labels;
-    //
-    //     // if (snap.hasError) {
-    //     //   return Scaffold(
-    //     //     body: Center(child: Text('Family stream error: ${snap.error}')),
-    //     //   );
-    //     // }
-    //
-    //     if (snap.connectionState == ConnectionState.waiting && labels.isEmpty) {
-    //       return const Scaffold(
-    //         body: Center(child: CircularProgressIndicator()),
-    //       );
-    //     }
-    //
-    //     // initialFilterMember geldiyse ve henüz uygulamadıysak, burada uygula
-    //     if (!_appliedInitial &&
-    //         (widget.initialFilterMember?.isNotEmpty ?? false)) {
-    //       final target = widget.initialFilterMember!;
-    //       final idx = visible.indexOf(target);
-    //       if (idx >= 0) {
-    //         _activeIndex = idx;
-    //         WidgetsBinding.instance.addPostFrameCallback((_) {
-    //           if (_pageController.hasClients) {
-    //             _pageController.jumpToPage(idx);
-    //           }
-    //           if (mounted) setState(() {});
-    //         });
-    //       }
-    //       _appliedInitial = true;
-    //     }
-    //
-    //     // activeIndex sınır koruması
-    //     if (_activeIndex >= visible.length) {
-    //       _activeIndex = visible.length - 1;
-    //       WidgetsBinding.instance.addPostFrameCallback((_) {
-    //         if (_pageController.hasClients) {
-    //           _pageController.jumpToPage(_activeIndex);
-    //         }
-    //         if (mounted) setState(() {});
-    //       });
-    //     }
-    //
-    //     final tasks = context.watch<TaskCloudProvider>().tasks;
-    //     final items = context.watch<ItemProvider>().items;
-    //
-    //     return Scaffold(
-    //       appBar: AppBar(
-    //         title: Row(
-    //           children: const [
-    //             Icon(Icons.family_restroom),
-    //             SizedBox(width: 8),
-    //             Text('Togetherly'),
-    //           ],
-    //         ),
-    //         actions: [
-    //           IconButton(
-    //             tooltip: 'Manage family',
-    //             icon: const Icon(Icons.group),
-    //             onPressed: () => showFamilyManager(context),
-    //           ),
-    //           IconButton(
-    //             tooltip: 'Weekly plan',
-    //             icon: const Icon(Icons.calendar_today),
-    //             onPressed: () {
-    //               Navigator.push(
-    //                 context,
-    //                 MaterialPageRoute(builder: (_) => const WeeklyPage()),
-    //               );
-    //             },
-    //           ),
-    //           IconButton(
-    //             tooltip: 'Add Center',
-    //             icon: const Icon(Icons.add_circle_outline),
-    //             onPressed: () {
-    //               Navigator.push(
-    //                 context,
-    //                 MaterialPageRoute(builder: (_) => const ManagePage()),
-    //               );
-    //             },
-    //           ),
-    //           IconButton(
-    //             tooltip: 'Configuration',
-    //             icon: const Icon(Icons.tune),
-    //             onPressed: () {
-    //               Navigator.push(
-    //                 context,
-    //                 MaterialPageRoute(
-    //                   builder: (_) => const ConfigurationPage(),
-    //                 ),
-    //               );
-    //             },
-    //           ),
-    //           IconButton(
-    //             tooltip: 'Sign out',
-    //             icon: const Icon(Icons.logout),
-    //             onPressed: () async {
-    //               await FirebaseAuth.instance.signOut();
-    //               if (!context.mounted) return;
-    //               Navigator.of(context).popUntil((r) => r.isFirst);
-    //             },
-    //           ),
-    //         ],
-    //       ),
-    //       body: Padding(
-    //         padding: const EdgeInsets.all(12),
-    //         child: Column(
-    //           children: [
-    //             DashboardSummaryBar(
-    //               onTap: (dest) {
-    //                 setState(() {
-    //                   switch (dest) {
-    //                     case SummaryDest.tasks:
-    //                       _section = HomeSection.tasks;
-    //                       break;
-    //                     case SummaryDest.items:
-    //                       _section = HomeSection.items;
-    //                       break;
-    //                     case SummaryDest.weekly:
-    //                       Navigator.push(
-    //                         context,
-    //                         MaterialPageRoute(
-    //                           builder: (_) => const WeeklyPage(),
-    //                         ),
-    //                       );
-    //                       return;
-    //                     case SummaryDest.expenses:
-    //                       _section = HomeSection.expenses;
-    //                       break;
-    //                   }
-    //                 });
-    //               },
-    //             ),
-    //             const SizedBox(height: 4),
-    //
-    //             Expanded(
-    //               child: PageView.builder(
-    //                 controller: _pageController,
-    //                 physics: const BouncingScrollPhysics(),
-    //                 onPageChanged: (i) => setState(() => _activeIndex = i),
-    //                 itemCount: visible.length,
-    //                 itemBuilder: (context, i) {
-    //                   final name = visible[i];
-    //                   final memberTasks = tasks
-    //                       .where((t) => t.assignedTo == name)
-    //                       .toList();
-    //                   final memberItems = items
-    //                       .where((it) => it.assignedTo == name)
-    //                       .toList();
-    //
-    //                   return AnimatedBuilder(
-    //                     animation: _pageController,
-    //                     builder: (context, child) {
-    //                       double scale = 1.0, opacity = 1.0;
-    //                       if (_pageController.position.haveDimensions) {
-    //                         final page =
-    //                             _pageController.page ?? _activeIndex.toDouble();
-    //                         final dist = (page - i).abs().clamp(0.0, 1.0);
-    //                         scale = 1.0 - dist * 0.06;
-    //                         opacity = 1.0 - dist * 0.20;
-    //                       }
-    //
-    //                       // 🔑 sadece kart içini sekmeye göre değiştiriyoruz
-    //                       final card = (_section == HomeSection.expenses)
-    //                           ? ExpensesCard(memberName: name)
-    //                           : MemberCard(
-    //                               memberName: name,
-    //                               tasks: memberTasks,
-    //                               items: memberItems,
-    //                               section: _section,
-    //                             );
-    //
-    //                       return Center(
-    //                         child: AnimatedOpacity(
-    //                           duration: const Duration(milliseconds: 150),
-    //                           opacity: opacity,
-    //                           child: Transform.scale(
-    //                             scale: scale,
-    //                             child: _MemberPageKeepAlive(
-    //                               key: PageStorageKey('member-page-$i'),
-    //                               child: Padding(
-    //                                 padding: const EdgeInsets.symmetric(
-    //                                   vertical: 8,
-    //                                 ),
-    //                                 child: AnimatedSwitcher(
-    //                                   duration: const Duration(
-    //                                     milliseconds: 180,
-    //                                   ),
-    //                                   switchInCurve: Curves.easeOutCubic,
-    //                                   switchOutCurve: Curves.easeInCubic,
-    //                                   child: KeyedSubtree(
-    //                                     key: ValueKey(_section),
-    //                                     child: card,
-    //                                   ),
-    //                                 ),
-    //                               ),
-    //                             ),
-    //                           ),
-    //                         ),
-    //                       );
-    //                     },
-    //                   );
-    //                 },
-    //               ),
-    //             ),
-    //
-    //             const SizedBox(height: 12),
-    //
-    //             MiniMembersBar(
-    //               names: visible, // 👈 sadece String listesi
-    //               activeIndex: _activeIndex,
-    //               onPickIndex: (i) {
-    //                 setState(() => _activeIndex = i);
-    //                 _pageController.animateToPage(
-    //                   i,
-    //                   duration: const Duration(milliseconds: 250),
-    //                   curve: Curves.easeOutCubic,
-    //                 );
-    //               },
-    //             ),
-    //             const SizedBox(height: 36),
-    //           ],
-    //         ),
-    //       ),
-    //     );
-    //   },
-    // );
   }
 }
 
@@ -579,66 +341,66 @@ class _MiniMemberTile extends StatelessWidget {
   }
 }
 
-class MiniMembersBar extends StatelessWidget {
-  final List<String> names;
-  final int activeIndex;
-  final ValueChanged<int> onPickIndex;
-
-  const MiniMembersBar({
-    super.key,
-    required this.names,
-    required this.activeIndex,
-    required this.onPickIndex,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (names.length <= 1) return const SizedBox.shrink();
-
-    // Sadece aktif olmayanlar
-    final others = <(int, String)>[];
-    for (var i = 0; i < names.length; i++) {
-      if (i == activeIndex) continue;
-      others.add((i, names[i]));
-    }
-
-    if (others.isEmpty) return const SizedBox.shrink();
-    return SafeArea(
-      // alt çentik / nav bar ile çakışmayı önler
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: LayoutBuilder(
-          builder: (context, c) {
-            final w = c.maxWidth;
-            final cols = w >= 1100
-                ? 4
-                : w >= 800
-                ? 3
-                : 2;
-            const spacing = 12.0;
-            final tileWidth = (w - (cols - 1) * spacing) / cols;
-
-            return Wrap(
-              alignment: WrapAlignment.center,
-              spacing: spacing,
-              runSpacing: spacing,
-              children: others.map((e) {
-                return SizedBox(
-                  width: tileWidth,
-                  child: KeyedSubtree(
-                    key: ValueKey('mini-${e.$1}'),
-                    child: _MiniMemberTile(
-                      name: e.$2,
-                      onTap: () => onPickIndex(e.$1),
-                    ),
-                  ),
-                );
-              }).toList(),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
+// class MiniMembersBar extends StatelessWidget {
+//   final List<String> names;
+//   final int activeIndex;
+//   final ValueChanged<int> onPickIndex;
+//
+//   const MiniMembersBar({
+//     super.key,
+//     required this.names,
+//     required this.activeIndex,
+//     required this.onPickIndex,
+//   });
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     if (names.length <= 1) return const SizedBox.shrink();
+//
+//     // Sadece aktif olmayanlar
+//     final others = <(int, String)>[];
+//     for (var i = 0; i < names.length; i++) {
+//       if (i == activeIndex) continue;
+//       others.add((i, names[i]));
+//     }
+//
+//     if (others.isEmpty) return const SizedBox.shrink();
+//     return SafeArea(
+//       // alt çentik / nav bar ile çakışmayı önler
+//       top: false,
+//       child: Padding(
+//         padding: const EdgeInsets.only(bottom: 8),
+//         child: LayoutBuilder(
+//           builder: (context, c) {
+//             final w = c.maxWidth;
+//             final cols = w >= 1100
+//                 ? 4
+//                 : w >= 800
+//                 ? 3
+//                 : 2;
+//             const spacing = 12.0;
+//             final tileWidth = (w - (cols - 1) * spacing) / cols;
+//
+//             return Wrap(
+//               alignment: WrapAlignment.center,
+//               spacing: spacing,
+//               runSpacing: spacing,
+//               children: others.map((e) {
+//                 return SizedBox(
+//                   width: tileWidth,
+//                   child: KeyedSubtree(
+//                     key: ValueKey('mini-${e.$1}'),
+//                     child: _MiniMemberTile(
+//                       name: e.$2,
+//                       onTap: () => onPickIndex(e.$1),
+//                     ),
+//                   ),
+//                 );
+//               }).toList(),
+//             );
+//           },
+//         ),
+//       ),
+//     );
+//   }
+// }

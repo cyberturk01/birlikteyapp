@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/weekly_task.dart';
-import '../../providers/task_provider.dart';
+import '../../providers/task_cloud_provider.dart';
 import '../../providers/weekly_provider.dart';
 import '../../widgets/member_dropdown.dart';
 
 class WeeklyPage extends StatefulWidget {
-  const WeeklyPage({Key? key}) : super(key: key);
+  const WeeklyPage({super.key});
 
   @override
   State<WeeklyPage> createState() => _WeeklyPageState();
@@ -153,7 +153,7 @@ class _WeeklyPageState extends State<WeeklyPage> {
     required int weekday,
   }) async {
     final weekly = context.read<WeeklyProvider>();
-    final taskProv = context.read<TaskProvider>();
+    final taskProv = context.read<TaskCloudProvider>();
     final dayName = _weekdayIntToCanonical(weekday);
 
     final c = TextEditingController();

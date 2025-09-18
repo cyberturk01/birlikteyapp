@@ -71,6 +71,7 @@ class TaskCloudProvider extends ChangeNotifier {
     _taskSub = null;
     _tasks.clear();
     notifyListeners();
+    debugPrint('[TaskCloud] bind user=${_currentUser?.uid} fam=$_familyId');
 
     final user = _currentUser;
     // 👇 Kullanıcı YOKSA veya familyId YOKSA bağlanma!
@@ -85,7 +86,8 @@ class TaskCloudProvider extends ChangeNotifier {
         .collection('tasks');
 
     _taskSub = _col!
-        .orderBy('createdAt', descending: true)
+        // .orderBy('createdAt', descending: true) // <-- ŞİMDİLİK KALDIR
+        .orderBy(FieldPath.documentId, descending: true) // güvenli
         .snapshots()
         .listen(
           (qs) {
@@ -100,15 +102,17 @@ class TaskCloudProvider extends ChangeNotifier {
                     assignedTo: (data['assignedTo'] as String?)?.trim(),
                   );
                   t.remoteId = d.id;
+                  debugPrint(
+                    '[TaskCloud] snapshot size=${qs.size} fam=$_familyId',
+                  );
                   return t;
                 }),
               );
-            debugPrint('rebindTasks: user=$_currentUser, familyId=$_familyId');
             notifyListeners();
           },
           onError: (e, st) {
             debugPrint('Task stream error: $e');
-            notifyListeners();
+            // Listeyi boşaltmayın; mevcut UI çökmesin
           },
         );
   }
@@ -160,6 +164,33 @@ class TaskCloudProvider extends ChangeNotifier {
   }
 
   // TaskCloudProvider.dart
+  List<Task> addTasksBulk(
+    List<String> names, {
+    String? assignedTo,
+    bool skipDuplicates = true,
+  }) {
+    final created = <Task>[];
+    final existing = tasks.map((t) => t.name.toLowerCase()).toSet();
+
+    for (final n in names) {
+      final name = n.trim();
+      if (name.isEmpty) continue;
+      if (skipDuplicates && existing.contains(name.toLowerCase())) continue;
+
+      final t = Task(name, assignedTo: assignedTo);
+      _tasks.add(t);
+      created.add(t);
+    }
+    if (created.isNotEmpty) notifyListeners();
+    return created;
+  }
+
+  void removeManyTasks(Iterable<Task> list) {
+    for (final t in list) {
+      t.delete();
+    }
+    if (list.isNotEmpty) notifyListeners();
+  }
 
   Future<String> _ensureId(
     CollectionReference<Map<String, dynamic>> col,
@@ -219,6 +250,15 @@ class TaskCloudProvider extends ChangeNotifier {
     _authSub?.cancel();
     _taskSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> renameTask(Task t, String newName) async {
+    final col = _ensureCol();
+    final id = await _ensureId(col, t);
+    await col.doc(id).update({'name': newName});
+    // local model’i de güncelle ki UI’da anında görünsün
+    t.name = newName;
+    notifyListeners();
   }
 
   void refreshNow() {

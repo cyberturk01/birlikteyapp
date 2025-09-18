@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../constants/app_strings.dart';
 import '../../models/item.dart';
 import '../../providers/family_provider.dart';
-import '../../providers/item_provider.dart';
+import '../../providers/item_cloud_provider.dart';
 
 class MarketPage extends StatefulWidget {
   @override
@@ -17,7 +17,7 @@ class _MarketPageState extends State<MarketPage> {
   String? _filterMember;
 
   void _addItemDialog(BuildContext context) {
-    final itemProvider = Provider.of<ItemProvider>(context, listen: false);
+    final itemProvider = Provider.of<ItemCloudProvider>(context, listen: false);
     final familyProvider = Provider.of<FamilyProvider>(context, listen: false);
 
     const defaultItems = [
@@ -141,7 +141,7 @@ class _MarketPageState extends State<MarketPage> {
 
   @override
   Widget build(BuildContext context) {
-    final itemProvider = Provider.of<ItemProvider>(context);
+    final itemProvider = Provider.of<ItemCloudProvider>(context);
     final familyProvider = Provider.of<FamilyProvider>(context);
 
     final List<Item> filteredItems = _filterMember == null
@@ -178,7 +178,7 @@ class _MarketPageState extends State<MarketPage> {
           return ListTile(
             leading: Checkbox(
               value: item.bought,
-              onChanged: (v) => Provider.of<ItemProvider>(
+              onChanged: (v) => Provider.of<ItemCloudProvider>(
                 context,
                 listen: false,
               ).toggleItem(item, v ?? false),
@@ -195,7 +195,7 @@ class _MarketPageState extends State<MarketPage> {
                 if (val == 'assign') {
                   _showAssignItemSheet(context, item);
                 } else if (val == 'delete') {
-                  Provider.of<ItemProvider>(
+                  Provider.of<ItemCloudProvider>(
                     context,
                     listen: false,
                   ).removeItem(item);
@@ -224,7 +224,7 @@ class _MarketPageState extends State<MarketPage> {
       context,
       listen: false,
     ).familyMembers;
-    final itemProv = Provider.of<ItemProvider>(context, listen: false);
+    final itemProv = Provider.of<ItemCloudProvider>(context, listen: false);
     String? selected = item.assignedTo;
 
     showModalBottomSheet(
