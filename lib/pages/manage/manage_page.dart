@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -85,31 +84,6 @@ class _ManagePageState extends State<ManagePage> {
 
           const SizedBox(height: 12),
           const Divider(),
-          //TODO kaldir gecici
-          const Divider(),
-          const SizedBox(height: 8),
-          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: (context.watch<FamilyProvider>().familyId == null)
-                ? const Stream.empty()
-                : FirebaseFirestore.instance
-                      .collection('families')
-                      .doc(context.watch<FamilyProvider>().familyId!)
-                      .collection(
-                        _tab == _ManageTab.tasks || _tab == _ManageTab.items
-                            ? 'tasks'
-                            : 'items',
-                      )
-                      //.orderBy(FieldPath.documentId, descending: true) // test için kapalı
-                      .snapshots(),
-            builder: (_, snap) {
-              final n = snap.data?.docs.length ?? 0;
-              return Text(
-                'RAW ${_tab == _ManageTab.tasks || _tab == _ManageTab.items ? 'tasks' : 'items'} count = $n',
-              );
-            },
-          ),
-
-          // Giriş satırı (Assign kaldırıldı)
           const SizedBox(height: 12),
           Row(
             children: [

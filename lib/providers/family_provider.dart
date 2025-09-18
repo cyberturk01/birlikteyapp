@@ -144,6 +144,7 @@ class FamilyProvider extends ChangeNotifier {
   }
 
   // FamilyProvider.createFamily
+  // FamilyProvider.createFamily (YENİ)
   Future<void> createFamily(String name) async {
     if ((_familyId ?? '').isNotEmpty) return;
 
@@ -152,82 +153,97 @@ class FamilyProvider extends ChangeNotifier {
     final db = FirebaseFirestore.instance;
     final display = await _preferredDisplayName();
 
-    final famRef = db.collection('families').doc();
+    final nameLower = name.trim().toLowerCase();
+    final famRef = db.collection('families').doc(); // yeni familyId
     final userRef = db.collection('users').doc(uid);
-    final inviteRef = db.collection('invites').doc(); // eğer kullanıyorsan
-
     final code = _randomCode(length: 8);
 
-    final batch = db.batch();
-    batch.set(famRef, {
-      'name': name,
-      'nameLower': name.trim().toLowerCase(),
+    // 🔹 1) İsmi rezerve et (AYRI yazım, batch/txn içinde DEĞİL)
+    final reserveRef = db.doc('family_names/$nameLower');
+    await reserveRef.set({
       'ownerUid': uid,
-      'members': {uid: 'owner'},
-      'memberNames': {uid: display},
-      'inviteCode': code,
-      'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: false));
-
-    batch.set(userRef, {
-      'families': FieldValue.arrayUnion([famRef.id]),
-      'activeFamilyId': famRef.id,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
-    // Eğer app bir yere gerçekten yazıyorsa (stack'te invites/H6SP9YCK görünüyor)
-    batch.set(inviteRef, {
-      'code': code,
-      'familyId': famRef.id,
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    await batch.commit();
+    try {
+      // 🔹 2) Asıl yazımlar (tek batch)
+      final batch = db.batch();
 
-    await _persistActive(famRef.id, ownerUid: uid);
+      // families/{fid}
+      batch.set(famRef, {
+        'name': name.trim(),
+        'nameLower': nameLower,
+        'ownerUid': uid,
+        'members': {uid: 'owner'},
+        'memberNames': {uid: display},
+        'inviteCode': code,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: false));
+
+      // users/{uid}
+      batch.set(userRef, {
+        'families': FieldValue.arrayUnion([famRef.id]),
+        'activeFamilyId': famRef.id,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // invites/{CODE}  👉 doc id = code (kurallarda GET ile bakacağız)
+      final inviteRef = db.collection('invites').doc(code);
+      batch.set(inviteRef, {
+        'familyId': famRef.id,
+        'ownerUid': uid,
+        'active': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: false));
+
+      await batch.commit();
+
+      // 🔹 3) Lokal persist
+      await _persistActive(famRef.id, ownerUid: uid);
+    } catch (e) {
+      // 🔹 4) Rollback (rezervasyonu sil)
+      await reserveRef.delete().catchError((_) {});
+      rethrow;
+    }
   }
 
+  // FamilyProvider.joinWithCode (YENİ)
   Future<bool> joinWithCode(String raw) async {
     final u = FirebaseAuth.instance.currentUser!;
     final uid = u.uid;
-    final code = raw.trim().toUpperCase();
     final db = FirebaseFirestore.instance;
     final display = await _preferredDisplayName();
 
-    // invites koleksiyonunu gerçekten kullanıyorsan:
-    final inviteSnap = await db
-        .collection('invites')
-        .where('code', isEqualTo: code)
-        .limit(1)
-        .get();
+    final code = raw.trim().toUpperCase();
+    final inviteRef = db.collection('invites').doc(code);
+    final inviteSnap = await inviteRef.get();
 
-    DocumentReference<Map<String, dynamic>> famRef;
+    DocumentReference<Map<String, dynamic>>? famRef;
 
-    if (inviteSnap.docs.isNotEmpty) {
-      // invite dokümanından familyId al
-      final data = inviteSnap.docs.first.data();
+    if (inviteSnap.exists) {
+      final data = inviteSnap.data()!;
       final famId = data['familyId'] as String?;
-      if (famId == null || famId.isEmpty) return false;
+      final active = data['active'] as bool? ?? true;
+      if (!active || famId == null || famId.isEmpty) return false;
       famRef = db.collection('families').doc(famId);
     } else {
-      // eski mantık: families içinde inviteCode alanı
+      // (Geridönük uyumluluk) Eski mantık: families içinde inviteCode alanı
       final q = await db
           .collection('families')
           .where('inviteCode', isEqualTo: code)
           .limit(1)
           .get();
       if (q.docs.isEmpty) return false;
-
       famRef = q.docs.first.reference;
     }
 
     final userRef = db.collection('users').doc(uid);
 
     final batch = db.batch();
-    // üyelik rolü merge
     batch.set(famRef, {
       'members': {uid: 'editor'},
       'memberNames': {uid: display},
+      'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
     batch.set(userRef, {
@@ -447,13 +463,12 @@ class FamilyProvider extends ChangeNotifier {
     return 'Member • ${uid.substring(0, 6)}';
   }
 
-  Future<bool> isFamilyNameTaken(String name) async {
-    final q = await FirebaseFirestore.instance
-        .collection('families')
-        .where('nameLower', isEqualTo: name.trim().toLowerCase())
-        .limit(1)
+  Future<bool> isFamilyNameTaken(String raw) async {
+    final nameLower = raw.trim().toLowerCase();
+    final doc = await FirebaseFirestore.instance
+        .doc('family_names/$nameLower')
         .get();
-    return q.docs.isNotEmpty;
+    return doc.exists;
   }
 
   Future<List<String>> suggestFamilyNames(String base, {int limit = 5}) async {
