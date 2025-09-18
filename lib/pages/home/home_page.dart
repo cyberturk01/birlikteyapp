@@ -219,10 +219,10 @@ class _HomePageState extends State<HomePage> {
                     itemBuilder: (context, i) {
                       final name = safeFamily[i]; // <<< ETİKET
                       final memberTasks = tasks
-                          .where((t) => t.assignedTo == name)
+                          .where((t) => _matchesAssignee(t.assignedTo, name))
                           .toList();
                       final memberItems = items
-                          .where((it) => it.assignedTo == name)
+                          .where((it) => _matchesAssignee(it.assignedTo, name))
                           .toList();
 
                       final card = (_section == HomeSection.expenses)
@@ -342,66 +342,24 @@ class _MiniMemberTile extends StatelessWidget {
   }
 }
 
-// class MiniMembersBar extends StatelessWidget {
-//   final List<String> names;
-//   final int activeIndex;
-//   final ValueChanged<int> onPickIndex;
-//
-//   const MiniMembersBar({
-//     super.key,
-//     required this.names,
-//     required this.activeIndex,
-//     required this.onPickIndex,
-//   });
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     if (names.length <= 1) return const SizedBox.shrink();
-//
-//     // Sadece aktif olmayanlar
-//     final others = <(int, String)>[];
-//     for (var i = 0; i < names.length; i++) {
-//       if (i == activeIndex) continue;
-//       others.add((i, names[i]));
-//     }
-//
-//     if (others.isEmpty) return const SizedBox.shrink();
-//     return SafeArea(
-//       // alt çentik / nav bar ile çakışmayı önler
-//       top: false,
-//       child: Padding(
-//         padding: const EdgeInsets.only(bottom: 8),
-//         child: LayoutBuilder(
-//           builder: (context, c) {
-//             final w = c.maxWidth;
-//             final cols = w >= 1100
-//                 ? 4
-//                 : w >= 800
-//                 ? 3
-//                 : 2;
-//             const spacing = 12.0;
-//             final tileWidth = (w - (cols - 1) * spacing) / cols;
-//
-//             return Wrap(
-//               alignment: WrapAlignment.center,
-//               spacing: spacing,
-//               runSpacing: spacing,
-//               children: others.map((e) {
-//                 return SizedBox(
-//                   width: tileWidth,
-//                   child: KeyedSubtree(
-//                     key: ValueKey('mini-${e.$1}'),
-//                     child: _MiniMemberTile(
-//                       name: e.$2,
-//                       onTap: () => onPickIndex(e.$1),
-//                     ),
-//                   ),
-//                 );
-//               }).toList(),
-//             );
-//           },
-//         ),
-//       ),
-//     );
-//   }
-// }
+bool _matchesAssignee(String? assignedTo, String cardLabel) {
+  if (assignedTo == null || assignedTo.trim().isEmpty) return false;
+  if (assignedTo == cardLabel) return true;
+
+  // "You (xxx)" <-> "xxx" simetrik eşleşme
+  final re = RegExp(r'^You \((.+)\)$');
+
+  final mAssigned = re.firstMatch(assignedTo);
+  if (mAssigned != null) {
+    final base = mAssigned.group(1)!; // xxx
+    return cardLabel == base || cardLabel == 'You ($base)';
+  }
+
+  final mCard = re.firstMatch(cardLabel);
+  if (mCard != null) {
+    final base = mCard.group(1)!;
+    return assignedTo == base || assignedTo == 'You ($base)';
+  }
+
+  return false;
+}
