@@ -64,7 +64,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
         && (request.resource.data.members is map)
-        && (request.resource.data.members[request.auth.uid] == 'owner');
+        && (request.resource.data.members[request.auth.uid] == 'owner')
         && (request.resource.data.nameLower is string)
         && exists(/databases/$(db)/documents/family_names/$(request.resource.data.nameLower))
         && get(/databases/$(db)/documents/family_names/$(request.resource.data.nameLower)).data.ownerUid == request.auth.uid;

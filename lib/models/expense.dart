@@ -19,11 +19,17 @@ class Expense extends HiveObject {
   @HiveField(4)
   String? category;
 
+  static String _capitalize(String input) {
+    if (input.isEmpty) return input;
+    return input[0].toUpperCase() + input.substring(1);
+  }
+
   Expense(
-    this.title,
+    String title,
     this.amount, {
     DateTime? date,
     this.assignedTo,
     this.category,
-  }) : date = date ?? DateTime.now();
+  }) : date = date ?? DateTime.now(),
+       title = _capitalize(title);
 }

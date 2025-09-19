@@ -53,6 +53,17 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
+  void _jumpTo(HomeSection s) {
+    if (_section == s) return;
+    setState(() => _section = s);
+
+    // Eğer "sekme değişince aktif üyeye hafif scroll" istersen:
+    // if (_pageController.hasClients) {
+    //   _pageController.animateToPage(_activeIndex,
+    //     duration: const Duration(milliseconds: 120), curve: Curves.easeOut);
+    // }
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -105,20 +116,7 @@ class _HomePageState extends State<HomePage> {
           });
           _appliedInitial = true;
         }
-        // // initialFilterMember'i SADECE BİR KEZ uygula
-        // if (!_appliedInitial && widget.initialFilterMember != null) {
-        //   final idx = safeFamily.indexOf(widget.initialFilterMember!);
-        //   if (idx >= 0) {
-        //     _activeIndex = idx;
-        //     WidgetsBinding.instance.addPostFrameCallback((_) {
-        //       if (_pageController.hasClients) _pageController.jumpToPage(idx);
-        //       setState(() {});
-        //     });
-        //   }
-        //   _appliedInitial = true; // <<< önemli
-        // }
 
-        // _activeIndex güvenliği
         if (_activeIndex >= names.length) {
           _activeIndex = names.length - 1;
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -204,6 +202,9 @@ class _HomePageState extends State<HomePage> {
                         case SummaryDest.items:
                           _section = HomeSection.items;
                           break;
+                        case SummaryDest.expenses:
+                          _section = HomeSection.expenses;
+                          break;
                         case SummaryDest.weekly:
                           Navigator.push(
                             context,
@@ -212,9 +213,6 @@ class _HomePageState extends State<HomePage> {
                             ),
                           );
                           return;
-                        case SummaryDest.expenses:
-                          _section = HomeSection.expenses;
-                          break;
                       }
                     });
                   },
@@ -225,10 +223,10 @@ class _HomePageState extends State<HomePage> {
                 // === ANA SWIPER ===
                 Expanded(
                   child: PageView.builder(
-                    controller: _pageController,
+                    controller: _pageController, // <-- DÜZELTME
                     physics: const BouncingScrollPhysics(),
                     onPageChanged: (i) => setState(() => _activeIndex = i),
-                    itemCount: ordered.length, // <<< BURASI LISTEDEN
+                    itemCount: ordered.length,
                     itemBuilder: (context, i) {
                       final name = ordered[i];
                       final memberTasks = tasks
@@ -245,14 +243,12 @@ class _HomePageState extends State<HomePage> {
                               tasks: memberTasks,
                               items: memberItems,
                               section: _section,
+                              onJumpSection: _jumpTo,
                             );
-                      final versionKey = ValueKey<String>(
-                        'member-$i'
-                        '-t${memberTasks.length}'
-                        '-i${memberItems.length}'
-                        '-s${_section.name}',
-                      );
 
+                      final versionKey = ValueKey<String>(
+                        'member-$i-t${memberTasks.length}-i${memberItems.length}-s${_section.name}',
+                      );
                       return Center(
                         child: _MemberPageKeepAlive(
                           key: PageStorageKey('member-page-$i'),

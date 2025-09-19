@@ -15,5 +15,11 @@ class Item extends HiveObject {
 
   String? remoteId;
 
-  Item(this.name, {this.bought = false, this.assignedTo, this.remoteId});
+  Item(String name, {this.bought = false, this.assignedTo, this.remoteId})
+    : name = _capitalize(name);
+
+  static String _capitalize(String input) {
+    if (input.isEmpty) return input;
+    return input[0].toUpperCase() + input.substring(1);
+  }
 }

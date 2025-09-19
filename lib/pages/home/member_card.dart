@@ -17,18 +17,21 @@ enum _TaskStatus { pending, completed }
 
 enum _ItemStatus { toBuy, bought }
 
+enum _MemberStatus { tasks, items }
+
 class MemberCard extends StatefulWidget {
   final String memberName;
   final List<Task> tasks;
   final List<Item> items;
   final HomeSection section;
-
+  final void Function(HomeSection section)? onJumpSection;
   const MemberCard({
     super.key,
     required this.memberName,
     required this.tasks,
     required this.items,
     required this.section,
+    this.onJumpSection,
   });
 
   @override
@@ -117,12 +120,55 @@ class _MemberCardState extends State<MemberCard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          widget.memberName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onHorizontalDragStart: (_) {},
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  widget.memberName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+
+                              // Küçük inline link butonlar
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  visualDensity: const VisualDensity(
+                                    horizontal: -2,
+                                    vertical: -2,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  widget.onJumpSection?.call(HomeSection.tasks);
+                                },
+                                child: const Text('Tasks'),
+                              ),
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  visualDensity: const VisualDensity(
+                                    horizontal: -2,
+                                    vertical: -2,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  // widget.onOpenItemsPopup?.call();
+                                  widget.onJumpSection?.call(HomeSection.items);
+                                },
+                                child: const Text('Market'),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 6),

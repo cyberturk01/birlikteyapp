@@ -15,5 +15,11 @@ class Task extends HiveObject {
 
   String? remoteId;
 
-  Task(this.name, {this.completed = false, this.assignedTo, this.remoteId});
+  static String _capitalize(String input) {
+    if (input.isEmpty) return input;
+    return input[0].toUpperCase() + input.substring(1);
+  }
+
+  Task(String name, {this.completed = false, this.assignedTo, this.remoteId})
+    : name = _capitalize(name);
 }
