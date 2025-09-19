@@ -15,6 +15,7 @@ import 'package:birlikteyapp/providers/task_cloud_provider.dart';
 import 'package:birlikteyapp/providers/task_provider.dart';
 import 'package:birlikteyapp/providers/templates_provider.dart';
 import 'package:birlikteyapp/providers/ui_provider.dart';
+import 'package:birlikteyapp/providers/weekly_cloud_provider.dart';
 import 'package:birlikteyapp/providers/weekly_provider.dart';
 import 'package:birlikteyapp/services/auth_service.dart';
 import 'package:birlikteyapp/services/notification_service.dart';
@@ -137,6 +138,7 @@ class _RootState extends State<_Root> {
             ChangeNotifierProvider(create: (_) => ui..loadPrefs()),
             Provider<AuthService>(create: (_) => AuthService()),
             Provider<TaskService>(create: (_) => TaskService()),
+            ChangeNotifierProvider(create: (_) => WeeklyCloudProvider()),
             ChangeNotifierProxyProvider3<
               AuthService,
               TaskService,
@@ -211,6 +213,7 @@ class _RootState extends State<_Root> {
       Hive.openBox<int>('itemCountBox'),
       Hive.openBox<WeeklyTask>('weeklyBox'),
       Hive.openBox<int>('weeklyNotifBox'),
+      Hive.openBox<int>('weeklyNotifCloudBox'),
     ]);
 
     // İlk seed (sadece boşsa)

@@ -3,9 +3,9 @@ import 'package:birlikteyapp/constants/app_lists.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/weekly_task.dart';
+import '../../models/weekly_task_cloud.dart';
 import '../../providers/task_cloud_provider.dart';
-import '../../providers/weekly_provider.dart';
+import '../../providers/weekly_cloud_provider.dart';
 import '../../widgets/member_dropdown.dart';
 
 class WeeklyPage extends StatefulWidget {
@@ -31,7 +31,7 @@ class _WeeklyPageState extends State<WeeklyPage> {
 
   @override
   Widget build(BuildContext context) {
-    final weekly = context.watch<WeeklyProvider>();
+    final weekly = context.watch<WeeklyCloudProvider>();
     final todayWd = DateTime.now().weekday;
 
     // Seçili gün için weekly listesi
@@ -152,7 +152,7 @@ class _WeeklyPageState extends State<WeeklyPage> {
     required BuildContext context,
     required int weekday,
   }) async {
-    final weekly = context.read<WeeklyProvider>();
+    final weekly = context.read<WeeklyCloudProvider>();
     final taskProv = context.read<TaskCloudProvider>();
     final dayName = _weekdayIntToCanonical(weekday);
 
@@ -219,7 +219,11 @@ class _WeeklyPageState extends State<WeeklyPage> {
                           label: Text(name),
                           onPressed: () async {
                             await weekly.addWeeklyTask(
-                              WeeklyTask(name, dayName, assignedTo: assign),
+                              WeeklyTaskCloud(
+                                dayName,
+                                name,
+                                assignedTo: assign,
+                              ),
                             );
                             if (weekday == DateTime.now().weekday) {
                               await weekly.syncTodayToTasks(taskProv);
@@ -255,7 +259,9 @@ class _WeeklyPageState extends State<WeeklyPage> {
       final text = c.text.trim();
       if (text.isEmpty) return;
 
-      await weekly.addWeeklyTask(WeeklyTask(text, dayName, assignedTo: assign));
+      await weekly.addWeeklyTask(
+        WeeklyTaskCloud(dayName, text, assignedTo: assign),
+      );
       if (weekday == DateTime.now().weekday) {
         await weekly.syncTodayToTasks(taskProv);
       }
@@ -282,12 +288,12 @@ class _WeeklyPageState extends State<WeeklyPage> {
 
 /// Tek satır: başlık + kişi + saat, saat seçici & sil
 class _WeeklyTaskTile extends StatelessWidget {
-  final WeeklyTask task;
+  final WeeklyTaskCloud task;
   const _WeeklyTaskTile({required this.task});
 
   @override
   Widget build(BuildContext context) {
-    final weekly = context.read<WeeklyProvider>();
+    final weekly = context.read<WeeklyCloudProvider>();
 
     String? timeText;
     if (task.hour != null && task.minute != null) {
@@ -337,7 +343,7 @@ class _WeeklyTaskTile extends StatelessWidget {
           ),
           IconButton(
             icon: const Icon(Icons.delete, color: Colors.red),
-            onPressed: () => weekly.removeTask(task),
+            onPressed: () => weekly.removeWeeklyTaskById(task.id),
           ),
         ],
       ),

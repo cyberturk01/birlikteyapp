@@ -6,6 +6,7 @@ import '../../models/view_section.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
+import '../../providers/weekly_cloud_provider.dart';
 import '../../providers/weekly_provider.dart';
 import '../../widgets/mini_members_bar.dart';
 import '../config/config_page.dart';
@@ -86,6 +87,7 @@ class _HomePageState extends State<HomePage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.read<TaskCloudProvider>().setFamilyId(familyId);
         context.read<ItemCloudProvider>().setFamilyId(familyId);
+        context.read<WeeklyCloudProvider>().setFamilyId(familyId);
       });
       _cloudBound = true;
     }
