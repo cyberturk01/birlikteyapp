@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../providers/expense_provider.dart';
+import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
 import '../../widgets/member_dropdown.dart';
 import 'expenses_insights_page.dart';
@@ -19,8 +19,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
 
   @override
   Widget build(BuildContext context) {
-    final expProv = context.watch<ExpenseProvider>();
-    // HATA KAYNAĞI: familyMembers (Hive) kullanma!
+    final expProv = context.watch<ExpenseCloudProvider>();
     final family = context.watch<FamilyProvider>().memberLabelsOrFallback;
 
     final expenses = expProv.forMemberFiltered(widget.memberName, _filter);
@@ -100,7 +99,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
                       itemBuilder: (_, i) {
                         final e = expenses[i];
                         return Dismissible(
-                          key: ValueKey(e.key),
+                          key: ValueKey(e.id),
                           background: const ColoredBox(
                             color: Colors.redAccent,
                             child: Padding(
@@ -122,16 +121,26 @@ class _ExpensesCardState extends State<ExpensesCard> {
                             ),
                           ),
                           confirmDismiss: (dir) async {
-                            final removed = e;
-                            context.read<ExpenseProvider>().remove(e);
+                            final removed = e; // (Undo için saklıyoruz)
+                            await context.read<ExpenseCloudProvider>().remove(
+                              removed.id,
+                            );
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: const Text('Expense deleted'),
                                 action: SnackBarAction(
                                   label: 'Undo',
-                                  onPressed: () => context
-                                      .read<ExpenseProvider>()
-                                      .add(removed),
+                                  onPressed: () {
+                                    final p = context
+                                        .read<ExpenseCloudProvider>();
+                                    p.add(
+                                      title: removed.title,
+                                      amount: removed.amount,
+                                      date: removed.date,
+                                      assignedToUid: removed.assignedToUid,
+                                      category: removed.category,
+                                    );
+                                  },
                                 ),
                               ),
                             );
@@ -238,6 +247,8 @@ class _ExpensesCardState extends State<ExpensesCard> {
       'Home',
       'Other',
     ];
+    final famId = context.read<FamilyProvider>().familyId;
+    final canAdd = famId != null && famId.isNotEmpty;
 
     showDialog(
       context: context,
@@ -359,23 +370,33 @@ class _ExpensesCardState extends State<ExpensesCard> {
                 child: const Text('Cancel'),
               ),
               FilledButton(
-                onPressed: () {
-                  final t = titleC.text.trim();
-                  final a = double.tryParse(
-                    amountC.text.trim().replaceAll(',', '.'),
-                  );
+                onPressed: !canAdd
+                    ? null
+                    : () async {
+                        final t = titleC.text.trim();
+                        final a = double.tryParse(
+                          amountC.text.trim().replaceAll(',', '.'),
+                        );
+                        if (t.isEmpty || a == null || a <= 0) return;
 
-                  if (t.isEmpty || a == null || a <= 0) return;
-
-                  context.read<ExpenseProvider>().addExpense(
-                    title: t,
-                    amount: a,
-                    date: DateTime.now(),
-                    assignedTo: assign, // null olabilir
-                    category: cat,
-                  );
-                  Navigator.pop(context);
-                },
+                        try {
+                          await context.read<ExpenseCloudProvider>().addExpense(
+                            title: t,
+                            amount: a,
+                            date: DateTime.now(),
+                            assignedTo:
+                                assign, // veya assignUid (UID akışına geçtiysen)
+                            category: cat,
+                          );
+                          if (context.mounted) Navigator.pop(context);
+                        } on StateError catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(e.message ?? 'No active family'),
+                            ),
+                          );
+                        }
+                      },
                 child: const Text('Add'),
               ),
             ],

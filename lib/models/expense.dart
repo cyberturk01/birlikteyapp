@@ -25,11 +25,11 @@ class Expense extends HiveObject {
   }
 
   Expense(
-    String title,
+    String rawTitle,
     this.amount, {
     DateTime? date,
     this.assignedTo,
     this.category,
-  }) : date = date ?? DateTime.now(),
-       title = _capitalize(title);
+  }) : title = _capitalize(rawTitle),
+       date = date ?? DateTime.now();
 }

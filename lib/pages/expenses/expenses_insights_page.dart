@@ -7,8 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../models/expense.dart';
-import '../../providers/expense_provider.dart';
+import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
 import '../../widgets/member_dropdown.dart';
 import 'expenses_by_category_page.dart';
@@ -37,7 +36,7 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final expProv = context.watch<ExpenseProvider>();
+    final expProv = context.watch<ExpenseCloudProvider>();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Expenses — Insights')),
@@ -72,7 +71,7 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                         : current;
 
                     // Hesaplamalar (artık StreamBuilder içinde; labels’a göre)
-                    final expProv = context.watch<ExpenseProvider>();
+                    final expProv = context.watch<ExpenseCloudProvider>();
                     final expenses = expProv.forMemberFiltered(
                       memberForFilter,
                       _filter,
@@ -84,7 +83,7 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                     final year = DateTime.now().year;
                     final monthly = expProv.monthlyTotals(
                       year: year,
-                      member: memberForFilter,
+                      uid: memberForFilter,
                     );
 
                     return Column(
@@ -243,7 +242,7 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     subtitle: Text(
-                                      '${_fmtDate(e.date)} • ${e.assignedTo ?? 'Unassigned'}'
+                                      '${_fmtDate(e.date)} • ${e.assignedToUid ?? 'Unassigned'}'
                                       '${e.category == null ? '' : ' • ${e.category}'}',
                                     ),
                                     trailing: Text(
@@ -300,8 +299,15 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
     return '${d.year}-$mm-$dd';
   }
 
-  Future<void> _exportCsv(BuildContext context, List<Expense> expenses) async {
+  Future<void> _exportCsv(
+    BuildContext context,
+    List<ExpenseDoc> expenses,
+  ) async {
     try {
+      final dict = await context
+          .read<FamilyProvider>()
+          .watchMemberDirectory()
+          .first;
       final rows = <List<dynamic>>[
         ['date', 'title', 'amount', 'member', 'category'],
         ...expenses.map(
@@ -309,7 +315,9 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
             _fmtDate(e.date),
             e.title,
             e.amount.toStringAsFixed(2),
-            e.assignedTo ?? '',
+            (e.assignedToUid == null
+                ? ''
+                : (dict[e.assignedToUid] ?? e.assignedToUid!)),
             e.category ?? '',
           ],
         ),
@@ -332,8 +340,15 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
     }
   }
 
-  Future<void> _shareCsv(BuildContext context, List<Expense> expenses) async {
+  Future<void> _shareCsv(
+    BuildContext context,
+    List<ExpenseDoc> expenses,
+  ) async {
     try {
+      final dict = await context
+          .read<FamilyProvider>()
+          .watchMemberDirectory()
+          .first;
       final rows = <List<dynamic>>[
         ['date', 'title', 'amount', 'member'],
         ...expenses.map(
@@ -341,7 +356,9 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
             _fmtDate(e.date),
             e.title,
             e.amount.toStringAsFixed(2),
-            e.assignedTo ?? '',
+            (e.assignedToUid == null
+                ? ''
+                : (dict[e.assignedToUid] ?? e.assignedToUid!)),
           ],
         ),
       ];
@@ -363,7 +380,7 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
   }
 }
 
-void _showChangeCategorySheet(BuildContext context, Expense e) {
+void _showChangeCategorySheet(BuildContext context, ExpenseDoc e) {
   const categories = <String>[
     'Groceries',
     'Dining',
@@ -421,7 +438,10 @@ void _showChangeCategorySheet(BuildContext context, Expense e) {
                 ActionChip(
                   label: const Text('Uncategorized'),
                   onPressed: () {
-                    context.read<ExpenseProvider>().updateCategory(e, null);
+                    context.read<ExpenseCloudProvider>().updateCategory(
+                      e.id,
+                      null,
+                    );
                     Navigator.pop(context);
                   },
                 ),
@@ -429,7 +449,10 @@ void _showChangeCategorySheet(BuildContext context, Expense e) {
                   (c) => ActionChip(
                     label: Text(c),
                     onPressed: () {
-                      context.read<ExpenseProvider>().updateCategory(e, c);
+                      context.read<ExpenseCloudProvider>().updateCategory(
+                        e.id,
+                        c,
+                      );
                       Navigator.pop(context);
                     },
                   ),
@@ -446,8 +469,8 @@ void _showChangeCategorySheet(BuildContext context, Expense e) {
                 isDense: true,
               ),
               onSubmitted: (val) {
-                context.read<ExpenseProvider>().updateCategory(
-                  e,
+                context.read<ExpenseCloudProvider>().updateCategory(
+                  e.id,
                   val.trim().isEmpty ? null : val.trim(),
                 );
                 Navigator.pop(context);
@@ -459,8 +482,8 @@ void _showChangeCategorySheet(BuildContext context, Expense e) {
               child: FilledButton(
                 onPressed: () {
                   final val = ctrl.text.trim();
-                  context.read<ExpenseProvider>().updateCategory(
-                    e,
+                  context.read<ExpenseCloudProvider>().updateCategory(
+                    e.id,
                     val.isEmpty ? null : val,
                   );
                   Navigator.pop(context);

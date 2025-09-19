@@ -43,55 +43,55 @@ class FamilyProvider extends ChangeNotifier {
     return [my];
   }
 
-  // Future<String> _preferredDisplayName() async {
-  //   final u = FirebaseAuth.instance.currentUser;
-  //   if (u == null) return 'Member';
-  //   // 1) Auth displayName
-  //   final dn = (u.displayName ?? '').trim();
-  //   if (dn.isNotEmpty) return dn;
-  //
-  //   // 2) users/{uid}.displayName
-  //   try {
-  //     final doc = await FirebaseFirestore.instance
-  //         .collection('users')
-  //         .doc(u.uid)
-  //         .get(const GetOptions(source: Source.server));
-  //     final fromUsers = (doc.data()?['displayName'] as String?)?.trim();
-  //     if (fromUsers != null && fromUsers.isNotEmpty) return fromUsers;
-  //   } catch (_) {}
-  //
-  //   // 3) email local-part
-  //   final emailLocal = (u.email ?? '').split('@').first;
-  //   return emailLocal.isNotEmpty ? emailLocal : 'Member';
-  // }
+  /// UID -> Label sözlüğü yayar.
+  /// Örn: { "uid123": "You (Gökhan)", "uid456": "Ayşe" }
+  Stream<Map<String, String>> watchMemberDirectory() {
+    final famId = _familyId;
+    if (famId == null || famId.isEmpty) {
+      return Stream.value(const <String, String>{});
+    }
 
-  // Future<void> setMyDisplayName(String name) async {
-  //   final u = FirebaseAuth.instance.currentUser;
-  //   if (u == null) return;
-  //   final trimmed = name.trim();
-  //   if (trimmed.isEmpty) return;
-  //
-  //   // 1) Auth profili
-  //   await u.updateDisplayName(trimmed);
-  //   await u.reload();
-  //
-  //   // 2) users/{uid}
-  //   await FirebaseFirestore.instance.collection('users').doc(u.uid).set({
-  //     'displayName': trimmed,
-  //     'updatedAt': FieldValue.serverTimestamp(),
-  //   }, SetOptions(merge: true));
-  //
-  //   // 3) Eğer aktif aile varsa, kendi girişini güncelle
-  //   final famId = _familyId;
-  //   if (famId != null && famId.isNotEmpty) {
-  //     await FirebaseFirestore.instance.collection('families').doc(famId).set({
-  //       'memberNames': {u.uid: trimmed},
-  //     }, SetOptions(merge: true));
-  //   }
-  //
-  //   // Etiket cache'ini gevşekçe tazele
-  //   notifyListeners();
-  // }
+    final me = FirebaseAuth.instance.currentUser;
+
+    return FirebaseFirestore.instance
+        .collection('families')
+        .doc(famId)
+        .snapshots()
+        .map((doc) {
+          if (!doc.exists) {
+            // family silindiyse local temizleyebilirsin ama burada notify etme
+            return <String, String>{};
+          }
+
+          final data = doc.data() ?? {};
+          final members = (data['members'] as Map<String, dynamic>? ?? {});
+          final namesMap = (data['memberNames'] as Map<String, dynamic>? ?? {});
+          final uids = members.keys.toList()..sort();
+
+          final map = <String, String>{};
+          for (final uid in uids) {
+            final nm = (namesMap[uid] as String?)?.trim();
+            final base = (nm != null && nm.isNotEmpty)
+                ? nm
+                : 'Member • ${uid.substring(0, 6)}';
+
+            if (uid == me?.uid) {
+              map[uid] = 'You ($base)';
+            } else {
+              map[uid] = base;
+            }
+          }
+          return map;
+        })
+        // gereksiz rebuild'leri engelle
+        .distinct((a, b) {
+          if (a.length != b.length) return false;
+          for (final k in a.keys) {
+            if (!b.containsKey(k) || b[k] != a[k]) return false;
+          }
+          return true;
+        });
+  }
 
   Future<void> loadActiveFamily() async {
     try {
@@ -344,8 +344,6 @@ class FamilyProvider extends ChangeNotifier {
           return labels;
         });
   }
-
-  // import 'package:flutter/foundation.dart';  // listEquals için (opsiyonel)
 
   Stream<List<String>> watchMemberLabels() {
     final famId = _familyId;

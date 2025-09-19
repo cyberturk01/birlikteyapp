@@ -106,9 +106,10 @@ service cloud.firestore {
       }
 
       // EXPENSES
-      match /expenses/{expenseId} {
-          allow read, create, update, delete: if signedIn() && isFamilyMember(familyId);
-      }
+      match /expenses/{eid} {
+          allow read: if isOwner(fid) || isMember(fid);
+          allow create, update, delete: if isOwner(fid) || isMember(fid);
+        }
 
       match /items/{iid} {
         allow read: if isOwner(fid) || isMember(fid);

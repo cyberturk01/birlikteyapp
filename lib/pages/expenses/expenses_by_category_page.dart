@@ -2,7 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../providers/expense_provider.dart';
+import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
 import '../../widgets/member_dropdown.dart';
 
@@ -28,13 +28,10 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
   @override
   Widget build(BuildContext context) {
     final family = context.watch<FamilyProvider>().familyMembers;
-    final expProv = context.watch<ExpenseProvider>();
+    final expProv = context.watch<ExpenseCloudProvider>();
 
     final memberForFilter = (_member == _allKey) ? null : _member;
-    final map = expProv.totalsByCategory(
-      member: memberForFilter,
-      filter: _filter,
-    );
+    final map = expProv.totalsByCategory(uid: memberForFilter, filter: _filter);
     final entries = map.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value)); // büyükten küçüğe
 

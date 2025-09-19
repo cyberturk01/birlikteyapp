@@ -7,6 +7,7 @@ import 'package:birlikteyapp/models/user_template.dart';
 import 'package:birlikteyapp/models/weekly_task.dart';
 import 'package:birlikteyapp/pages/family/family_onboarding_page.dart';
 import 'package:birlikteyapp/pages/home/home_page.dart';
+import 'package:birlikteyapp/providers/expense_cloud_provider.dart';
 import 'package:birlikteyapp/providers/expense_provider.dart';
 import 'package:birlikteyapp/providers/family_provider.dart';
 import 'package:birlikteyapp/providers/item_cloud_provider.dart';
@@ -139,6 +140,24 @@ class _RootState extends State<_Root> {
             Provider<AuthService>(create: (_) => AuthService()),
             Provider<TaskService>(create: (_) => TaskService()),
             ChangeNotifierProvider(create: (_) => WeeklyCloudProvider()),
+            ChangeNotifierProxyProvider<FamilyProvider, ExpenseCloudProvider>(
+              create: (_) => ExpenseCloudProvider(
+                FirebaseAuth.instance,
+                FirebaseFirestore.instance,
+              ),
+              update: (_, family, exp) {
+                final p =
+                    exp ??
+                    ExpenseCloudProvider(
+                      FirebaseAuth.instance,
+                      FirebaseFirestore.instance,
+                    );
+                p.setFamilyId(
+                  family.familyId,
+                ); // 🔑 olmazsa _col hep null kalır
+                return p;
+              },
+            ),
             ChangeNotifierProxyProvider3<
               AuthService,
               TaskService,
