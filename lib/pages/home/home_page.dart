@@ -92,10 +92,12 @@ class _HomePageState extends State<HomePage> {
       _cloudBound = true;
     }
 
-    return StreamBuilder<List<String>>(
-      stream: famProv.watchMemberLabels(),
+    return StreamBuilder<List<FamilyMemberEntry>>(
+      stream: famProv.watchMemberEntries(),
       builder: (context, snap) {
-        final labels = snap.data ?? const <String>[];
+        final entries = snap.data ?? const <FamilyMemberEntry>[];
+        final labels = entries.map((e) => e.label).toList();
+        final uids = entries.map((e) => e.uid).toList();
 
         final names = labels.isEmpty
             ? context.read<FamilyProvider>().memberLabelsOrFallback
@@ -107,8 +109,15 @@ class _HomePageState extends State<HomePage> {
           );
         }
         // ❷ Giriş yapanı en başa taşı (aşağıda kod var)
-        final ordered = _orderWithMeFirst(labels);
-
+        final idxMe = labels.indexWhere((s) => s.startsWith('You ('));
+        final orderedLabels = [...labels];
+        final orderedUids = [...uids];
+        if (idxMe > 0) {
+          final meLabel = orderedLabels.removeAt(idxMe);
+          final meUid = orderedUids.removeAt(idxMe);
+          orderedLabels.insert(0, meLabel);
+          orderedUids.insert(0, meUid);
+        }
         // ❸ sadece ilk kez aktif index’i set et
         if (!_appliedInitial) {
           _activeIndex = 0; // me first
@@ -228,9 +237,10 @@ class _HomePageState extends State<HomePage> {
                     controller: _pageController, // <-- DÜZELTME
                     physics: const BouncingScrollPhysics(),
                     onPageChanged: (i) => setState(() => _activeIndex = i),
-                    itemCount: ordered.length,
+                    itemCount: orderedLabels.length,
                     itemBuilder: (context, i) {
-                      final name = ordered[i];
+                      final name = orderedLabels[i];
+                      final uid = orderedUids[i];
                       final memberTasks = tasks
                           .where((t) => _matchesAssignee(t.assignedTo, name))
                           .toList();
@@ -239,7 +249,7 @@ class _HomePageState extends State<HomePage> {
                           .toList();
 
                       final card = (_section == HomeSection.expenses)
-                          ? ExpensesCard(memberName: name)
+                          ? ExpensesCard(memberUid: uid)
                           : MemberCard(
                               memberName: name,
                               tasks: memberTasks,
@@ -271,7 +281,7 @@ class _HomePageState extends State<HomePage> {
 
                 // === MİNİ BAR ===
                 MiniMembersBar(
-                  names: ordered,
+                  names: orderedLabels,
                   activeIndex: _activeIndex,
                   onPickIndex: (i) {
                     setState(() => _activeIndex = i);
@@ -312,56 +322,56 @@ class _MemberPageKeepAliveState extends State<_MemberPageKeepAlive>
   }
 }
 
-// Küçük dikdörtgen member kutusu:
-class _MiniMemberTile extends StatelessWidget {
-  final String name;
-  final VoidCallback onTap;
-  const _MiniMemberTile({required this.name, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Row(
-            children: [
-              CircleAvatar(radius: 16, child: Text(initial)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const Icon(Icons.chevron_right, size: 18),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-List<String> _orderWithMeFirst(List<String> labels) {
-  // FamilyProvider.watchMemberLabels() şu cihazdaki kullanıcıyı hep "You (...)" olarak döndürür.
-  final idx = labels.indexWhere((s) => s.startsWith('You ('));
-  if (idx <= 0) return labels;
-  final copy = [...labels];
-  final me = copy.removeAt(idx);
-  copy.insert(0, me);
-  return copy;
-}
+// // Küçük dikdörtgen member kutusu:
+// class _MiniMemberTile extends StatelessWidget {
+//   final String name;
+//   final VoidCallback onTap;
+//   const _MiniMemberTile({required this.name, required this.onTap});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+//     final theme = Theme.of(context);
+//     return Card(
+//       elevation: 2,
+//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//       clipBehavior: Clip.antiAlias,
+//       child: InkWell(
+//         onTap: onTap,
+//         child: Padding(
+//           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+//           child: Row(
+//             children: [
+//               CircleAvatar(radius: 16, child: Text(initial)),
+//               const SizedBox(width: 8),
+//               Expanded(
+//                 child: Text(
+//                   name,
+//                   maxLines: 1,
+//                   overflow: TextOverflow.ellipsis,
+//                   style: theme.textTheme.bodyMedium?.copyWith(
+//                     fontWeight: FontWeight.w600,
+//                   ),
+//                 ),
+//               ),
+//               const Icon(Icons.chevron_right, size: 18),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
+//
+// List<String> _orderWithMeFirst(List<String> labels) {
+//   // FamilyProvider.watchMemberLabels() şu cihazdaki kullanıcıyı hep "You (...)" olarak döndürür.
+//   final idx = labels.indexWhere((s) => s.startsWith('You ('));
+//   if (idx <= 0) return labels;
+//   final copy = [...labels];
+//   final me = copy.removeAt(idx);
+//   copy.insert(0, me);
+//   return copy;
+// }
 
 bool _matchesAssignee(String? assignedTo, String cardLabel) {
   if (assignedTo == null || assignedTo.trim().isEmpty) return false;

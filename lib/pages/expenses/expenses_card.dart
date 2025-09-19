@@ -3,12 +3,12 @@ import 'package:provider/provider.dart';
 
 import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
-import '../../widgets/member_dropdown.dart';
+import '../../widgets/member_dropdown_uid.dart';
 import 'expenses_insights_page.dart';
 
 class ExpensesCard extends StatefulWidget {
-  final String memberName; // aktif üye label'ı (ör. "You (yigitgokhan1)")
-  const ExpensesCard({super.key, required this.memberName});
+  final String? memberUid;
+  const ExpensesCard({super.key, this.memberUid});
 
   @override
   State<ExpensesCard> createState() => _ExpensesCardState();
@@ -22,8 +22,9 @@ class _ExpensesCardState extends State<ExpensesCard> {
     final expProv = context.watch<ExpenseCloudProvider>();
     final family = context.watch<FamilyProvider>().memberLabelsOrFallback;
 
-    final expenses = expProv.forMemberFiltered(widget.memberName, _filter);
-    final total = expProv.totalForMember(widget.memberName, filter: _filter);
+    final expenses = expProv.forMemberFiltered(widget.memberUid, _filter);
+    final total = expProv.totalForMember(widget.memberUid, filter: _filter);
+    final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
 
     return Card(
       elevation: 6,
@@ -38,20 +39,36 @@ class _ExpensesCardState extends State<ExpensesCard> {
             Row(
               children: [
                 CircleAvatar(
-                  child: Text(
-                    widget.memberName.isNotEmpty
-                        ? widget.memberName[0].toUpperCase()
-                        : '?',
+                  child: StreamBuilder<Map<String, String>>(
+                    stream: dictStream,
+                    builder: (_, snap) {
+                      final dict = snap.data ?? const {};
+                      final label = widget.memberUid == null
+                          ? 'All'
+                          : (dict[widget.memberUid] ?? 'Member');
+                      final ch = label.trim().isEmpty
+                          ? '?'
+                          : label.trim()[0].toUpperCase();
+                      return Text(ch);
+                    },
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    '${widget.memberName} ${_filterLabel(_filter)}',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  child: StreamBuilder<Map<String, String>>(
+                    stream: dictStream,
+                    builder: (_, snap) {
+                      final dict = snap.data ?? const {};
+                      final label = widget.memberUid == null
+                          ? 'All members'
+                          : (dict[widget.memberUid] ?? 'Member');
+                      return Text(
+                        '$label ${_filterLabel(_filter)}',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      );
+                    },
                   ),
                 ),
                 Text(
@@ -169,7 +186,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
                 FilledButton.tonalIcon(
                   icon: const Icon(Icons.add),
                   label: const Text('Add expense'),
-                  onPressed: () => _openAddDialog(context, widget.memberName),
+                  onPressed: () => _openAddDialog(context, widget.memberUid),
                 ),
                 const SizedBox(width: 8),
                 TextButton.icon(
@@ -178,7 +195,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => ExpensesInsightsPage(
-                          initialMember: widget.memberName, // aktif üyeyle aç
+                          initialMember: widget.memberUid, // aktif üyeyle aç
                         ),
                       ),
                     );
@@ -229,12 +246,12 @@ class _ExpensesCardState extends State<ExpensesCard> {
 
   void _openAddDialog(
     BuildContext context,
-    String member, // varsayılan atama
+    String? memberUid, // varsayılan atama
   ) {
     final titleC = TextEditingController();
     final amountC = TextEditingController();
 
-    String? assign = member; // default değer: aktif karttaki üye
+    String? assignUid = memberUid;
     String? cat; // null => Uncategorized
     bool normalizedOnce = false;
     const categories = <String>[
@@ -282,34 +299,11 @@ class _ExpensesCardState extends State<ExpensesCard> {
                   const SizedBox(height: 8),
 
                   // 🔽 AİLE ETİKETLERİ — FIRESTORE STREAM
-                  StreamBuilder<List<String>>(
-                    stream: context.read<FamilyProvider>().watchMemberLabels(),
-                    builder: (ctx, snap) {
-                      final labels = (snap.data ?? const <String>[]);
-                      final unique = labels.toSet().toList()..sort();
-
-                      if (!normalizedOnce) {
-                        if (!unique.contains(assign)) assign = '';
-                        normalizedOnce = true;
-                      }
-
-                      final items = <DropdownMenuItem<String>>[
-                        const DropdownMenuItem(
-                          value: '',
-                          child: Text('Unassigned'),
-                        ),
-                        ...unique.map(
-                          (m) => DropdownMenuItem(value: m, child: Text(m)),
-                        ),
-                      ];
-
-                      return MemberDropdown(
-                        value: assign, // String? (null = Unassigned)
-                        onChanged: (v) => setLocal(() => assign = v),
-                        label: 'Assign to',
-                        nullLabel: 'Unassigned',
-                      );
-                    },
+                  MemberDropdownUid(
+                    value: assignUid,
+                    onChanged: (v) => setLocal(() => assignUid = v),
+                    label: 'Assign to',
+                    nullLabel: 'Unassigned',
                   ),
 
                   const SizedBox(height: 8),
@@ -380,12 +374,11 @@ class _ExpensesCardState extends State<ExpensesCard> {
                         if (t.isEmpty || a == null || a <= 0) return;
 
                         try {
-                          await context.read<ExpenseCloudProvider>().addExpense(
+                          await context.read<ExpenseCloudProvider>().add(
                             title: t,
                             amount: a,
                             date: DateTime.now(),
-                            assignedTo:
-                                assign, // veya assignUid (UID akışına geçtiysen)
+                            assignedToUid: assignUid,
                             category: cat,
                           );
                           if (context.mounted) Navigator.pop(context);

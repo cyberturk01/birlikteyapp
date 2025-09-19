@@ -9,7 +9,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
-import '../../widgets/member_dropdown.dart';
+import '../../widgets/member_dropdown_uid.dart';
 import 'expenses_by_category_page.dart';
 
 class ExpensesInsightsPage extends StatefulWidget {
@@ -21,22 +21,19 @@ class ExpensesInsightsPage extends StatefulWidget {
 }
 
 class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
-  // _member: dropdown seçimi. Özel anahtar: __ALL__ => tüm üyeler
-  static const String _allKey = '__ALL__';
-
-  String? _member; // label | '' (unassigned) | __ALL__
+  String? _memberUid;
   ExpenseDateFilter _filter = ExpenseDateFilter.thisMonth;
 
   @override
   void initState() {
     super.initState();
     // initialMember gelebilir (örn: "You (yigitgokhan1)")
-    _member = widget.initialMember; // normalize'ı build içinde yapacağız
+    _memberUid = widget.initialMember; // normalize'ı build içinde yapacağız
   }
 
   @override
   Widget build(BuildContext context) {
-    final expProv = context.watch<ExpenseCloudProvider>();
+    final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Expenses — Insights')),
@@ -52,40 +49,22 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
               // Member seçici (CANLI: Firestore labels)
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 400),
-                child: StreamBuilder<List<String>>(
-                  stream: context.read<FamilyProvider>().watchMemberLabels(),
-                  builder: (context, snap) {
-                    final labels = (snap.data ?? const <String>[]).toList();
-
-                    // __ALL__ anahtarı ve normalize
-                    const allKey = '__ALL__';
-                    String? current = _member;
-                    if (current == null) {
-                      current = allKey;
-                    } else if (current.isNotEmpty &&
-                        !labels.contains(current)) {
-                      current = labels.isNotEmpty ? labels.first : allKey;
-                    }
-                    final memberForFilter = (current == allKey)
-                        ? null
-                        : current;
-
-                    // Hesaplamalar (artık StreamBuilder içinde; labels’a göre)
+                child: Builder(
+                  builder: (context) {
                     final expProv = context.watch<ExpenseCloudProvider>();
                     final expenses = expProv.forMemberFiltered(
-                      memberForFilter,
+                      _memberUid,
                       _filter,
                     );
                     final total = expProv.totalForMember(
-                      memberForFilter,
+                      _memberUid,
                       filter: _filter,
                     );
                     final year = DateTime.now().year;
                     final monthly = expProv.monthlyTotals(
                       year: year,
-                      uid: memberForFilter,
+                      uid: _memberUid,
                     );
-
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -97,38 +76,13 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                             // 1) Üye seçici sadece 280px ile sınırlı
                             ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 280),
-                              child: MemberDropdown(
-                                value: _member,
-                                onChanged: (v) => setState(() => _member = v),
+                              child: MemberDropdownUid(
+                                value: _memberUid,
+                                onChanged: (v) =>
+                                    setState(() => _memberUid = v),
                                 label: 'Member',
                                 nullLabel: 'All members',
                               ),
-                              // DropdownButtonFormField<String?>(
-                              //   value: current,
-                              //   isExpanded: true,
-                              //   items: [
-                              //     const DropdownMenuItem<String?>(
-                              //       value: allKey,
-                              //       child: Text('All members'),
-                              //     ),
-                              //     const DropdownMenuItem<String?>(
-                              //       value: '',
-                              //       child: Text('Unassigned'),
-                              //     ),
-                              //     ...labels.map(
-                              //       (m) => DropdownMenuItem<String?>(
-                              //         value: m,
-                              //         child: Text(m),
-                              //       ),
-                              //     ),
-                              //   ],
-                              //   onChanged: (v) => setState(() => _member = v),
-                              //   decoration: const InputDecoration(
-                              //     labelText: 'Member',
-                              //     border: OutlineInputBorder(),
-                              //     isDense: true,
-                              //   ),
-                              // ),
                             ),
 
                             // 2) Tarih filtresi — wrap içinde serbest
@@ -167,7 +121,7 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (_) => ExpensesByCategoryPage(
-                                          initialMember: memberForFilter,
+                                          initialMember: _memberUid,
                                         ),
                                       ),
                                     );
@@ -234,23 +188,47 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                                   ),
                                 )
                               else
-                                ...expenses.map(
-                                  (e) => ListTile(
-                                    dense: true,
-                                    title: Text(
-                                      e.title,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    subtitle: Text(
-                                      '${_fmtDate(e.date)} • ${e.assignedToUid ?? 'Unassigned'}'
-                                      '${e.category == null ? '' : ' • ${e.category}'}',
-                                    ),
-                                    trailing: Text(
-                                      '€ ${e.amount.toStringAsFixed(2)}',
-                                    ),
-                                    onLongPress: () =>
-                                        _showChangeCategorySheet(context, e),
-                                  ),
+                                StreamBuilder<Map<String, String>>(
+                                  stream: dictStream,
+                                  builder: (_, snapDict) {
+                                    final dict = snapDict.data ?? const {};
+                                    if (expenses.isEmpty) {
+                                      return const Padding(
+                                        padding: EdgeInsets.all(16),
+                                        child: Text(
+                                          'No expenses for selected range.',
+                                        ),
+                                      );
+                                    }
+                                    return Column(
+                                      children: expenses.map((e) {
+                                        final memberLabel =
+                                            e.assignedToUid == null
+                                            ? 'Unassigned'
+                                            : (dict[e.assignedToUid] ??
+                                                  'Member');
+                                        return ListTile(
+                                          dense: true,
+                                          title: Text(
+                                            e.title,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          subtitle: Text(
+                                            '${_fmtDate(e.date)} • $memberLabel'
+                                            '${e.category == null ? '' : ' • ${e.category}'}',
+                                          ),
+                                          trailing: Text(
+                                            '€ ${e.amount.toStringAsFixed(2)}',
+                                          ),
+                                          onLongPress: () =>
+                                              _showChangeCategorySheet(
+                                                context,
+                                                e,
+                                              ),
+                                        );
+                                      }).toList(),
+                                    );
+                                  },
                                 ),
                             ],
                           ),
