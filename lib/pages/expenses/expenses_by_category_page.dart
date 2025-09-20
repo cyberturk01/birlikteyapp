@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
+import '../../utils/formatting.dart';
 import '../../widgets/member_dropdown.dart';
 
 class ExpensesByCategoryPage extends StatefulWidget {
@@ -152,7 +153,7 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
                   ListTile(
                     title: const Text('Totals by category'),
                     trailing: Text(
-                      '€ ${total.toStringAsFixed(2)}',
+                      fmtMoney(context, total),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -165,7 +166,7 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
                       dense: true,
                       title: Text(e.key),
                       trailing: Text(
-                        '€ ${e.value.toStringAsFixed(2)}  •  ${pct.toStringAsFixed(1)}%',
+                        '${fmtMoney(context, e.value)}   •  ${pct.toStringAsFixed(1)}%',
                       ),
                     );
                   }),

@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
+import '../../utils/formatting.dart';
+import '../../utils/input_formatters.dart';
+import '../../widgets/expense_edit_dialog.dart';
 import '../../widgets/member_dropdown_uid.dart';
 import 'expenses_insights_page.dart';
 
@@ -72,7 +75,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
                   ),
                 ),
                 Text(
-                  '€ ${total.toStringAsFixed(2)}',
+                  fmtMoney(context, total),
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
@@ -138,42 +141,85 @@ class _ExpensesCardState extends State<ExpensesCard> {
                             ),
                           ),
                           confirmDismiss: (dir) async {
-                            final removed = e; // (Undo için saklıyoruz)
-                            await context.read<ExpenseCloudProvider>().remove(
-                              removed.id,
-                            );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text('Expense deleted'),
-                                action: SnackBarAction(
-                                  label: 'Undo',
-                                  onPressed: () {
-                                    final p = context
-                                        .read<ExpenseCloudProvider>();
-                                    p.add(
-                                      title: removed.title,
-                                      amount: removed.amount,
-                                      date: removed.date,
-                                      assignedToUid: removed.assignedToUid,
-                                      category: removed.category,
-                                    );
-                                  },
+                            final ok = await showDialog<bool>(
+                              context: context,
+                              builder: (_) => AlertDialog(
+                                title: const Text('Delete expense?'),
+                                content: Text(
+                                  '“${e.title}” will be removed. You can undo right after.',
                                 ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    child: const Text('Delete'),
+                                  ),
+                                ],
                               ),
                             );
-                            return true;
+                            if (ok != true) return false;
+
+                            try {
+                              final removed = e; // undo için sakla
+                              await context.read<ExpenseCloudProvider>().remove(
+                                removed.id,
+                              );
+                              if (!context.mounted) return true;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text('Expense deleted'),
+                                  action: SnackBarAction(
+                                    label: 'Undo',
+                                    onPressed: () {
+                                      final p = context
+                                          .read<ExpenseCloudProvider>();
+                                      p.add(
+                                        title: removed.title,
+                                        amount: removed.amount,
+                                        date: removed.date,
+                                        assignedToUid: removed.assignedToUid,
+                                        category: removed.category,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              );
+                              return true;
+                            } catch (err) {
+                              if (!context.mounted) return false;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Delete failed: $err')),
+                              );
+                              return false;
+                            }
                           },
                           child: ListTile(
                             dense: true,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 0,
                             ),
+                            onTap: () async {
+                              await showExpenseEditDialog(
+                                context: context,
+                                id: e.id,
+                                initialTitle: e.title,
+                                initialAmount: e.amount,
+                                initialDate: e.date,
+                                initialAssignedToUid: e.assignedToUid,
+                                initialCategory: e.category,
+                              );
+                            },
                             title: Text(
                               '${e.title} ${e.category == null ? '' : '• ${e.category}'}',
                               overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(_fmtDate(e.date)),
-                            trailing: Text('€ ${e.amount.toStringAsFixed(2)}'),
+                            trailing: Text(fmtMoney(context, e.amount)),
                           ),
                         );
                       },
@@ -186,7 +232,11 @@ class _ExpensesCardState extends State<ExpensesCard> {
                 FilledButton.tonalIcon(
                   icon: const Icon(Icons.add),
                   label: const Text('Add expense'),
-                  onPressed: () => _openAddDialog(context, widget.memberUid),
+                  onPressed: () async {
+                    await showExpenseEditDialog(
+                      context: context,
+                    ); // id null => create
+                  },
                 ),
                 const SizedBox(width: 8),
                 TextButton.icon(
@@ -291,6 +341,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
+                    inputFormatters: [AmountInputFormatter()],
                     decoration: const InputDecoration(
                       hintText: 'Amount (e.g., 24.90)',
                       prefixIcon: Icon(Icons.euro),
@@ -368,24 +419,58 @@ class _ExpensesCardState extends State<ExpensesCard> {
                     ? null
                     : () async {
                         final t = titleC.text.trim();
-                        final a = double.tryParse(
-                          amountC.text.trim().replaceAll(',', '.'),
-                        );
-                        if (t.isEmpty || a == null || a <= 0) return;
+                        final a = parseAmountFlexible(amountC.text);
+
+                        if (t.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Title is required')),
+                          );
+                          return;
+                        }
+                        if (a == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Enter a valid amount'),
+                            ),
+                          );
+                          return;
+                        }
+                        if (a <= 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Amount must be greater than 0'),
+                            ),
+                          );
+                          return;
+                        }
 
                         try {
-                          await context.read<ExpenseCloudProvider>().add(
+                          await context.read<ExpenseCloudProvider>().addExpense(
                             title: t,
                             amount: a,
                             date: DateTime.now(),
-                            assignedToUid: assignUid,
+                            assignedTo: assignUid,
                             category: cat,
                           );
-                          if (context.mounted) Navigator.pop(context);
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Added: ${fmtMoney(context, a)}'),
+                            ),
+                          );
                         } on StateError catch (e) {
+                          if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(e.message ?? 'No active family'),
+                            ),
+                          );
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to add expense: $e'),
                             ),
                           );
                         }

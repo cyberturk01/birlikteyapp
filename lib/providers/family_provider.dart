@@ -4,7 +4,9 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hive/hive.dart';
+import 'package:share_plus/share_plus.dart';
 
 class FamilyProvider extends ChangeNotifier {
   final _familyBox = Hive.box<String>('familyBox');
@@ -91,6 +93,59 @@ class FamilyProvider extends ChangeNotifier {
           }
           return true;
         });
+  }
+
+  Future<String?> ensureInviteCode() async {
+    final id = _familyId;
+    if (id == null) return null;
+
+    // var olan kodu oku
+    final doc = await FirebaseFirestore.instance
+        .collection('families')
+        .doc(id)
+        .get();
+    var code = (doc.data()?['inviteCode'] as String?)?.trim();
+
+    // yoksa yeni üret ve yaz
+    if (code == null || code.isEmpty) {
+      code = _randomCode(length: 8);
+      await FirebaseFirestore.instance.collection('invites').doc(code).set({
+        'familyId': id,
+        'ownerUid': FirebaseAuth.instance.currentUser!.uid,
+        'active': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      await FirebaseFirestore.instance.collection('families').doc(id).set({
+        'inviteCode': code,
+      }, SetOptions(merge: true));
+    }
+    return code;
+  }
+
+  Future<void> shareInvite(BuildContext context) async {
+    final code = await ensureInviteCode();
+    if (code == null) return;
+    final text = 'Join our Togetherly family with code: $code';
+    await Clipboard.setData(ClipboardData(text: code));
+    await Share.share(text, subject: 'Togetherly invite');
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Copied to clipboard: $code')));
+  }
+
+  Future<void> setInviteActive(bool active) async {
+    final fid = _familyId;
+    if (fid == null) return;
+    final famDoc = await FirebaseFirestore.instance
+        .collection('families')
+        .doc(fid)
+        .get();
+    final code = (famDoc.data()?['inviteCode'] as String?)?.trim();
+    if (code == null || code.isEmpty) return;
+    await FirebaseFirestore.instance.collection('invites').doc(code).set({
+      'active': active,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   Future<void> loadActiveFamily() async {

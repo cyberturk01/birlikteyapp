@@ -26,9 +26,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 
@@ -40,10 +40,10 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Emülatör (debug)
-  if (kDebugMode) {
-    FirebaseAuth.instance.useAuthEmulator('10.0.2.2', 9099);
-    FirebaseFirestore.instance.useFirestoreEmulator('10.0.2.2', 8080);
-  }
+  // if (kDebugMode) {
+  //   FirebaseAuth.instance.useAuthEmulator('10.0.2.2', 9099);
+  //   FirebaseFirestore.instance.useFirestoreEmulator('10.0.2.2', 8080);
+  // }
 
   await FirebaseAppCheck.instance.activate(
     androidProvider: AndroidProvider.debug,
@@ -195,6 +195,16 @@ class _RootState extends State<_Root> {
           ],
           child: Consumer<UiProvider>(
             builder: (_, ui, __) => MaterialApp(
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: const [
+                Locale('en'),
+                Locale('tr'), // Türkçe
+                Locale('de'), // Almanca
+              ],
               debugShowCheckedModeBanner: false,
               title: 'Togetherly',
               themeMode: ui.themeMode,
@@ -223,6 +233,7 @@ class _RootState extends State<_Root> {
 
     // Gerekli kutular
     await Future.wait([
+      Hive.openBox('appBox'),
       Hive.openBox<String>('familyBox'),
       Hive.openBox<Task>('taskBox'),
       Hive.openBox<Item>('itemBox'),

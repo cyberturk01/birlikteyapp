@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import '../utils/recent_categories.dart';
+
 enum ExpenseDateFilter { thisMonth, lastMonth, all }
 
 class ExpenseDoc {
@@ -125,6 +127,9 @@ class ExpenseCloudProvider extends ChangeNotifier {
     if (c == null) {
       throw StateError('[ExpenseCloud] No active familyId set');
     }
+    if ((category ?? '').trim().isNotEmpty) {
+      RecentExpenseCats.push(category!.trim());
+    }
     await c.add({
       'title': title.trim(),
       'amount': amount,
@@ -192,6 +197,38 @@ class ExpenseCloudProvider extends ChangeNotifier {
       }
     }
     return buckets;
+  }
+
+  Future<void> updateExpense(
+    String id, {
+    String? title,
+    double? amount,
+    DateTime? date,
+    String? assignedToUid,
+    String? category,
+  }) async {
+    final c = _col;
+    if (c == null) throw StateError('No active family/collection');
+
+    final data = <String, dynamic>{};
+    if (title != null) data['title'] = title.trim();
+    if (amount != null) data['amount'] = amount;
+    if (date != null) data['date'] = Timestamp.fromDate(date);
+    // assignedToUid null gelirse kategorik olarak temizlemek isteyebiliriz:
+    if (assignedToUid != null) {
+      data['assignedToUid'] = assignedToUid.trim().isEmpty
+          ? null
+          : assignedToUid.trim();
+    }
+    if (category != null) {
+      data['category'] = category.trim().isEmpty ? null : category.trim();
+    }
+    if (category != null && category.trim().isNotEmpty) {
+      RecentExpenseCats.push(category.trim());
+    }
+    if (data.isEmpty) return;
+
+    await c.doc(id).set(data, SetOptions(merge: true));
   }
 
   Map<String, double> totalsByCategory({

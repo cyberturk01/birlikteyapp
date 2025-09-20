@@ -9,6 +9,8 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
+import '../../utils/formatting.dart';
+import '../../widgets/expense_edit_dialog.dart';
 import '../../widgets/member_dropdown_uid.dart';
 import 'expenses_by_category_page.dart';
 
@@ -140,6 +142,18 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                                   icon: const Icon(Icons.share),
                                   label: const Text('Share'),
                                 ),
+                                TextButton.icon(
+                                  onPressed: () =>
+                                      _pickRangeAndExport(context, _memberUid),
+                                  icon: const Icon(Icons.calendar_month),
+                                  label: const Text('Export (range)'),
+                                ),
+                                TextButton.icon(
+                                  onPressed: () =>
+                                      _pickRangeAndShare(context, _memberUid),
+                                  icon: const Icon(Icons.ios_share),
+                                  label: const Text('Share (range)'),
+                                ),
                               ],
                             ),
                           ],
@@ -157,7 +171,7 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                               ),
                             ),
                             Text(
-                              '€ ${total.toStringAsFixed(2)}',
+                              fmtMoney(context, total),
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
@@ -218,13 +232,25 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                                             '${e.category == null ? '' : ' • ${e.category}'}',
                                           ),
                                           trailing: Text(
-                                            '€ ${e.amount.toStringAsFixed(2)}',
+                                            fmtMoney(context, e.amount),
                                           ),
                                           onLongPress: () =>
                                               _showChangeCategorySheet(
                                                 context,
                                                 e,
                                               ),
+                                          onTap: () async {
+                                            await showExpenseEditDialog(
+                                              context: context,
+                                              id: e.id,
+                                              initialTitle: e.title,
+                                              initialAmount: e.amount,
+                                              initialDate: e.date,
+                                              initialAssignedToUid:
+                                                  e.assignedToUid,
+                                              initialCategory: e.category,
+                                            );
+                                          },
                                         );
                                       }).toList(),
                                     );
@@ -277,6 +303,149 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
     return '${d.year}-$mm-$dd';
   }
 
+  String _stampNow() {
+    final now = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${now.year}-${two(now.month)}-${two(now.day)}_${two(now.hour)}${two(now.minute)}';
+  }
+
+  Future<DateTimeRange?> _pickRange(BuildContext context) async {
+    final now = DateTime.now();
+    final first = DateTime(now.year - 3, 1, 1);
+    final last = DateTime(now.year + 1, 12, 31);
+    return await showDateRangePicker(
+      context: context,
+      firstDate: first,
+      lastDate: last,
+      initialDateRange: DateTimeRange(
+        start: DateTime(now.year, now.month, 1),
+        end: now,
+      ),
+    );
+  }
+
+  /// Provider’dan ALLEXPENSES -> member ve tarihe göre filtreler.
+  List<ExpenseDoc> _filterByRange(
+    BuildContext context, {
+    required String? memberUid,
+    required DateTimeRange range,
+  }) {
+    final prov = context.read<ExpenseCloudProvider>();
+    // mevcut API’n yoksa ALLEXPENSES’i Exposure et; yoksa allFiltered yaz:
+    final all = prov.forMemberFiltered(memberUid, ExpenseDateFilter.all);
+    final start = DateTime(
+      range.start.year,
+      range.start.month,
+      range.start.day,
+    );
+    final endEx = DateTime(
+      range.end.year,
+      range.end.month,
+      range.end.day,
+    ).add(const Duration(days: 1)); // bitiş gününü dahil et
+    return all
+        .where((e) => !e.date.isBefore(start) && e.date.isBefore(endEx))
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+  }
+
+  Future<void> _pickRangeAndExport(
+    BuildContext context,
+    String? memberUid,
+  ) async {
+    final picked = await _pickRange(context);
+    if (picked == null) return;
+
+    try {
+      final dict = await context
+          .read<FamilyProvider>()
+          .watchMemberDirectory()
+          .first;
+      final list = _filterByRange(context, memberUid: memberUid, range: picked);
+
+      final rows = <List<dynamic>>[
+        ['date', 'title', 'amount', 'member', 'category'],
+        ...list.map(
+          (e) => [
+            _fmtDate(e.date),
+            e.title,
+            e.amount.toStringAsFixed(2), // CSV’de sayısal kalsın
+            (e.assignedToUid == null
+                ? ''
+                : (dict[e.assignedToUid] ?? e.assignedToUid!)),
+            e.category ?? '',
+          ],
+        ),
+      ];
+
+      final csv = const ListToCsvConverter().convert(rows);
+      final dir = await getTemporaryDirectory();
+      final famId = context.read<FamilyProvider>().familyId ?? 'noFamily';
+      final file = File(
+        '${dir.path}/expenses_${famId}_${_fmtDate(picked.start)}_${_fmtDate(picked.end)}_${_stampNow()}.csv',
+      );
+      await file.writeAsString(csv);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Saved CSV: ${file.path.split('/').last}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+    }
+  }
+
+  Future<void> _pickRangeAndShare(
+    BuildContext context,
+    String? memberUid,
+  ) async {
+    final picked = await _pickRange(context);
+    if (picked == null) return;
+
+    try {
+      final dict = await context
+          .read<FamilyProvider>()
+          .watchMemberDirectory()
+          .first;
+      final list = _filterByRange(context, memberUid: memberUid, range: picked);
+
+      final rows = <List<dynamic>>[
+        ['date', 'title', 'amount', 'member', 'category'],
+        ...list.map(
+          (e) => [
+            _fmtDate(e.date),
+            e.title,
+            e.amount.toStringAsFixed(2),
+            (e.assignedToUid == null
+                ? ''
+                : (dict[e.assignedToUid] ?? e.assignedToUid!)),
+            e.category ?? '',
+          ],
+        ),
+      ];
+
+      final csv = const ListToCsvConverter().convert(rows);
+      final dir = await getTemporaryDirectory();
+      final famId = context.read<FamilyProvider>().familyId ?? 'noFamily';
+      final file = File(
+        '${dir.path}/expenses_share_${famId}_${_fmtDate(picked.start)}_${_fmtDate(picked.end)}_${_stampNow()}.csv',
+      );
+      await file.writeAsString(csv);
+
+      await Share.shareXFiles([
+        XFile(file.path),
+      ], text: 'Togetherly — Expenses CSV');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
+    }
+  }
+
   Future<void> _exportCsv(
     BuildContext context,
     List<ExpenseDoc> expenses,
@@ -302,9 +471,8 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
       ];
       final csv = const ListToCsvConverter().convert(rows);
       final dir = await getTemporaryDirectory();
-      final file = File(
-        '${dir.path}/expenses_${DateTime.now().millisecondsSinceEpoch}.csv',
-      );
+      final famId = context.read<FamilyProvider>().familyId ?? 'noFamily';
+      final file = File('${dir.path}/expenses_${famId}_${_stampNow()}.csv');
       await file.writeAsString(csv);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -342,8 +510,9 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
       ];
       final csv = const ListToCsvConverter().convert(rows);
       final dir = await getTemporaryDirectory();
+      final famId = context.read<FamilyProvider>().familyId ?? 'noFamily';
       final file = File(
-        '${dir.path}/expenses_share_${DateTime.now().millisecondsSinceEpoch}.csv',
+        '${dir.path}/expenses_share_${famId}_${_stampNow()}.csv',
       );
       await file.writeAsString(csv);
       await Share.shareXFiles([
@@ -356,6 +525,19 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
       ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
     }
   }
+}
+
+// YYYY-MM-DD
+String _fmtDate(DateTime d) {
+  final mm = d.month.toString().padLeft(2, '0');
+  final dd = d.day.toString().padLeft(2, '0');
+  return '${d.year}-$mm-$dd';
+}
+
+String _stampNow() {
+  final now = DateTime.now();
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${now.year}-${two(now.month)}-${two(now.day)}_${two(now.hour)}${two(now.minute)}';
 }
 
 void _showChangeCategorySheet(BuildContext context, ExpenseDoc e) {

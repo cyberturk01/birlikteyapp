@@ -41,49 +41,47 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyC62QqGqGGfIeReUn9Wli5CM3MKTuBlzmE',
-    appId: '1:429792658004:web:130e4651cefd409f96e3c1',
-    messagingSenderId: '429792658004',
-    projectId: 'togetherly-6161',
-    authDomain: 'togetherly-6161.firebaseapp.com',
-    storageBucket: 'togetherly-6161.firebasestorage.app',
-    measurementId: 'G-GVNC7GDXM4',
+    apiKey: 'AIzaSyCZfibYOqOEDoriccTivWAptuMdWg2alzo',
+    appId: '1:880853149618:web:3933dafc4b4b085b1b66ab',
+    messagingSenderId: '880853149618',
+    projectId: 'togetherly-staging',
+    authDomain: 'togetherly-staging.firebaseapp.com',
+    storageBucket: 'togetherly-staging.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBcsWY_eVIllV0hFBDDn734I9dFaYGkMQY',
-    appId: '1:429792658004:android:18a59e0fe6dc078e96e3c1',
-    messagingSenderId: '429792658004',
-    projectId: 'togetherly-6161',
-    storageBucket: 'togetherly-6161.firebasestorage.app',
+    apiKey: 'AIzaSyDgp7vk6pPUYEd95oy-bumhehUiV2f116Y',
+    appId: '1:880853149618:android:64f68a1c39ae90051b66ab',
+    messagingSenderId: '880853149618',
+    projectId: 'togetherly-staging',
+    storageBucket: 'togetherly-staging.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAFIRVii0FeYntBZ4-0sqd_VZgf6B20xRk',
-    appId: '1:429792658004:ios:ca9e376e384780c196e3c1',
-    messagingSenderId: '429792658004',
-    projectId: 'togetherly-6161',
-    storageBucket: 'togetherly-6161.firebasestorage.app',
+    apiKey: 'AIzaSyCubclIxmuKZURidnSy9LhJtn30sf4POCo',
+    appId: '1:880853149618:ios:437d1c9cfaa6c8ef1b66ab',
+    messagingSenderId: '880853149618',
+    projectId: 'togetherly-staging',
+    storageBucket: 'togetherly-staging.firebasestorage.app',
     iosBundleId: 'com.birlikteyapp.birlikteyapp',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyAFIRVii0FeYntBZ4-0sqd_VZgf6B20xRk',
-    appId: '1:429792658004:ios:ca9e376e384780c196e3c1',
-    messagingSenderId: '429792658004',
-    projectId: 'togetherly-6161',
-    storageBucket: 'togetherly-6161.firebasestorage.app',
+    apiKey: 'AIzaSyCubclIxmuKZURidnSy9LhJtn30sf4POCo',
+    appId: '1:880853149618:ios:437d1c9cfaa6c8ef1b66ab',
+    messagingSenderId: '880853149618',
+    projectId: 'togetherly-staging',
+    storageBucket: 'togetherly-staging.firebasestorage.app',
     iosBundleId: 'com.birlikteyapp.birlikteyapp',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyC62QqGqGGfIeReUn9Wli5CM3MKTuBlzmE',
-    appId: '1:429792658004:web:21a34c82d161cff696e3c1',
-    messagingSenderId: '429792658004',
-    projectId: 'togetherly-6161',
-    authDomain: 'togetherly-6161.firebaseapp.com',
-    storageBucket: 'togetherly-6161.firebasestorage.app',
-    measurementId: 'G-FZNEDE8YQZ',
+    apiKey: 'AIzaSyCZfibYOqOEDoriccTivWAptuMdWg2alzo',
+    appId: '1:880853149618:web:e111be52e87397471b66ab',
+    messagingSenderId: '880853149618',
+    projectId: 'togetherly-staging',
+    authDomain: 'togetherly-staging.firebaseapp.com',
+    storageBucket: 'togetherly-staging.firebasestorage.app',
   );
 
 }

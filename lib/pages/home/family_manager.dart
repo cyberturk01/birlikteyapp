@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -132,6 +133,72 @@ class _FamilyManagerSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+void showInviteSheet(BuildContext context) async {
+  final fam = context.read<FamilyProvider>();
+  String? code = await fam.ensureInviteCode();
+  bool isActive = true;
+  try {
+    final snap = await FirebaseFirestore.instance
+        .collection('invites')
+        .doc(code!)
+        .get();
+    isActive = (snap.data()?['active'] as bool?) ?? true;
+  } catch (_) {}
+
+  showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) {
+      return StatefulBuilder(
+        builder: (ctx, setLocal) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  height: 4,
+                  width: 40,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).dividerColor,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                ListTile(
+                  title: const Text('Invite code'),
+                  subtitle: Text(code ?? '—'),
+                  trailing: Switch(
+                    value: isActive,
+                    onChanged: (v) async {
+                      await fam.setInviteActive(v);
+                      setLocal(() => isActive = v);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.copy),
+                        label: const Text('Copy & Share'),
+                        onPressed: () async => fam.shareInvite(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
 }
 
 class _InviteCodeTile extends StatelessWidget {
