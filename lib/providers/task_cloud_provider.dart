@@ -117,56 +117,6 @@ class TaskCloudProvider extends ChangeNotifier {
         );
   }
 
-  // void _rebindTasks() {
-  //   debugPrint('[TaskCloud] REBIND → user=${_currentUser?.uid} fam=$_familyId');
-  //   _taskSub?.cancel();
-  //   _taskSub = null;
-  //   _tasks.clear();
-  //   notifyListeners();
-  //
-  //   final user = _currentUser;
-  //   // 👇 Kullanıcı YOKSA veya familyId YOKSA bağlanma!
-  //   if (user == null || _familyId == null || _familyId!.isEmpty) {
-  //     _col = null;
-  //     debugPrint('[TaskCloud] SKIP (user/family null)');
-  //     return;
-  //   }
-  //
-  //   _col = FirebaseFirestore.instance
-  //       .collection('families')
-  //       .doc(_familyId!)
-  //       .collection('tasks');
-  //   debugPrint('[TaskCloud] PATH = families/$_familyId/tasks');
-  //
-  //   _taskSub = _col!
-  //       // .orderBy('createdAt', descending: true) // <-- ŞİMDİLİK KALDIR
-  //       .orderBy(FieldPath.documentId, descending: true) // güvenli
-  //       .snapshots()
-  //       .listen(
-  //         (qs) {
-  //           debugPrint('[TaskCloud] SNAP size=${qs.size}');
-  //           _tasks
-  //             ..clear()
-  //             ..addAll(
-  //               qs.docs.map((d) {
-  //                 final data = d.data();
-  //                 final t = Task(
-  //                   (data['name'] as String?)?.trim() ?? '',
-  //                   completed: (data['completed'] as bool?) ?? false,
-  //                   assignedTo: (data['assignedTo'] as String?)?.trim(),
-  //                 );
-  //                 t.remoteId = d.id;
-  //                 return t;
-  //               }),
-  //             );
-  //           notifyListeners();
-  //         },
-  //         onError: (e, st) {
-  //           debugPrint('[TaskCloud] STREAM ERROR: $e');
-  //         },
-  //       );
-  // }
-
   List<String> get suggestedTasks {
     final names = _tasks.map((e) => e.name).where((s) => s.isNotEmpty).toSet();
     return names.take(5).toList();
@@ -318,4 +268,6 @@ class TaskCloudProvider extends ChangeNotifier {
   void refreshNow() {
     _rebindTasks(); // mevcut stream'i iptal edip yeniden bağlar, _tasks'ı temizleyip yeniden doldurur
   }
+
+  void teardown() => setFamilyId(null);
 }

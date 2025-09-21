@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/view_section.dart';
+import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
@@ -192,6 +193,10 @@ class _HomePageState extends State<HomePage> {
                 tooltip: 'Sign out',
                 icon: const Icon(Icons.logout),
                 onPressed: () async {
+                  context.read<TaskCloudProvider>().teardown();
+                  context.read<ItemCloudProvider>().teardown();
+                  context.read<WeeklyCloudProvider>().teardown();
+                  context.read<ExpenseCloudProvider>().teardown();
                   await FirebaseAuth.instance.signOut();
                   if (!context.mounted) return;
                   Navigator.of(context).popUntil((r) => r.isFirst);

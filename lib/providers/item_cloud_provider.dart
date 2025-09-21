@@ -106,6 +106,8 @@ class ItemCloudProvider extends ChangeNotifier {
           },
           onError: (e, st) {
             debugPrint('[ItemCloud] STREAM ERROR: $e');
+            _items.clear();
+            notifyListeners();
           },
         );
   }
@@ -243,4 +245,6 @@ class ItemCloudProvider extends ChangeNotifier {
     _itemSub?.cancel();
     super.dispose();
   }
+
+  void teardown() => setFamilyId(null);
 }

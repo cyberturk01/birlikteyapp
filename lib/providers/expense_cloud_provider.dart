@@ -141,11 +141,15 @@ class ExpenseCloudProvider extends ChangeNotifier {
   }
 
   Future<void> remove(String id) async {
-    await _col!.doc(id).delete();
+    final c = _col;
+    if (c == null) throw StateError('[ExpenseCloud] No active familyId set');
+    await c.doc(id).delete();
   }
 
   Future<void> updateCategory(String id, String? category) async {
-    await _col!.doc(id).update({
+    final c = _col;
+    if (c == null) throw StateError('[ExpenseCloud] No active familyId set');
+    await c.doc(id).update({
       'category': (category?.trim().isEmpty ?? true) ? null : category!.trim(),
     });
   }
@@ -245,4 +249,6 @@ class ExpenseCloudProvider extends ChangeNotifier {
     }
     return map;
   }
+
+  void teardown() => setFamilyId(null);
 }

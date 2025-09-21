@@ -234,6 +234,7 @@ class _RootState extends State<_Root> {
     // Gerekli kutular
     await Future.wait([
       Hive.openBox('appBox'),
+      Hive.openBox<int>('weeklyNotifCloudBox'),
       Hive.openBox<String>('familyBox'),
       Hive.openBox<Task>('taskBox'),
       Hive.openBox<Item>('itemBox'),
@@ -243,7 +244,6 @@ class _RootState extends State<_Root> {
       Hive.openBox<int>('itemCountBox'),
       Hive.openBox<WeeklyTask>('weeklyBox'),
       Hive.openBox<int>('weeklyNotifBox'),
-      Hive.openBox<int>('weeklyNotifCloudBox'),
     ]);
 
     // İlk seed (sadece boşsa)

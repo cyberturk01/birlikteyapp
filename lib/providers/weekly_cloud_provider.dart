@@ -283,4 +283,7 @@ class WeeklyCloudProvider extends ChangeNotifier {
     _sub?.cancel();
     super.dispose();
   }
+
+  // istersen açık bir teardown metodu
+  void teardown() => setFamilyId(null);
 }
