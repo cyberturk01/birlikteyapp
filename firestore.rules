@@ -1,4 +1,3 @@
-// firestore.rules
 rules_version = '2';
 service cloud.firestore {
   match /databases/{db}/documents {
@@ -26,13 +25,11 @@ service cloud.firestore {
         );
     }
 
-    // --- Users: sadece kendi belgesi ---
     match /users/{uid} {
       allow read, create, update: if signedIn() && request.auth.uid == uid;
       allow delete: if false;
     }
 
-    // --- Family name reservations ---
     match /family_names/{nameLower} {
       allow get: if signedIn();
       allow list: if false;
@@ -47,16 +44,13 @@ service cloud.firestore {
       allow update: if false;
     }
 
-    // --- Families ---
     match /families/{fid} {
 
-      // Tekil doc erişimi: owner veya üye
+      // Owner veya üye doc'u okuyabilir
       allow get: if isOwner(fid) || isMember(fid);
-
-      // Koleksiyon düzeyi list/query kapalı (güvenlik + maliyet)
       allow list: if false;
 
-      // Create: sadece kendini owner yazarak ve rezerve isimle
+      // Create: yalnızca kendi adını owner olarak yazarak
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
         && (request.resource.data.members is map)
@@ -67,19 +61,22 @@ service cloud.firestore {
 
       // Update:
       allow update: if
-        // 1) owner her şeyi güncelleyebilir
+        // 1) Owner serbest
         isOwner(fid)
         ||
-        // 2) join: daha önce üye değilse kendini editor/viewer ekleyebilir
+        // 2) JOIN: üye değilken sadece kendini ekleyebilsin (merge ile)
         (
           signedIn()
           && familyExists(fid)
           && !(request.auth.uid in (resource.data.members is map ? resource.data.members.keys() : []))
           && (request.resource.data.members is map)
           && (request.resource.data.members[request.auth.uid] in ['editor','viewer'])
+          // sadece belirli alanlar değişsin
+          && request.resource.data.diff(resource.data).changedKeys()
+              .hasOnly(['members','memberNames','updatedAt'])
         )
         ||
-        // 3) Üye: güvenli alanlarla sınırlı
+        // 3) Üye: güvenli alanlar
         (
           isMember(fid)
           && request.resource.data.diff(resource.data).changedKeys()
@@ -90,41 +87,25 @@ service cloud.firestore {
       allow delete: if isOwner(fid);
 
       // ---- Subcollections ----
-
-      // tasks
       match /tasks/{tid} {
-        allow read: if isOwner(fid) || isMember(fid);
-        allow create, update, delete: if isOwner(fid) || isMember(fid);
+        allow read, create, update, delete: if isOwner(fid) || isMember(fid);
       }
-
-      // weekly  ✅ HATA DÜZELTİLDİ: isFamilyMember(...) yok; aynı mantık kullanılıyor
       match /weekly/{docId} {
-        allow read: if isOwner(fid) || isMember(fid);
-        allow create, update, delete: if isOwner(fid) || isMember(fid);
+        allow read, create, update, delete: if isOwner(fid) || isMember(fid);
       }
-
-      // expenses
       match /expenses/{eid} {
-        allow read: if isOwner(fid) || isMember(fid);
-        allow create, update, delete: if isOwner(fid) || isMember(fid);
+        allow read, create, update, delete: if isOwner(fid) || isMember(fid);
       }
-
-      // items
       match /items/{iid} {
-        allow read: if isOwner(fid) || isMember(fid);
-        allow create, update, delete: if isOwner(fid) || isMember(fid);
+        allow read, create, update, delete: if isOwner(fid) || isMember(fid);
       }
-
-      // diğer alt koleksiyonlar için genel kural
+      // diğer alt koleksiyonlar
       match /{sub=**}/{docId} {
-        allow read: if isOwner(fid) || isMember(fid);
-        allow create, update, delete: if isOwner(fid) || isMember(fid);
+        allow read, create, update, delete: if isOwner(fid) || isMember(fid);
       }
     }
 
-    // --- Invites ---
     match /invites/{code} {
-      // Tekil doc GET serbest; list kapalı
       allow get: if signedIn();
       allow list: if false;
 

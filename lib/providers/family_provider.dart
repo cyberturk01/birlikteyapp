@@ -173,8 +173,13 @@ class FamilyProvider extends ChangeNotifier {
         final s = await usersRef.get(const GetOptions(source: Source.server));
         final cloud = (s.data()?['activeFamilyId'] as String?)?.trim();
         if (cloud != null && cloud.isNotEmpty) {
-          await _persistActive(cloud, ownerUid: uid);
-          return;
+          if (await _amIMemberOf(cloud)) {
+            await _persistActive(cloud, ownerUid: uid);
+            return;
+          } else {
+            // Ben üye değilim → temizle
+            await _familyBox.delete(_kActiveFamilyKey);
+          }
         }
       } catch (_) {}
 
@@ -331,6 +336,7 @@ class FamilyProvider extends ChangeNotifier {
   Future<void> adoptActiveFromCloud(String famId) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
+    if (!await _amIMemberOf(famId)) return;
     await _persistActive(famId, ownerUid: uid);
   }
 
@@ -405,7 +411,6 @@ class FamilyProvider extends ChangeNotifier {
     if (famId == null || famId.isEmpty) return Stream.value(const <String>[]);
 
     final me = FirebaseAuth.instance.currentUser;
-    final myLabel = 'You (${(me?.email ?? 'me').split('@').first})';
 
     return FirebaseFirestore.instance
         .collection('families')
@@ -422,6 +427,15 @@ class FamilyProvider extends ChangeNotifier {
           final data = doc.data() ?? {};
           final members = (data['members'] as Map<String, dynamic>? ?? {});
           final namesMap = (data['memberNames'] as Map<String, dynamic>? ?? {});
+          final meUid = FirebaseAuth.instance.currentUser?.uid;
+
+          if (meUid != null && !members.containsKey(meUid)) {
+            // Artık üye değilim → aktif aileyi düşür
+            _familyId = null;
+            _familyBox.delete(_kActiveFamilyKey);
+            notifyListeners(); // UI onboarding’e döner
+            return <String>[];
+          }
 
           // UID’leri tekilleştir + sıralı
           final uids = members.keys.toSet().toList()..sort();
@@ -453,6 +467,33 @@ class FamilyProvider extends ChangeNotifier {
           }
           return true;
         });
+  }
+
+  Future<bool> amIOwner() async {
+    final fid = _familyId;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (fid == null || uid == null) return false;
+    final doc = await FirebaseFirestore.instance
+        .collection('families')
+        .doc(fid)
+        .get();
+    return (doc.data()?['ownerUid'] == uid);
+  }
+
+  Future<bool> _amIMemberOf(String famId) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return false;
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('families')
+          .doc(famId)
+          .get();
+      if (!snap.exists) return false;
+      final m = (snap.data()?['members'] as Map<String, dynamic>? ?? {});
+      return m.containsKey(uid);
+    } catch (e) {
+      return false;
+    }
   }
 
   Stream<List<String>> watchMemberNames() {
@@ -679,6 +720,101 @@ class FamilyProvider extends ChangeNotifier {
 
   /// (İsteğe bağlı) davet kodunu gösterip kopyalamak için zaten getInviteCode() var.
 }
+
+Future<void> removeMemberFromFamilyAndFixAssignments({
+  required String familyId,
+  required String memberUid,
+  required String memberLabelText, // "nuran" ya da "You (nuran)"
+  ReassignStrategy strategy = ReassignStrategy.leaveAsText,
+  String? reassignToLabel, // "You (gokhan)" gibi
+}) async {
+  final db = FirebaseFirestore.instance;
+
+  // 1) Aile dokümanında üyeyi ve görünen adını sil
+  final famRef = db.doc('families/$familyId');
+  final famSnap = await famRef.get();
+  if (!famSnap.exists) return;
+
+  final batch1 = db.batch();
+  batch1.update(famRef, {
+    'members.$memberUid': FieldValue.delete(),
+    'memberNames.$memberUid': FieldValue.delete(), // <-- memberLabels değil
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
+  await batch1.commit();
+
+  // 2) Kullanıcının user dokümanı: families array’inden bu aileyi çıkar,
+  //    activeFamilyId bu aile ise temizle (koşullu).
+  final userRef = db.doc('users/$memberUid');
+  await db.runTransaction((txn) async {
+    final uSnap = await txn.get(userRef);
+    if (!uSnap.exists) return;
+    final data = uSnap.data() as Map<String, dynamic>;
+    final active = (data['activeFamilyId'] as String?) ?? '';
+    final updates = <String, dynamic>{
+      'families': FieldValue.arrayRemove([familyId]),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    if (active == familyId) {
+      // temizle; istersen null da verebilirsin
+      updates['activeFamilyId'] = FieldValue.delete();
+    }
+    txn.set(userRef, updates, SetOptions(merge: true));
+  });
+
+  // 3) (Opsiyonel) görev & market atamalarını düzelt
+  if (strategy != ReassignStrategy.leaveAsText) {
+    bool matchesLabel(String s) {
+      if (s == memberLabelText) return true;
+      // "You (xxx)" <-> "xxx" simetrik eşleşme
+      final re = RegExp(r'^You \((.+)\)$');
+      final m1 = re.firstMatch(s);
+      final m2 = re.firstMatch(memberLabelText);
+      if (m1 != null && m1.group(1) == memberLabelText) return true;
+      if (m2 != null && m2.group(1) == s) return true;
+      return false;
+    }
+
+    // küçük batch’lerle yaz (500 limitini aşmamak için)
+    Future<void> _fixCol(String col, String field) async {
+      final snap = await db.collection('families/$familyId/$col').get();
+      var writes = db.batch();
+      var count = 0;
+      for (final d in snap.docs) {
+        final m = d.data();
+        final at = (m[field] as String?)?.trim() ?? '';
+        if (at.isEmpty) continue;
+        if (!matchesLabel(at)) continue;
+
+        String? newVal;
+        switch (strategy) {
+          case ReassignStrategy.unassign:
+            newVal = null;
+            break;
+          case ReassignStrategy.reassignTo:
+            newVal = reassignToLabel; // "You (gokhan)" gibi
+            break;
+          case ReassignStrategy.leaveAsText:
+            newVal = at;
+            break;
+        }
+        writes.update(d.reference, {field: newVal});
+        count++;
+        if (count % 400 == 0) {
+          // güvenli sınır
+          await writes.commit();
+          writes = db.batch();
+        }
+      }
+      await writes.commit();
+    }
+
+    await _fixCol('tasks', 'assignedTo');
+    await _fixCol('items', 'assignedTo');
+  }
+}
+
+enum ReassignStrategy { unassign, reassignTo, leaveAsText }
 
 class FamilyMemberEntry {
   final String uid;
