@@ -20,7 +20,7 @@ import 'member_card.dart';
 
 class HomePage extends StatefulWidget {
   final String? initialFilterMember;
-  const HomePage({Key? key, this.initialFilterMember}) : super(key: key);
+  const HomePage({super.key, this.initialFilterMember});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -42,7 +42,6 @@ class _HomePageState extends State<HomePage> {
     );
     // initialFilterMember geldiyse index’e çevir
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // final target = widget.initialFilterMember;
       final weekly = context.read<WeeklyProvider>();
       final taskProv = context.read<TaskCloudProvider>();
       await weekly.ensureTodaySynced(taskProv);
@@ -58,20 +57,6 @@ class _HomePageState extends State<HomePage> {
   void _jumpTo(HomeSection s) {
     if (_section == s) return;
     setState(() => _section = s);
-
-    // Eğer "sekme değişince aktif üyeye hafif scroll" istersen:
-    // if (_pageController.hasClients) {
-    //   _pageController.animateToPage(_activeIndex,
-    //     duration: const Duration(milliseconds: 120), curve: Curves.easeOut);
-    // }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // final family = context.watch<FamilyProvider>().familyMembers;
-    // // İlk kez: aktif yoksa ilk kişiyi seç
-    // _activeMember ??= family.isNotEmpty ? family.first : null;
   }
 
   @override
@@ -89,6 +74,7 @@ class _HomePageState extends State<HomePage> {
         context.read<TaskCloudProvider>().setFamilyId(familyId);
         context.read<ItemCloudProvider>().setFamilyId(familyId);
         context.read<WeeklyCloudProvider>().setFamilyId(familyId);
+        context.read<ExpenseCloudProvider>().setFamilyId(familyId);
       });
       _cloudBound = true;
     }
@@ -141,13 +127,15 @@ class _HomePageState extends State<HomePage> {
 
         final tasks = context.watch<TaskCloudProvider>().tasks;
         final items = context.watch<ItemCloudProvider>().items;
+        final h = MediaQuery.of(context).size.height;
+        final isShort = h < 640;
         debugPrint('Home labels=$labels');
         return Scaffold(
           appBar: AppBar(
             title: Row(
               children: const [
                 Icon(Icons.family_restroom),
-                SizedBox(width: 8),
+                SizedBox(width: 4),
                 Text('Togetherly'),
               ],
             ),
@@ -157,16 +145,16 @@ class _HomePageState extends State<HomePage> {
                 icon: const Icon(Icons.group),
                 onPressed: () => showFamilyManager(context),
               ),
-              IconButton(
-                tooltip: 'Weekly plan',
-                icon: const Icon(Icons.calendar_today),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const WeeklyPage()),
-                  );
-                },
-              ),
+              // IconButton(
+              //   tooltip: 'Weekly plan',
+              //   icon: const Icon(Icons.calendar_today),
+              //   onPressed: () {
+              //     Navigator.push(
+              //       context,
+              //       MaterialPageRoute(builder: (_) => const WeeklyPage()),
+              //     );
+              //   },
+              // ),
               IconButton(
                 tooltip: 'Add Center',
                 icon: const Icon(Icons.add_circle_outline),
@@ -205,100 +193,121 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           body: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                DashboardSummaryBar(
-                  onTap: (dest) {
-                    setState(() {
-                      switch (dest) {
-                        case SummaryDest.tasks:
-                          _section = HomeSection.tasks;
-                          break;
-                        case SummaryDest.items:
-                          _section = HomeSection.items;
-                          break;
-                        case SummaryDest.expenses:
-                          _section = HomeSection.expenses;
-                          break;
-                        case SummaryDest.weekly:
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const WeeklyPage(),
+            padding: const EdgeInsets.fromLTRB(10, 0, 10, 25),
+            child: LayoutBuilder(
+              builder: (ctx, c) {
+                final content = Column(
+                  children: [
+                    DashboardSummaryBar(
+                      onTap: (dest) {
+                        setState(() {
+                          switch (dest) {
+                            case SummaryDest.tasks:
+                              _section = HomeSection.tasks;
+                              break;
+                            case SummaryDest.items:
+                              _section = HomeSection.items;
+                              break;
+                            case SummaryDest.expenses:
+                              _section = HomeSection.expenses;
+                              break;
+                            case SummaryDest.weekly:
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const WeeklyPage(),
+                                ),
+                              );
+                              return;
+                          }
+                        });
+                      },
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    // === ANA SWIPER ===
+                    Expanded(
+                      child: PageView.builder(
+                        controller: _pageController, // <-- DÜZELTME
+                        physics: const BouncingScrollPhysics(),
+                        onPageChanged: (i) => setState(() => _activeIndex = i),
+                        itemCount: orderedLabels.length,
+                        itemBuilder: (context, i) {
+                          final name = orderedLabels[i];
+                          final uid = orderedUids[i];
+                          final memberTasks = tasks
+                              .where(
+                                (t) => _matchesAssignee(t.assignedTo, name),
+                              )
+                              .toList();
+                          final memberItems = items
+                              .where(
+                                (it) => _matchesAssignee(it.assignedTo, name),
+                              )
+                              .toList();
+
+                          final card = (_section == HomeSection.expenses)
+                              ? ExpensesCard(memberUid: uid)
+                              : MemberCard(
+                                  memberName: name,
+                                  tasks: memberTasks,
+                                  items: memberItems,
+                                  section: _section,
+                                  onJumpSection: _jumpTo,
+                                );
+
+                          final versionKey = ValueKey<String>(
+                            'member-$i-t${memberTasks.length}-i${memberItems.length}-s${_section.name}',
+                          );
+                          return Center(
+                            child: _MemberPageKeepAlive(
+                              key: PageStorageKey('member-page-$i'),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 180),
+                                  child: KeyedSubtree(
+                                    key: versionKey,
+                                    child: card,
+                                  ),
+                                ),
+                              ),
                             ),
                           );
-                          return;
-                      }
-                    });
-                  },
-                ),
+                        },
+                      ),
+                    ),
 
-                const SizedBox(height: 4),
+                    const SizedBox(height: 4),
 
-                // === ANA SWIPER ===
-                Expanded(
-                  child: PageView.builder(
-                    controller: _pageController, // <-- DÜZELTME
-                    physics: const BouncingScrollPhysics(),
-                    onPageChanged: (i) => setState(() => _activeIndex = i),
-                    itemCount: orderedLabels.length,
-                    itemBuilder: (context, i) {
-                      final name = orderedLabels[i];
-                      final uid = orderedUids[i];
-                      final memberTasks = tasks
-                          .where((t) => _matchesAssignee(t.assignedTo, name))
-                          .toList();
-                      final memberItems = items
-                          .where((it) => _matchesAssignee(it.assignedTo, name))
-                          .toList();
-
-                      final card = (_section == HomeSection.expenses)
-                          ? ExpensesCard(memberUid: uid)
-                          : MemberCard(
-                              memberName: name,
-                              tasks: memberTasks,
-                              items: memberItems,
-                              section: _section,
-                              onJumpSection: _jumpTo,
-                            );
-
-                      final versionKey = ValueKey<String>(
-                        'member-$i-t${memberTasks.length}-i${memberItems.length}-s${_section.name}',
-                      );
-                      return Center(
-                        child: _MemberPageKeepAlive(
-                          key: PageStorageKey('member-page-$i'),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 180),
-                              child: KeyedSubtree(key: versionKey, child: card),
-                            ),
-                          ),
+                    // === MİNİ BAR ===
+                    MiniMembersBar(
+                      names: orderedLabels,
+                      activeIndex: _activeIndex,
+                      onPickIndex: (i) {
+                        setState(() => _activeIndex = i);
+                        _pageController.animateToPage(
+                          i,
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOutCubic,
+                        );
+                      },
+                    ),
+                    if (!isShort) const SizedBox(height: 12),
+                  ],
+                );
+                return isShort
+                    ? SingleChildScrollView(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minHeight: c.maxHeight),
+                          child: content,
                         ),
-                      );
-                    },
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // === MİNİ BAR ===
-                MiniMembersBar(
-                  names: orderedLabels,
-                  activeIndex: _activeIndex,
-                  onPickIndex: (i) {
-                    setState(() => _activeIndex = i);
-                    _pageController.animateToPage(
-                      i,
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeOutCubic,
-                    );
-                  },
-                ),
-                const SizedBox(height: 26),
-              ],
+                      )
+                    : content;
+              },
             ),
           ),
         );
@@ -326,57 +335,6 @@ class _MemberPageKeepAliveState extends State<_MemberPageKeepAlive>
     return widget.child;
   }
 }
-
-// // Küçük dikdörtgen member kutusu:
-// class _MiniMemberTile extends StatelessWidget {
-//   final String name;
-//   final VoidCallback onTap;
-//   const _MiniMemberTile({required this.name, required this.onTap});
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
-//     final theme = Theme.of(context);
-//     return Card(
-//       elevation: 2,
-//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-//       clipBehavior: Clip.antiAlias,
-//       child: InkWell(
-//         onTap: onTap,
-//         child: Padding(
-//           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-//           child: Row(
-//             children: [
-//               CircleAvatar(radius: 16, child: Text(initial)),
-//               const SizedBox(width: 8),
-//               Expanded(
-//                 child: Text(
-//                   name,
-//                   maxLines: 1,
-//                   overflow: TextOverflow.ellipsis,
-//                   style: theme.textTheme.bodyMedium?.copyWith(
-//                     fontWeight: FontWeight.w600,
-//                   ),
-//                 ),
-//               ),
-//               const Icon(Icons.chevron_right, size: 18),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-// }
-//
-// List<String> _orderWithMeFirst(List<String> labels) {
-//   // FamilyProvider.watchMemberLabels() şu cihazdaki kullanıcıyı hep "You (...)" olarak döndürür.
-//   final idx = labels.indexWhere((s) => s.startsWith('You ('));
-//   if (idx <= 0) return labels;
-//   final copy = [...labels];
-//   final me = copy.removeAt(idx);
-//   copy.insert(0, me);
-//   return copy;
-// }
 
 bool _matchesAssignee(String? assignedTo, String cardLabel) {
   if (assignedTo == null || assignedTo.trim().isEmpty) return false;

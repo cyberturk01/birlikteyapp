@@ -60,6 +60,12 @@ class ExpenseCloudProvider extends ChangeNotifier {
 
   void updateAuthAndDb(FirebaseAuth a, FirebaseFirestore d) {}
 
+  List<ExpenseDoc> get all {
+    final list = _expenses.toList();
+    list.sort((a, b) => b.date.compareTo(a.date)); // newest first
+    return list;
+  }
+
   void setFamilyId(String? fid) {
     if (_familyId == fid) return;
     _familyId = fid;

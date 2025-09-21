@@ -95,15 +95,15 @@ class TasksSection extends StatelessWidget {
                   vertical: -2,
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                leading: IconButton(
-                  tooltip: isDone ? 'Mark as pending' : 'Mark as completed',
-                  icon: Icon(
-                    isDone
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                  ),
-                  onPressed: () => onToggleTask(task),
-                ),
+                // leading: IconButton(
+                //   tooltip: isDone ? 'Mark as pending' : 'Mark as completed',
+                //   // icon: Icon(
+                //   //   isDone
+                //   //       ? Icons.radio_button_checked
+                //   //       : Icons.radio_button_unchecked,
+                //   // ),
+                //   onPressed: () => onToggleTask(task),
+                // ),
                 title: Text(
                   '${task.name}${(task.assignedTo != null && task.assignedTo!.isNotEmpty) ? " " : ""}',
                   overflow: TextOverflow.ellipsis,
@@ -225,14 +225,14 @@ class ItemsSection extends StatelessWidget {
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 0),
                 onTap: () => onToggleItem(it),
-                leading: IconButton(
-                  icon: Icon(
-                    bought
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                  ),
-                  onPressed: () => onToggleItem(it),
-                ),
+                // leading: IconButton(
+                //   icon: Icon(
+                //     bought
+                //         ? Icons.radio_button_checked
+                //         : Icons.radio_button_unchecked,
+                //   ),
+                //   onPressed: () => onToggleItem(it),
+                // ),
                 title: Text(
                   '${it.name}${(it.assignedTo != null && it.assignedTo!.isNotEmpty) ? " " : ""}',
                   overflow: TextOverflow.ellipsis,

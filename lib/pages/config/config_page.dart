@@ -131,44 +131,8 @@ class ConfigurationPage extends StatelessWidget {
           ),
           const Divider(),
           const SizedBox(height: 8),
-
-          // === Reminders ===
-          Text('Reminders', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 6),
-          ListTile(
-            leading: const Icon(Icons.access_time),
-            title: const Text('Weekly default reminder time'),
-            subtitle: Text(_fmt(current)),
-            trailing: const Icon(Icons.edit),
-            onTap: () async {
-              final picked = await showTimePicker(
-                context: context,
-                initialTime: current,
-                builder: (ctx, child) => MediaQuery(
-                  data: MediaQuery.of(
-                    ctx,
-                  ).copyWith(alwaysUse24HourFormat: true),
-                  child: child ?? const SizedBox.shrink(),
-                ),
-              );
-              if (picked != null) {
-                await context.read<UiProvider>().setWeeklyDefaultReminder(
-                  picked,
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Default weekly reminder time saved'),
-                  ),
-                );
-              }
-            },
-          ),
-          const Divider(height: 24),
           // === Debug / Notifications ===
-          Text(
-            'Debug / Notifications',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          Text('Notifications', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
@@ -212,13 +176,6 @@ class ConfigurationPage extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            icon: const Icon(Icons.check),
-            label: const Text('Apply & Close'),
-            onPressed: () => Navigator.pop(context),
           ),
         ],
       ),

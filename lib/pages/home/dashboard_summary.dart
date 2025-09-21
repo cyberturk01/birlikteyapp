@@ -1,15 +1,20 @@
 // lib/pages/home/dashboard_summary.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/expense.dart';
+import '../../models/item.dart';
+import '../../models/task.dart';
 import '../../models/weekly_task.dart';
-import '../../providers/expense_provider.dart';
+import '../../providers/expense_cloud_provider.dart';
+import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/weekly_provider.dart';
-import '../../widgets/quick_overview_sheets.dart';
+import '../../widgets/member_dropdown.dart';
 import '../../widgets/section_lists.dart';
+import 'grouped_sheet.dart';
 
 enum SummaryDest { tasks, items, weekly, expenses }
 
@@ -50,13 +55,21 @@ class DashboardSummaryBar extends StatelessWidget {
     final List<WeeklyTask> todaysWeekly =
         weeklyProv?.tasksForDay(todayName) ?? const [];
 
-    // (Opsiyonel) Expenses — yoksa 0/boş gösteririz.
-    final expProv = Provider.of<ExpenseProvider?>(context, listen: true);
-    final expenses = expProv?.all ?? const <Expense>[];
+    final expProv = context.watch<ExpenseCloudProvider>();
+    final expensesWatch = expProv.all;
 
     final pendingTasks = tasks.where((t) => !t.completed).length;
     final toBuyItems = items.where((i) => !i.bought).length;
-    final todayExpenses = expenses.length;
+    final now = DateTime.now();
+    final todayOnly = expensesWatch.where((e) {
+      final d = DateUtils.dateOnly(e.date); // e.date bir DateTime olmalı
+      return d.year == now.year && d.month == now.month;
+    }).toList();
+
+    final todayExpenses = todayOnly.length;
+    debugPrint(
+      '[Summary] expenses(all)=${expensesWatch.length}, today=$todayExpenses',
+    );
 
     return LayoutBuilder(
       builder: (context, c) {
@@ -128,6 +141,371 @@ class DashboardSummaryBar extends StatelessWidget {
       },
     );
   }
+}
+
+Future<void> _showGroupedSheet<T>({
+  required BuildContext context,
+  required String Function(BuildContext ctx, List<T> list) titleBuilder,
+  required Iterable<T> Function(BuildContext ctx) sourceSelector,
+  // required IconData leadingIcon,
+  required void Function(BuildContext ctx, T item) onTogglePrimary,
+  required void Function(BuildContext ctx, T item) onDelete,
+  required String Function(T item) getName,
+  required String Function(T item) getAssignedTo,
+  required String sectionTitle,
+  void Function(BuildContext ctx, T item)? onEdit,
+  void Function(BuildContext ctx, T item)? onAssign,
+}) async {
+  await showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (sheetCtx) {
+      return StatefulBuilder(
+        builder: (ctx, setLocal) {
+          // her setLocal’da veriyi taze çek
+          final list = sourceSelector(ctx).toList();
+
+          Future<void> runAndRefresh(FutureOr<void> Function() fn) async {
+            await Future.sync(fn);
+            if (ctx.mounted) setLocal(() {});
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 12,
+              right: 12,
+              top: 12,
+              bottom: 12 + MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 38,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(ctx).dividerColor,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        titleBuilder(ctx, list),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                if (list.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    child: Text('No ${sectionTitle.toLowerCase()}'),
+                  )
+                else
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      itemCount: list.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (_, i) {
+                        final e = list[i];
+                        final who = getAssignedTo(e);
+
+                        return ListTile(
+                          dense: false,
+                          visualDensity: const VisualDensity(
+                            horizontal: -3,
+                            vertical: -3,
+                          ),
+                          minLeadingWidth: 30,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                          ),
+                          // leading: Icon(leadingIcon, size: 20),
+                          title: Text(
+                            getName(e),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: who.isEmpty ? null : Text('👤 $who'),
+                          trailing: Wrap(
+                            spacing: 0,
+                            children: [
+                              if (onAssign != null)
+                                IconButton(
+                                  tooltip: 'Assign',
+                                  icon: const Icon(
+                                    Icons.person_add_alt,
+                                    size: 20,
+                                  ),
+                                  onPressed: () =>
+                                      runAndRefresh(() => onAssign(ctx, e)),
+                                ),
+                              if (onEdit != null)
+                                IconButton(
+                                  tooltip: 'Edit',
+                                  icon: const Icon(Icons.edit, size: 20),
+                                  onPressed: () =>
+                                      runAndRefresh(() => onEdit(ctx, e)),
+                                ),
+                              IconButton(
+                                tooltip: 'Delete',
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.redAccent,
+                                  size: 20,
+                                ),
+                                onPressed: () =>
+                                    runAndRefresh(() => onDelete(ctx, e)),
+                              ),
+                            ],
+                          ),
+                          onTap: () =>
+                              runAndRefresh(() => onTogglePrimary(ctx, e)),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+Future<void> showPendingTasksSheet(BuildContext context) async {
+  await showGroupedByMemberSheet<Task>(
+    context: context,
+    titleAll: 'Pending tasks',
+    titleMine: 'My tasks',
+    titleUnassigned: 'Unassigned',
+    sourceSelector: (ctx) =>
+        ctx.watch<TaskCloudProvider>().tasks.where((t) => !t.completed),
+    getName: (t) => t.name,
+    getAssignedTo: (t) => (t.assignedTo ?? '').trim(),
+    onTogglePrimary: (ctx, t) =>
+        ctx.read<TaskCloudProvider>().toggleTask(t, true),
+    onDelete: (ctx, t) => ctx.read<TaskCloudProvider>().removeTask(t),
+    onEdit: (ctx, t) => _showRenameTaskDialog(ctx, t),
+    onAssign: (ctx, t) => _showAssignTaskSheet(ctx, t),
+  );
+}
+
+Future<void> showToBuyItemsSheet(BuildContext context) async {
+  await showGroupedByMemberSheet<Item>(
+    context: context,
+    titleAll: 'To buy',
+    titleMine: 'My list',
+    titleUnassigned: 'Unassigned',
+    sourceSelector: (ctx) =>
+        ctx.watch<ItemCloudProvider>().items.where((i) => !i.bought),
+    getName: (it) => it.name,
+    getAssignedTo: (it) => (it.assignedTo ?? '').trim(),
+    onTogglePrimary: (ctx, it) =>
+        ctx.read<ItemCloudProvider>().toggleItem(it, true),
+    onDelete: (ctx, it) => ctx.read<ItemCloudProvider>().removeItem(it),
+    onEdit: (ctx, it) => _showRenameItemDialog(ctx, it),
+    onAssign: (ctx, it) => _showAssignItemSheet(ctx, it),
+  );
+}
+
+void _showRenameTaskDialog(BuildContext context, Task task) {
+  final ctrl = TextEditingController(text: task.name);
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Edit task'),
+      content: TextField(
+        controller: ctrl,
+        autofocus: true,
+        decoration: const InputDecoration(
+          border: OutlineInputBorder(),
+          hintText: 'Task name',
+          isDense: true,
+        ),
+        onSubmitted: (_) {
+          context.read<TaskCloudProvider>().renameTask(task, ctrl.text.trim());
+          Navigator.pop(context);
+        },
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            context.read<TaskCloudProvider>().renameTask(
+              task,
+              ctrl.text.trim(),
+            );
+            Navigator.pop(context);
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  );
+}
+
+void _showRenameItemDialog(BuildContext context, Item item) {
+  final ctrl = TextEditingController(text: item.name);
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Edit item'),
+      content: TextField(
+        controller: ctrl,
+        autofocus: true,
+        decoration: const InputDecoration(
+          border: OutlineInputBorder(),
+          hintText: 'Item name',
+          isDense: true,
+        ),
+        onSubmitted: (_) {
+          context.read<ItemCloudProvider>().renameItem(item, ctrl.text.trim());
+          Navigator.pop(context);
+        },
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            context.read<ItemCloudProvider>().renameItem(
+              item,
+              ctrl.text.trim(),
+            );
+            Navigator.pop(context);
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  );
+}
+
+void _showAssignTaskSheet(BuildContext context, Task task) {
+  String? selected = task.assignedTo;
+  final taskCloud = context.read<TaskCloudProvider>();
+  showModalBottomSheet(
+    context: context,
+    builder: (_) => Padding(
+      padding: const EdgeInsets.all(16),
+      child: StatefulBuilder(
+        builder: (ctx, setLocal) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Assign task',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            MemberDropdown(
+              value: selected,
+              onChanged: (v) => setLocal(() => selected = v),
+              label: 'Assign to',
+              nullLabel: 'No one',
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () async {
+                  await taskCloud.updateAssignment(
+                    task,
+                    (selected != null && selected!.trim().isNotEmpty)
+                        ? selected
+                        : null,
+                  );
+                  taskCloud.refreshNow();
+                  if (context.mounted) Navigator.pop(context);
+                },
+                child: const Text('Save'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+void _showAssignItemSheet(BuildContext context, Item item) {
+  String? selected = item.assignedTo;
+  showModalBottomSheet(
+    context: context,
+    builder: (_) => Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Assign item',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          StreamBuilder<List<String>>(
+            stream: context.read<FamilyProvider>().watchMemberLabels(),
+            builder: (ctx, snap) {
+              final labels = (snap.data ?? const <String>[]).toSet().toList();
+              final items = <DropdownMenuItem<String>>[
+                const DropdownMenuItem(value: '', child: Text('No one')),
+                ...labels.map(
+                  (m) => DropdownMenuItem(value: m, child: Text(m)),
+                ),
+              ];
+              final value = labels.contains(selected) ? selected! : '';
+              return DropdownButtonFormField<String>(
+                value: value,
+                isExpanded: true,
+                items: items,
+                onChanged: (v) => selected = v ?? '',
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () {
+                context.read<ItemCloudProvider>().updateAssignment(
+                  item,
+                  (selected != null && selected!.trim().isNotEmpty)
+                      ? selected
+                      : null,
+                );
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 Future<void> showPendingTasksDialog(BuildContext context) async {
