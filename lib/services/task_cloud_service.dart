@@ -18,7 +18,7 @@ class TaskCloudService {
     return Task(
         data['name'] as String,
         completed: (data['completed'] as bool?) ?? false,
-        assignedTo: data['assignedTo'] as String?,
+        assignedToUid: data['assignedToUid'] as String?,
       )
       ..remoteId =
           d.id; // Task’a String? remoteId alanı ekleyebilirsin (opsiyonel)
@@ -27,7 +27,7 @@ class TaskCloudService {
   Map<String, dynamic> _toMap(Task t) => {
     'name': t.name,
     'completed': t.completed,
-    'assignedTo': t.assignedTo,
+    'assignedToUid': t.assignedToUid,
     'updatedAt': FieldValue.serverTimestamp(),
   };
 
@@ -51,11 +51,11 @@ class TaskCloudService {
     });
   }
 
-  Future<void> updateAssignment(Task t, String? member) async {
+  Future<void> updateAssignment(Task t, String? memberUid) async {
     final id = t.remoteId;
     if (id == null) return;
     await _col.doc(id).update({
-      'assignedTo': member,
+      'assignedToUid': memberUid,
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
@@ -69,7 +69,7 @@ class TaskCloudService {
   Future<void> clearCompleted({String? forMember}) async {
     Query<Map<String, dynamic>> q = _col.where('completed', isEqualTo: true);
     if (forMember != null) {
-      q = q.where('assignedTo', isEqualTo: forMember);
+      q = q.where('assignedToUid', isEqualTo: forMember);
     }
     final snap = await q.get();
     for (final d in snap.docs) {

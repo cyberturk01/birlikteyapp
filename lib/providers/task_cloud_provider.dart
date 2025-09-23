@@ -20,6 +20,9 @@ class TaskCloudProvider extends ChangeNotifier {
   final List<Task> _tasks = [];
   List<Task> get tasks => List.unmodifiable(_tasks);
 
+  String? _lastError;
+  String? get lastError => _lastError;
+
   // Abonelikler
   StreamSubscription<User?>? _authSub;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _taskSub;
@@ -66,6 +69,13 @@ class TaskCloudProvider extends ChangeNotifier {
     _bindAuth();
   }
 
+  void _setError(String? msg) {
+    _lastError = msg;
+    notifyListeners();
+  }
+
+  void clearError() => _setError(null);
+
   void _rebindTasks() {
     debugPrint('[TaskCloud] REBIND → user=${_currentUser?.uid} fam=$_familyId');
 
@@ -103,16 +113,22 @@ class TaskCloudProvider extends ChangeNotifier {
                   final t = Task(
                     (data['name'] as String?)?.trim() ?? '',
                     completed: (data['completed'] as bool?) ?? false,
-                    assignedTo: (data['assignedTo'] as String?)?.trim(),
+                    assignedToUid:
+                        ((data['assignedToUid'] ?? data['assignedTo'])
+                                as String?)
+                            ?.trim(),
+                    origin: data['origin'] as String?,
                   );
                   t.remoteId = d.id;
                   return t;
                 }),
               );
+            _setError(null);
             notifyListeners();
           },
           onError: (e, st) {
             debugPrint('[TaskCloud] STREAM ERROR: $e');
+            _setError('Tasks: $e'); // UI’da banner çıkacak
           },
         );
   }
@@ -130,7 +146,8 @@ class TaskCloudProvider extends ChangeNotifier {
     final doc = await col.add({
       'name': t.name,
       'completed': t.completed,
-      'assignedTo': t.assignedTo,
+      'assignedToUid': t.assignedToUid,
+      if (t.origin != null) 'origin': t.origin,
       'createdAt': FieldValue.serverTimestamp(),
     });
     debugPrint('[TaskCloud] ADDED id=${doc.id}');
@@ -147,7 +164,7 @@ class TaskCloudProvider extends ChangeNotifier {
     final col = _ensureCol();
     Query<Map<String, dynamic>> q = col.where('completed', isEqualTo: true);
     if (forMember != null) {
-      q = q.where('assignedTo', isEqualTo: forMember);
+      q = q.where('assignedToUid', isEqualTo: forMember);
     }
     final snap = await q.get();
     for (final d in snap.docs) {
@@ -170,7 +187,7 @@ class TaskCloudProvider extends ChangeNotifier {
   // TaskCloudProvider.dart
   List<Task> addTasksBulk(
     List<String> names, {
-    String? assignedTo,
+    String? assignedToUid,
     bool skipDuplicates = true,
   }) {
     final created = <Task>[];
@@ -181,7 +198,7 @@ class TaskCloudProvider extends ChangeNotifier {
       if (name.isEmpty) continue;
       if (skipDuplicates && existing.contains(name.toLowerCase())) continue;
 
-      final t = Task(name, assignedTo: assignedTo);
+      final t = Task(name, assignedToUid: assignedToUid);
       _tasks.add(t);
       created.add(t);
     }
@@ -219,7 +236,7 @@ class TaskCloudProvider extends ChangeNotifier {
     final doc = await col.add({
       'name': t.name,
       'completed': t.completed,
-      'assignedTo': t.assignedTo, // null olabilir
+      'assignedToUid': t.assignedToUid, // null olabilir
       'createdAt': FieldValue.serverTimestamp(),
     });
     t.remoteId = doc.id;
@@ -227,16 +244,25 @@ class TaskCloudProvider extends ChangeNotifier {
   }
 
   // TaskCloudProvider.updateAssignment(...)
-  Future<void> updateAssignment(Task t, String? member) async {
+  Future<void> updateAssignment(Task t, String? memberUid) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
-    await col.doc(id).update({'assignedTo': member});
+    await col.doc(id).update({
+      'assignedToUid': (memberUid == null || memberUid.trim().isEmpty)
+          ? FieldValue.delete()
+          : memberUid.trim(),
+    });
+    t.assignedToUid = (memberUid?.trim().isEmpty ?? true)
+        ? null
+        : memberUid!.trim();
 
-    // 👇 Optimistic local update
     final idx = _tasks.indexWhere((x) => x.remoteId == id);
     if (idx != -1) {
-      _tasks[idx] = Task(t.name, completed: t.completed, assignedTo: member)
-        ..remoteId = id;
+      _tasks[idx] = Task(
+        t.name,
+        completed: t.completed,
+        assignedToUid: memberUid,
+      )..remoteId = id;
       notifyListeners();
     }
   }

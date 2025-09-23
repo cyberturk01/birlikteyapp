@@ -20,6 +20,9 @@ class WeeklyCloudProvider extends ChangeNotifier {
   final List<WeeklyTaskCloud> _list = [];
   List<WeeklyTaskCloud> get tasks => List.unmodifiable(_list);
 
+  String? _lastError;
+  String? get lastError => _lastError;
+
   /// Bildirim id’leri: key=docId, value=notificationId
   final Box<int> _notifBox = Hive.box<int>('weeklyNotifCloudBox');
 
@@ -31,6 +34,13 @@ class WeeklyCloudProvider extends ChangeNotifier {
     _rebind();
   }
 
+  void _setError(String? msg) {
+    _lastError = msg;
+    notifyListeners();
+  }
+
+  void clearError() => _setError(null);
+
   void _rebind() {
     _sub?.cancel();
     _list.clear();
@@ -40,21 +50,29 @@ class WeeklyCloudProvider extends ChangeNotifier {
     }
     final col = _db.collection('families/$_familyId/weekly');
 
-    _sub = col.orderBy('createdAt', descending: false).snapshots().listen((
-      snap,
-    ) async {
-      _list
-        ..clear()
-        ..addAll(snap.docs.map(WeeklyTaskCloud.fromDoc));
-      notifyListeners();
+    _sub = col
+        .orderBy('createdAt', descending: false)
+        .snapshots()
+        .listen(
+          (snap) async {
+            _list
+              ..clear()
+              ..addAll(snap.docs.map(WeeklyTaskCloud.fromDoc));
+            _setError(null);
+            notifyListeners();
 
-      // Auto-reschedule safety (opsiyonel): yeni gelenler için id yoksa planla
-      for (final w in _list) {
-        if (_notifBox.get(w.id) == null) {
-          await _scheduleFor(w);
-        }
-      }
-    });
+            // Auto-reschedule safety (opsiyonel): yeni gelenler için id yoksa planla
+            for (final w in _list) {
+              if (_notifBox.get(w.id) == null) {
+                await _scheduleFor(w);
+              }
+            }
+          },
+          onError: (e) {
+            debugPrint('[WeeklyTaskCloud] STREAM ERROR: $e');
+            _setError('WeeklyTaskCloud: $e'); // UI’da banner çıkacak
+          },
+        );
   }
 
   // ===== queries =====
@@ -71,20 +89,35 @@ class WeeklyCloudProvider extends ChangeNotifier {
   List<WeeklyTaskCloud> todayTasks() => tasksFor(DateTime.now());
 
   // ===== mutations =====
-
-  Future<void> addWeeklyTask(WeeklyTaskCloud task) async {
-    if (_familyId == null) return;
+  Future<WeeklyTaskCloud> addWeeklyTask(WeeklyTaskCloud task) async {
+    if (_familyId == null) throw StateError('No familyId');
     final col = _db.collection('families/$_familyId/weekly');
     final ref = await col.add(task.toMapForCreate());
-    // docId lazımsa elde var:
     final doc = await ref.get();
+
     final created = WeeklyTaskCloud.fromDoc(doc);
     await _scheduleFor(created);
-    // Stream zaten listeyi güncelleyecek; notify dinamikten gelecek.
+    return created;
   }
 
-  /// Convenience: eski API’nize benzer kısa yol
-  Future<void> addTask(WeeklyTaskCloud task) => addWeeklyTask(task);
+  Future<List<WeeklyTaskCloud>> addWeeklyBulk(
+    List<(String, String)> entries, {
+    String? assignedToUid,
+  }) async {
+    final created = <WeeklyTaskCloud>[];
+    for (final e in entries) {
+      final day = e.$1.trim();
+      final title = e.$2.trim();
+      if (day.isEmpty || title.isEmpty) continue;
+
+      final pending = WeeklyTaskCloud(day, title, assignedToUid: assignedToUid);
+      final saved = await addWeeklyTask(pending); // <-- KAYDEDİLENİ AL
+      created.add(saved); // <-- GERÇEK id’Lİ OBJ
+    }
+    return created;
+  }
+
+  Future<WeeklyTaskCloud> addTask(WeeklyTaskCloud task) => addWeeklyTask(task);
 
   Future<void> removeWeeklyTaskById(String id) async {
     if (_familyId == null) return;
@@ -99,14 +132,14 @@ class WeeklyCloudProvider extends ChangeNotifier {
   Future<void> addSimple({
     required String day,
     required String title,
-    String? assignedTo,
+    String? assignedToUid,
     TimeOfDay? timeOfDay,
   }) async {
     await addWeeklyTask(
       WeeklyTaskCloud(
         day,
         title,
-        assignedTo: assignedTo,
+        assignedToUid: assignedToUid,
         hour: timeOfDay?.hour,
         minute: timeOfDay?.minute,
       ),
@@ -118,7 +151,7 @@ class WeeklyCloudProvider extends ChangeNotifier {
     WeeklyTaskCloud task, {
     String? title,
     String? day,
-    String? assignedTo,
+    String? assignedToUid,
     TimeOfDay? timeOfDay,
   }) async {
     if (_familyId == null) return;
@@ -132,9 +165,9 @@ class WeeklyCloudProvider extends ChangeNotifier {
       task.day = day.trim();
       needsReschedule = true;
     }
-    if (assignedTo != null) {
-      final v = assignedTo.trim();
-      task.assignedTo = v.isEmpty ? null : v;
+    if (assignedToUid != null) {
+      final v = assignedToUid.trim();
+      task.assignedToUid = v.isEmpty ? null : v;
       needsReschedule = true;
     }
     if (timeOfDay != null) {
@@ -177,16 +210,21 @@ class WeeklyCloudProvider extends ChangeNotifier {
     final existing = taskProv.tasks;
     for (final w in today) {
       final title = w.title.trim();
-      final assg = w.assignedTo?.trim();
+      final assg = w.assignedToUid?.trim();
+
+      final weeklyOrigin = 'weekly:${w.id}';
+      final hasByOrigin = existing.any((t) => t.origin == weeklyOrigin);
+      if (hasByOrigin) continue;
       final dup = existing.any(
         (t) =>
             t.name.toLowerCase() == title.toLowerCase() &&
-            ((t.assignedTo ?? '').toLowerCase() == (assg ?? '').toLowerCase()),
+            ((t.assignedToUid ?? '').toLowerCase() ==
+                (assg ?? '').toLowerCase()),
       );
       if (!dup) {
         await taskProv.addTask(
           // Capitalize zaten TaskCloudProvider içinde de var; yine de temiz gidelim:
-          Task(title, assignedTo: assg),
+          Task(title, assignedToUid: assg, origin: weeklyOrigin),
         );
       }
     }
@@ -200,7 +238,7 @@ class WeeklyCloudProvider extends ChangeNotifier {
     final id = await NotificationService.scheduleWeekly(
       title: 'Weekly task',
       body:
-          '${task.title}${task.assignedTo != null ? " – ${task.assignedTo}" : ""}',
+          '${task.title}${task.assignedToUid != null ? " – ${task.assignedToUid}" : ""}',
       weekday: weekday,
       timeOfDay: time,
     );

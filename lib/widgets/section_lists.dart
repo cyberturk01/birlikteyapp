@@ -56,7 +56,7 @@ class TasksSection extends StatelessWidget {
             return Dismissible(
               direction: DismissDirection.endToStart,
               key: ValueKey(
-                task.remoteId ?? '${task.name}|${task.assignedTo ?? ""}',
+                task.remoteId ?? '${task.name}|${task.assignedToUid ?? ""}',
               ),
               background: const SwipeBg(
                 color: Colors.green,
@@ -105,7 +105,7 @@ class TasksSection extends StatelessWidget {
                 //   onPressed: () => onToggleTask(task),
                 // ),
                 title: Text(
-                  '${task.name}${(task.assignedTo != null && task.assignedTo!.isNotEmpty) ? " " : ""}',
+                  '${task.name}${(task.assignedToUid != null && task.assignedToUid!.isNotEmpty) ? " " : ""}',
                   overflow: TextOverflow.ellipsis,
                   style: isDone
                       ? const TextStyle(decoration: TextDecoration.lineThrough)
@@ -200,7 +200,7 @@ class ItemsSection extends StatelessWidget {
                   final copy = Item(
                     removed.name,
                     bought: removed.bought,
-                    assignedTo: removed.assignedTo,
+                    assignedToUid: removed.assignedToUid,
                   );
                   context.read<ItemCloudProvider>().removeItem(removed);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -234,7 +234,7 @@ class ItemsSection extends StatelessWidget {
                 //   onPressed: () => onToggleItem(it),
                 // ),
                 title: Text(
-                  '${it.name}${(it.assignedTo != null && it.assignedTo!.isNotEmpty) ? " " : ""}',
+                  '${it.name}${(it.assignedToUid != null && it.assignedToUid!.isNotEmpty) ? " " : ""}',
                   overflow: TextOverflow.ellipsis,
                   style: bought
                       ? const TextStyle(decoration: TextDecoration.lineThrough)

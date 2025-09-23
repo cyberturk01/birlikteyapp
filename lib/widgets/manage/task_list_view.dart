@@ -5,7 +5,7 @@ import '../../constants/app_strings.dart';
 import '../../models/task.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../widgets/swipe_bg.dart';
-import '../member_dropdown.dart';
+import '../member_dropdown_uid.dart';
 
 class TaskListView extends StatelessWidget {
   const TaskListView({super.key});
@@ -46,7 +46,7 @@ class TaskListView extends StatelessWidget {
               final copy = Task(
                 t.name,
                 completed: t.completed,
-                assignedTo: t.assignedTo,
+                assignedToUid: t.assignedToUid,
               );
               context.read<TaskCloudProvider>().removeTask(t);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -77,8 +77,8 @@ class TaskListView extends StatelessWidget {
                   ? const TextStyle(decoration: TextDecoration.lineThrough)
                   : null,
             ),
-            subtitle: (t.assignedTo != null && t.assignedTo!.isNotEmpty)
-                ? Text('👤 ${t.assignedTo}')
+            subtitle: (t.assignedToUid != null && t.assignedToUid!.isNotEmpty)
+                ? Text('👤 ${t.assignedToUid}')
                 : null,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -114,7 +114,7 @@ class TaskListView extends StatelessWidget {
   }
 
   void _showAssignTaskSheetCloud(BuildContext context, Task task) {
-    String? selected = task.assignedTo;
+    String? selected = task.assignedToUid;
     final taskCloud = context.read<TaskCloudProvider>();
 
     showModalBottomSheet(
@@ -131,7 +131,7 @@ class TaskListView extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
-                MemberDropdown(
+                MemberDropdownUid(
                   value: selected,
                   onChanged: (v) => setLocal(() => selected = v),
                   label: 'Assign to',

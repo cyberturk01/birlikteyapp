@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/item.dart';
-import '../../providers/item_provider.dart';
-import '../member_dropdown.dart';
+import '../../providers/item_cloud_provider.dart';
+import '../member_dropdown_uid.dart';
 
 class AssignItemSheet extends StatefulWidget {
   final Item item;
@@ -19,12 +19,12 @@ class _AssignItemSheetState extends State<AssignItemSheet> {
   @override
   void initState() {
     super.initState();
-    _selected = widget.item.assignedTo;
+    _selected = widget.item.assignedToUid;
   }
 
   @override
   Widget build(BuildContext context) {
-    final itemProv = context.read<ItemProvider>();
+    final itemProv = context.read<ItemCloudProvider>();
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -37,7 +37,7 @@ class _AssignItemSheetState extends State<AssignItemSheet> {
           ),
           const SizedBox(height: 12),
 
-          MemberDropdown(
+          MemberDropdownUid(
             value: _selected,
             onChanged: (v) => setState(() => _selected = v),
             label: 'Assign to',

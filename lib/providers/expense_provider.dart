@@ -17,7 +17,7 @@ class ExpenseProvider extends ChangeNotifier {
   List<Expense> forMember(String? member) {
     final list = (member == null)
         ? _box.values.toList()
-        : _box.values.where((e) => e.assignedTo == member).toList();
+        : _box.values.where((e) => e.assignedToUid == member).toList();
     list.sort((a, b) => b.date.compareTo(a.date)); // newest first
     return list;
   }
@@ -113,10 +113,9 @@ class ExpenseProvider extends ChangeNotifier {
     String? category, // ✅ kategori parametresi olmalı
   }) {
     final e = Expense(
-      title,
       amount,
       date: date,
-      assignedTo: assignedTo,
+      assignedToUid: assignedTo,
       category: category ?? 'Uncategorized', // ✅ burada da set et
     );
     _box.add(e);

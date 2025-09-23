@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../constants/app_strings.dart';
 import '../../models/item.dart';
-import '../../providers/item_provider.dart';
+import '../../providers/item_cloud_provider.dart';
 import '../../widgets/muted_text.dart';
 import '../../widgets/swipe_bg.dart';
 
@@ -66,16 +66,16 @@ class ItemsSubsection extends StatelessWidget {
                   final copy = Item(
                     removed.name,
                     bought: removed.bought,
-                    assignedTo: removed.assignedTo,
+                    assignedToUid: removed.assignedToUid,
                   );
-                  context.read<ItemProvider>().removeItem(removed);
+                  context.read<ItemCloudProvider>().removeItem(removed);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: const Text('Item deleted'),
                       action: SnackBarAction(
                         label: 'Undo',
                         onPressed: () =>
-                            context.read<ItemProvider>().addItem(copy),
+                            context.read<ItemCloudProvider>().addItem(copy),
                       ),
                       duration: const Duration(seconds: 5),
                     ),
@@ -109,7 +109,8 @@ class ItemsSubsection extends StatelessWidget {
                 trailing: IconButton(
                   tooltip: S.delete,
                   icon: const Icon(Icons.delete, color: Colors.redAccent),
-                  onPressed: () => context.read<ItemProvider>().removeItem(it),
+                  onPressed: () =>
+                      context.read<ItemCloudProvider>().removeItem(it),
                 ),
               ),
             );

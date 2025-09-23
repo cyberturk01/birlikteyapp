@@ -3,9 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class WeeklyTaskCloud {
   final String id; // Firestore doc id
-  String day; // "Monday"..."Sunday" (or localized forms you already accept)
+  String day;
   String title;
-  String? assignedTo; // "You (name)" format continues
+  String? assignedToUid;
   int? hour; // optional reminder hour
   int? minute; // optional reminder minute
   DateTime createdAt;
@@ -13,7 +13,7 @@ class WeeklyTaskCloud {
   WeeklyTaskCloud(
     this.day,
     this.title, {
-    this.assignedTo,
+    this.assignedToUid,
     this.hour,
     this.minute,
     String? id, // <-- ARTIK OPTIONAL
@@ -26,7 +26,7 @@ class WeeklyTaskCloud {
     return WeeklyTaskCloud(
       (m['day'] ?? 'Monday') as String,
       (m['title'] ?? '') as String,
-      assignedTo: m['assignedTo'] as String?,
+      assignedToUid: m['assignedToUid'] as String?,
       hour: (m['hour'] as num?)?.toInt(),
       minute: (m['minute'] as num?)?.toInt(),
       id: d.id,
@@ -35,20 +35,25 @@ class WeeklyTaskCloud {
   }
 
   Map<String, dynamic> toMapForCreate() => {
-    'title': _cap(title),
     'day': day,
-    'assignedTo': assignedTo,
+    'title': title.trim(),
+    'assignedToUid': (assignedToUid?.trim().isEmpty ?? true)
+        ? null
+        : assignedToUid!.trim(),
     'hour': hour,
     'minute': minute,
     'createdAt': FieldValue.serverTimestamp(),
   };
 
   Map<String, dynamic> toMapForUpdate() => {
-    'title': _cap(title),
-    'day': day,
-    'assignedTo': assignedTo,
+    if (day.isNotEmpty) 'day': day,
+    if (title.isNotEmpty) 'title': title.trim(),
+    'assignedToUid': (assignedToUid?.trim().isEmpty ?? true)
+        ? FieldValue.delete()
+        : assignedToUid!.trim(),
     'hour': hour,
     'minute': minute,
+    'updatedAt': FieldValue.serverTimestamp(),
   };
 
   static String _cap(String s) =>

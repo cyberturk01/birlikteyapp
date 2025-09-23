@@ -46,7 +46,7 @@ class ItemListView extends StatelessWidget {
               final copy = Item(
                 it.name,
                 bought: it.bought,
-                assignedTo: it.assignedTo,
+                assignedToUid: it.assignedToUid,
               );
               context.read<ItemCloudProvider>().removeItem(it);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -77,8 +77,8 @@ class ItemListView extends StatelessWidget {
                   ? const TextStyle(decoration: TextDecoration.lineThrough)
                   : null,
             ),
-            subtitle: (it.assignedTo != null && it.assignedTo!.isNotEmpty)
-                ? Text('👤 ${it.assignedTo}')
+            subtitle: (it.assignedToUid != null && it.assignedToUid!.isNotEmpty)
+                ? Text('👤 ${it.assignedToUid}')
                 : null,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -154,7 +154,7 @@ class ItemListView extends StatelessWidget {
       context,
       title: 'Assign item',
       nullLabel: 'No one',
-      initial: item.assignedTo,
+      initial: item.assignedToUid,
       onSave: (picked) {
         context.read<ItemCloudProvider>().updateAssignment(item, picked);
       },

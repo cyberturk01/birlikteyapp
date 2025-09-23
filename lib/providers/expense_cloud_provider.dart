@@ -57,6 +57,8 @@ class ExpenseCloudProvider extends ChangeNotifier {
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
   List<ExpenseDoc> _expenses = [];
   List<ExpenseDoc> get expenses => _expenses;
+  String? _lastError;
+  String? get lastError => _lastError;
 
   void updateAuthAndDb(FirebaseAuth a, FirebaseFirestore d) {}
 
@@ -78,6 +80,12 @@ class ExpenseCloudProvider extends ChangeNotifier {
     return _db.collection('families/$fid/expenses');
   }
 
+  void _setError(String? msg) {
+    _lastError = msg;
+    notifyListeners();
+  }
+
+  void clearError() => _setError(null);
   void _bind() {
     _sub?.cancel();
     final c = _col;
@@ -92,10 +100,12 @@ class ExpenseCloudProvider extends ChangeNotifier {
         .listen(
           (snap) {
             _expenses = snap.docs.map((d) => ExpenseDoc.fromSnap(d)).toList();
+            _setError(null);
             notifyListeners();
           },
           onError: (e) {
             debugPrint('[ExpenseCloud] STREAM ERROR: $e');
+            _setError('ExpenseCloud: $e');
           },
         );
   }

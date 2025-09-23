@@ -11,13 +11,10 @@ import 'package:birlikteyapp/providers/expense_cloud_provider.dart';
 import 'package:birlikteyapp/providers/expense_provider.dart';
 import 'package:birlikteyapp/providers/family_provider.dart';
 import 'package:birlikteyapp/providers/item_cloud_provider.dart';
-import 'package:birlikteyapp/providers/item_provider.dart';
 import 'package:birlikteyapp/providers/task_cloud_provider.dart';
-import 'package:birlikteyapp/providers/task_provider.dart';
 import 'package:birlikteyapp/providers/templates_provider.dart';
 import 'package:birlikteyapp/providers/ui_provider.dart';
 import 'package:birlikteyapp/providers/weekly_cloud_provider.dart';
-import 'package:birlikteyapp/providers/weekly_provider.dart';
 import 'package:birlikteyapp/services/auth_service.dart';
 import 'package:birlikteyapp/services/notification_service.dart';
 import 'package:birlikteyapp/services/task_service.dart';
@@ -131,9 +128,6 @@ class _RootState extends State<_Root> {
         return MultiProvider(
           providers: [
             ChangeNotifierProvider(create: (_) => FamilyProvider()),
-            ChangeNotifierProvider(create: (_) => TaskProvider()),
-            ChangeNotifierProvider(create: (_) => ItemProvider()),
-            ChangeNotifierProvider(create: (_) => WeeklyProvider()),
             ChangeNotifierProvider(create: (_) => TemplatesProvider()),
             ChangeNotifierProvider(create: (_) => ExpenseProvider()),
             ChangeNotifierProvider(create: (_) => ui..loadPrefs()),

@@ -15,6 +15,8 @@ class ItemCloudProvider extends ChangeNotifier {
   User? _currentUser;
   String? _familyId;
   CollectionReference<Map<String, dynamic>>? _col;
+  String? _lastError;
+  String? get lastError => _lastError;
 
   final List<Item> _items = [];
   List<Item> get items => List.unmodifiable(_items);
@@ -60,6 +62,13 @@ class ItemCloudProvider extends ChangeNotifier {
     _bindAuth();
   }
 
+  void _setError(String? msg) {
+    _lastError = msg;
+    notifyListeners();
+  }
+
+  void clearError() => _setError(null);
+
   void _rebindItems() {
     debugPrint('[ItemCloud] REBIND → user=${_currentUser?.uid} fam=$_familyId');
 
@@ -96,17 +105,22 @@ class ItemCloudProvider extends ChangeNotifier {
                   final it = Item(
                     (data['name'] as String?)?.trim() ?? '',
                     bought: (data['bought'] as bool?) ?? false,
-                    assignedTo: (data['assignedTo'] as String?)?.trim(),
+                    assignedToUid:
+                        ((data['assignedToUid'] ?? data['assignedTo'])
+                                as String?)
+                            ?.trim(), // ← fallback
                   );
                   it.remoteId = d.id;
                   return it;
                 }),
               );
+            _setError(null);
             notifyListeners();
           },
           onError: (e, st) {
             debugPrint('[ItemCloud] STREAM ERROR: $e');
             _items.clear();
+            _setError('ItemCloud: $e');
             notifyListeners();
           },
         );
@@ -120,7 +134,7 @@ class ItemCloudProvider extends ChangeNotifier {
     final doc = await col.add({
       'name': it.name,
       'bought': it.bought,
-      'assignedTo': it.assignedTo,
+      'assignedToUid': it.assignedToUid ?? FieldValue.delete(),
       'createdAt': FieldValue.serverTimestamp(),
     });
     debugPrint('[ItemCloud] ADDED id=${doc.id}');
@@ -144,10 +158,18 @@ class ItemCloudProvider extends ChangeNotifier {
     await col.doc(id).update({'bought': bought});
   }
 
-  Future<void> updateAssignment(Item it, String? member) async {
+  Future<void> updateAssignment(Item it, String? memberUid) async {
     final col = _ensureCol();
     final id = await _ensureId(col, it);
-    await col.doc(id).update({'assignedTo': member});
+    await col.doc(id).update({
+      'assignedToUid': (memberUid == null || memberUid.trim().isEmpty)
+          ? FieldValue.delete()
+          : memberUid.trim(),
+    });
+    it.assignedToUid = (memberUid?.trim().isEmpty ?? true)
+        ? null
+        : memberUid!.trim();
+    notifyListeners();
   }
 
   Future<void> renameItem(Item it, String newName) async {
@@ -167,7 +189,7 @@ class ItemCloudProvider extends ChangeNotifier {
   Future<void> clearBought({String? forMember}) async {
     final col = _ensureCol();
     Query<Map<String, dynamic>> q = col.where('bought', isEqualTo: true);
-    if (forMember != null) q = q.where('assignedTo', isEqualTo: forMember);
+    if (forMember != null) q = q.where('assignedToUid', isEqualTo: forMember);
     final snap = await q.get();
     for (final d in snap.docs) {
       await d.reference.delete();
@@ -191,11 +213,10 @@ class ItemCloudProvider extends ChangeNotifier {
 
     Query<Map<String, dynamic>> q = col.where('name', isEqualTo: it.name);
 
-    if (it.assignedTo == null || it.assignedTo!.trim().isEmpty) {
-      // null veya boş atama
-      q = q.where('assignedTo', isNull: true);
+    if ((it.assignedToUid ?? '').isEmpty) {
+      q = q.where('assignedToUid', isNull: true);
     } else {
-      q = q.where('assignedTo', isEqualTo: it.assignedTo);
+      q = q.where('assignedToUid', isEqualTo: it.assignedToUid);
     }
 
     final snap = await q.limit(1).get();
@@ -208,7 +229,7 @@ class ItemCloudProvider extends ChangeNotifier {
 
   List<Item> addItemsBulk(
     List<String> names, {
-    String? assignedTo,
+    String? assignedToUid,
     bool skipDuplicates = true,
   }) {
     final created = <Item>[];
@@ -219,7 +240,7 @@ class ItemCloudProvider extends ChangeNotifier {
       if (name.isEmpty) continue;
       if (skipDuplicates && existing.contains(name.toLowerCase())) continue;
 
-      final it = Item(name, assignedTo: assignedTo);
+      final it = Item(name, assignedToUid: assignedToUid);
       _items.add(it);
 
       // (İsteğe bağlı) frekans sayacı artırmak istemezsen, burayı atla:

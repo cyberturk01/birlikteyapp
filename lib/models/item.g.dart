@@ -19,7 +19,7 @@ class ItemAdapter extends TypeAdapter<Item> {
     return Item(
       fields[0] as String,
       bought: fields[1] as bool,
-      assignedTo: fields[2] as String?,
+      assignedToUid: fields[2] as String?,
     );
   }
 
@@ -32,7 +32,7 @@ class ItemAdapter extends TypeAdapter<Item> {
       ..writeByte(1)
       ..write(obj.bought)
       ..writeByte(2)
-      ..write(obj.assignedTo);
+      ..write(obj.assignedToUid);
   }
 
   @override

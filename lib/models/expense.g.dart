@@ -17,12 +17,11 @@ class ExpenseAdapter extends TypeAdapter<Expense> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return Expense(
-      fields[0] as String,
       fields[1] as double,
       date: fields[3] as DateTime?,
-      assignedTo: fields[2] as String?,
+      assignedToUid: fields[2] as String?,
       category: fields[4] as String?,
-    );
+    )..title = fields[0] as String;
   }
 
   @override
@@ -34,7 +33,7 @@ class ExpenseAdapter extends TypeAdapter<Expense> {
       ..writeByte(1)
       ..write(obj.amount)
       ..writeByte(2)
-      ..write(obj.assignedTo)
+      ..write(obj.assignedToUid)
       ..writeByte(3)
       ..write(obj.date)
       ..writeByte(4)

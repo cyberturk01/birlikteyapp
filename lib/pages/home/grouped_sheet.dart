@@ -296,10 +296,10 @@ Future<void> showGroupedByMemberSheet<T>({
   );
 }
 
-bool _isMine(String assignedTo, String? meLabel) {
+bool _isMine(String assignedToUid, String? meLabel) {
   if (meLabel == null || meLabel.isEmpty) return false;
   final bare = _bareName(meLabel);
-  return assignedTo == meLabel || assignedTo == bare;
+  return assignedToUid == meLabel || assignedToUid == bare;
 }
 
 String _bareName(String youLabel) {

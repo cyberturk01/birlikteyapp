@@ -7,7 +7,7 @@ import '../../models/task.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
-import '../../widgets/member_dropdown.dart';
+import '../../widgets/member_dropdown_uid.dart';
 import '../../widgets/swipe_bg.dart';
 
 enum _ManageTab { tasks, items }
@@ -203,96 +203,117 @@ class _TaskListView extends StatelessWidget {
     if (tasks.isEmpty) {
       return const Text('No tasks yet');
     }
+    final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
+    return StreamBuilder<Map<String, String>>(
+      stream: dictStream, // { uid: label }
+      builder: (_, snap) {
+        final dict = snap.data ?? const <String, String>{};
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: tasks.length,
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (_, i) {
+            final t = tasks[i];
 
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: tasks.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (_, i) {
-        final t = tasks[i];
-        return Dismissible(
-          key: ValueKey('task-${t.remoteId ?? t.name}-${t.hashCode}'),
-          background: const SwipeBg(
-            color: Colors.green,
-            icon: Icons.check,
-            align: Alignment.centerLeft,
-          ),
-          secondaryBackground: const SwipeBg(
-            color: Colors.red,
-            icon: Icons.delete,
-            align: Alignment.centerRight,
-          ),
-          confirmDismiss: (dir) async {
-            if (dir == DismissDirection.startToEnd) {
-              context.read<TaskCloudProvider>().toggleTask(t, !t.completed);
-              return false;
-            } else {
-              final copy = Task(
-                t.name,
-                completed: t.completed,
-                assignedTo: t.assignedTo,
-              );
-              context.read<TaskCloudProvider>().removeTask(t);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Task deleted'),
-                  action: SnackBarAction(
-                    label: 'Undo',
-                    onPressed: () =>
-                        context.read<TaskCloudProvider>().addTask(copy),
-                  ),
+            final uid = t.assignedToUid; // <- UID
+            final display = (uid == null || uid.isEmpty)
+                ? null
+                : (dict[uid] ?? 'Member');
+
+            return Dismissible(
+              key: ValueKey('task-${t.remoteId ?? t.name}-${t.hashCode}'),
+              background: const SwipeBg(
+                color: Colors.green,
+                icon: Icons.check,
+                align: Alignment.centerLeft,
+              ),
+              secondaryBackground: const SwipeBg(
+                color: Colors.red,
+                icon: Icons.delete,
+                align: Alignment.centerRight,
+              ),
+              confirmDismiss: (dir) async {
+                if (dir == DismissDirection.startToEnd) {
+                  context.read<TaskCloudProvider>().toggleTask(t, !t.completed);
+                  return false;
+                } else {
+                  final copy = Task(
+                    t.name,
+                    completed: t.completed,
+                    assignedToUid: t.assignedToUid,
+                  );
+                  context.read<TaskCloudProvider>().removeTask(t);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Task deleted'),
+                      action: SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () =>
+                            context.read<TaskCloudProvider>().addTask(copy),
+                      ),
+                    ),
+                  );
+                  return true;
+                }
+              },
+              child: ListTile(
+                dense: true,
+                visualDensity: const VisualDensity(
+                  horizontal: -4,
+                  vertical: -2,
                 ),
-              );
-              return true;
-            }
+                leading: Checkbox(
+                  value: t.completed,
+                  onChanged: (v) => context
+                      .read<TaskCloudProvider>()
+                      .toggleTask(t, v ?? false),
+                ),
+                title: Text(
+                  t.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: t.completed
+                      ? const TextStyle(decoration: TextDecoration.lineThrough)
+                      : null,
+                ),
+                subtitle: display == null ? null : Text('👤 $display'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Assign',
+                      icon: const Icon(Icons.person_add_alt),
+                      onPressed: () => _showAssignTaskSheet(context, t),
+                    ),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Edit',
+                      icon: const Icon(Icons.edit),
+                      onPressed: () => _showRenameDialog(
+                        context: context,
+                        initial: t.name,
+                        hint: 'Task name',
+                        onSave: (newName) => context
+                            .read<TaskCloudProvider>()
+                            .renameTask(t, newName),
+                      ),
+                    ),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: S.delete,
+                      icon: const Icon(Icons.delete, color: Colors.redAccent),
+                      onPressed: () =>
+                          context.read<TaskCloudProvider>().removeTask(t),
+                    ),
+                  ],
+                ),
+              ),
+            );
           },
-          child: ListTile(
-            dense: true,
-            visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
-            leading: Checkbox(
-              value: t.completed,
-              onChanged: (v) =>
-                  context.read<TaskCloudProvider>().toggleTask(t, v ?? false),
-            ),
-            title: Text(
-              t.name,
-              overflow: TextOverflow.ellipsis,
-              style: t.completed
-                  ? const TextStyle(decoration: TextDecoration.lineThrough)
-                  : null,
-            ),
-            subtitle: (t.assignedTo != null && t.assignedTo!.isNotEmpty)
-                ? Text('👤 ${t.assignedTo}')
-                : null,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Assign',
-                  icon: const Icon(Icons.person_add_alt),
-                  onPressed: () => _showAssignTaskSheet(context, t),
-                ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Edit',
-                  icon: const Icon(Icons.edit),
-                  onPressed: () => _showRenameTaskDialog(context, t),
-                ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: S.delete,
-                  icon: const Icon(Icons.delete, color: Colors.redAccent),
-                  onPressed: () =>
-                      context.read<TaskCloudProvider>().removeTask(t),
-                ),
-              ],
-            ),
-          ),
         );
       },
     );
@@ -309,153 +330,147 @@ class _ItemListView extends StatelessWidget {
       return const Text('No items yet');
     }
 
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (_, i) {
-        final it = items[i];
-        return Dismissible(
-          key: ValueKey('item-${it.remoteId ?? it.name}-${it.hashCode}'),
-          background: const SwipeBg(
-            color: Colors.green,
-            icon: Icons.check,
-            align: Alignment.centerLeft,
-          ),
-          secondaryBackground: const SwipeBg(
-            color: Colors.red,
-            icon: Icons.delete,
-            align: Alignment.centerRight,
-          ),
-          confirmDismiss: (dir) async {
-            if (dir == DismissDirection.startToEnd) {
-              context.read<ItemCloudProvider>().toggleItem(it, !it.bought);
-              return false;
-            } else {
-              final copy = Item(
-                it.name,
-                bought: it.bought,
-                assignedTo: it.assignedTo,
-              );
-              context.read<ItemCloudProvider>().removeItem(it);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Item deleted'),
-                  action: SnackBarAction(
-                    label: 'Undo',
-                    onPressed: () =>
-                        context.read<ItemCloudProvider>().addItem(copy),
-                  ),
+    final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
+
+    return StreamBuilder<Map<String, String>>(
+      stream: dictStream,
+      builder: (_, snap) {
+        final dict = snap.data ?? const <String, String>{};
+
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: items.length,
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (_, i) {
+            final it = items[i];
+
+            final uid = it.assignedToUid; // <- UID
+            final display = (uid == null || uid.isEmpty)
+                ? null
+                : (dict[uid] ?? 'Member');
+
+            return Dismissible(
+              key: ValueKey('item-${it.remoteId ?? it.name}-${it.hashCode}'),
+              background: const SwipeBg(
+                color: Colors.green,
+                icon: Icons.check,
+                align: Alignment.centerLeft,
+              ),
+              secondaryBackground: const SwipeBg(
+                color: Colors.red,
+                icon: Icons.delete,
+                align: Alignment.centerRight,
+              ),
+              confirmDismiss: (dir) async {
+                if (dir == DismissDirection.startToEnd) {
+                  context.read<ItemCloudProvider>().toggleItem(it, !it.bought);
+                  return false;
+                } else {
+                  final copy = Item(
+                    it.name,
+                    bought: it.bought,
+                    assignedToUid: it.assignedToUid,
+                  );
+                  context.read<ItemCloudProvider>().removeItem(it);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Item deleted'),
+                      action: SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () =>
+                            context.read<ItemCloudProvider>().addItem(copy),
+                      ),
+                    ),
+                  );
+                  return true;
+                }
+              },
+              child: ListTile(
+                dense: true,
+                visualDensity: const VisualDensity(
+                  horizontal: -4,
+                  vertical: -2,
                 ),
-              );
-              return true;
-            }
+                leading: Checkbox(
+                  value: it.bought,
+                  onChanged: (v) => context
+                      .read<ItemCloudProvider>()
+                      .toggleItem(it, v ?? false),
+                ),
+                title: Text(
+                  it.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: it.bought
+                      ? const TextStyle(decoration: TextDecoration.lineThrough)
+                      : null,
+                ),
+                subtitle: display == null ? null : Text('👤 $display'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Assign',
+                      icon: const Icon(Icons.person_add_alt),
+                      onPressed: () => _showAssignItemSheet(context, it),
+                    ),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Edit',
+                      icon: const Icon(Icons.edit),
+                      onPressed: () => _showRenameDialog(
+                        context: context,
+                        initial: it.name,
+                        hint: 'Item name',
+                        onSave: (newName) => context
+                            .read<ItemCloudProvider>()
+                            .renameItem(it, newName),
+                      ),
+                    ),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: S.delete,
+                      icon: const Icon(Icons.delete, color: Colors.redAccent),
+                      onPressed: () =>
+                          context.read<ItemCloudProvider>().removeItem(it),
+                    ),
+                  ],
+                ),
+              ),
+            );
           },
-          child: ListTile(
-            dense: true,
-            visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
-            leading: Checkbox(
-              value: it.bought,
-              onChanged: (v) =>
-                  context.read<ItemCloudProvider>().toggleItem(it, v ?? false),
-            ),
-            title: Text(
-              it.name,
-              overflow: TextOverflow.ellipsis,
-              style: it.bought
-                  ? const TextStyle(decoration: TextDecoration.lineThrough)
-                  : null,
-            ),
-            subtitle: (it.assignedTo != null && it.assignedTo!.isNotEmpty)
-                ? Text('👤 ${it.assignedTo}')
-                : null,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Assign',
-                  icon: const Icon(Icons.person_add_alt),
-                  onPressed: () => _showAssignItemSheet(context, it),
-                ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Edit',
-                  icon: const Icon(Icons.edit),
-                  onPressed: () => _showRenameItemDialog(context, it),
-                ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: S.delete,
-                  icon: const Icon(Icons.delete, color: Colors.redAccent),
-                  onPressed: () =>
-                      context.read<ItemCloudProvider>().removeItem(it),
-                ),
-              ],
-            ),
-          ),
         );
       },
     );
   }
-
-  void _showRenameItemDialog(BuildContext context, Item item) {
-    final ctrl = TextEditingController(text: item.name);
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Edit item'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            hintText: 'Item name',
-            isDense: true,
-          ),
-          onSubmitted: (_) {
-            context.read<ItemCloudProvider>().renameItem(item, ctrl.text);
-            Navigator.pop(context);
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(S.cancel),
-          ),
-          FilledButton(
-            onPressed: () {
-              context.read<ItemCloudProvider>().renameItem(item, ctrl.text);
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-void _showRenameTaskDialog(BuildContext context, Task task) {
-  final ctrl = TextEditingController(text: task.name);
+Future<void> _showRenameDialog({
+  required BuildContext context,
+  required String initial,
+  required String hint,
+  required Future<void> Function(String newName) onSave,
+}) async {
+  final ctrl = TextEditingController(text: initial);
+
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text('Edit task'),
+      title: const Text('Edit name'),
       content: TextField(
         controller: ctrl,
         autofocus: true,
-        decoration: const InputDecoration(
-          border: OutlineInputBorder(),
-          hintText: 'Task name',
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
+          hintText: hint,
           isDense: true,
         ),
-        onSubmitted: (_) {
-          context.read<TaskCloudProvider>().renameTask(task, ctrl.text);
+        onSubmitted: (_) async {
+          await onSave(ctrl.text.trim());
           Navigator.pop(context);
         },
       ),
@@ -465,8 +480,8 @@ void _showRenameTaskDialog(BuildContext context, Task task) {
           child: const Text(S.cancel),
         ),
         FilledButton(
-          onPressed: () {
-            context.read<TaskCloudProvider>().renameTask(task, ctrl.text);
+          onPressed: () async {
+            await onSave(ctrl.text.trim());
             Navigator.pop(context);
           },
           child: const Text('Save'),
@@ -478,7 +493,8 @@ void _showRenameTaskDialog(BuildContext context, Task task) {
 
 // ITEM
 void _showAssignItemSheet(BuildContext context, Item item) {
-  String? selected = item.assignedTo;
+  String? selectedUid = item.assignedToUid; // mevcut atamayı UID olarak başlat
+  final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
 
   showModalBottomSheet(
     context: context,
@@ -493,27 +509,42 @@ void _showAssignItemSheet(BuildContext context, Item item) {
           ),
           const SizedBox(height: 12),
 
-          StreamBuilder<List<String>>(
-            stream: context.read<FamilyProvider>().watchMemberLabels(),
-            builder: (ctx, snap) {
-              final labels = (snap.data ?? const <String>[]).toSet().toList();
-              final items = <DropdownMenuItem<String>>[
-                const DropdownMenuItem(value: '', child: Text('No one')),
-                ...labels.map(
-                  (m) => DropdownMenuItem(value: m, child: Text(m)),
-                ),
-              ];
-              final value = labels.contains(selected) ? selected! : '';
+          StatefulBuilder(
+            builder: (ctx, setLocal) {
+              return StreamBuilder<Map<String, String>>(
+                stream: dictStream, // {uid: label}
+                builder: (ctx, snap) {
+                  final dict = snap.data ?? const <String, String>{};
 
-              return DropdownButtonFormField<String>(
-                value: value,
-                isExpanded: true,
-                items: items,
-                onChanged: (v) => selected = v ?? '',
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
+                  final items = <DropdownMenuItem<String?>>[
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('No one'),
+                    ),
+                    ...dict.entries.map(
+                      (e) => DropdownMenuItem<String?>(
+                        value: e.key,
+                        child: Text(e.value),
+                      ),
+                    ),
+                  ];
+
+                  final value = dict.containsKey(selectedUid)
+                      ? selectedUid
+                      : null;
+
+                  return DropdownButtonFormField<String?>(
+                    value: value,
+                    isExpanded: true,
+                    items: items,
+                    onChanged: (v) => setLocal(() => selectedUid = v),
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      labelText: 'Assign to',
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -522,14 +553,14 @@ void _showAssignItemSheet(BuildContext context, Item item) {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: () {
-                context.read<ItemCloudProvider>().updateAssignment(
+              onPressed: () async {
+                await context.read<ItemCloudProvider>().updateAssignment(
                   item,
-                  (selected != null && selected!.trim().isNotEmpty)
-                      ? selected
+                  (selectedUid != null && selectedUid!.trim().isNotEmpty)
+                      ? selectedUid
                       : null,
                 );
-                Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context);
               },
               child: const Text('Save'),
             ),
@@ -542,7 +573,7 @@ void _showAssignItemSheet(BuildContext context, Item item) {
 
 // TASK
 void _showAssignTaskSheet(BuildContext context, Task task) {
-  String? selected = task.assignedTo;
+  String? selectedUid = task.assignedToUid; // mevcut atamayı UID olarak başlat
   final taskCloud = context.read<TaskCloudProvider>();
 
   showModalBottomSheet(
@@ -560,9 +591,9 @@ void _showAssignTaskSheet(BuildContext context, Task task) {
               ),
               const SizedBox(height: 12),
 
-              MemberDropdown(
-                value: selected,
-                onChanged: (v) => setLocal(() => selected = v),
+              MemberDropdownUid(
+                value: selectedUid,
+                onChanged: (v) => setLocal(() => selectedUid = v),
                 label: 'Assign to',
                 nullLabel: 'No one',
               ),
@@ -574,11 +605,11 @@ void _showAssignTaskSheet(BuildContext context, Task task) {
                   onPressed: () async {
                     await taskCloud.updateAssignment(
                       task,
-                      (selected != null && selected!.trim().isNotEmpty)
-                          ? selected
+                      (selectedUid != null && selectedUid!.trim().isNotEmpty)
+                          ? selectedUid
                           : null,
                     );
-                    taskCloud.refreshNow();
+                    // await taskCloud.refreshNow();
                     if (context.mounted) Navigator.pop(context);
                   },
                   child: const Text('Save'),

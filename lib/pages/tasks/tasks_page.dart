@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/task.dart';
 import '../../providers/family_provider.dart';
-import '../../providers/task_provider.dart';
+import '../../providers/task_cloud_provider.dart';
 
 class TasksPage extends StatefulWidget {
   @override
@@ -17,7 +17,7 @@ class _TasksPageState extends State<TasksPage> {
   String? _filterMember;
 
   void _addTaskDialog(BuildContext context) {
-    final taskProvider = Provider.of<TaskProvider>(context, listen: false);
+    final taskProvider = Provider.of<TaskCloudProvider>(context, listen: false);
     final familyProvider = Provider.of<FamilyProvider>(context, listen: false);
 
     const defaultTasks = AppLists.defaultTasks;
@@ -109,7 +109,9 @@ class _TasksPageState extends State<TasksPage> {
               onPressed: () {
                 final text = controller.text.trim();
                 if (text.isNotEmpty) {
-                  taskProvider.addTask(Task(text, assignedTo: selectedMember));
+                  taskProvider.addTask(
+                    Task(text, assignedToUid: selectedMember),
+                  );
                   Navigator.pop(context);
                 }
               },
@@ -122,14 +124,14 @@ class _TasksPageState extends State<TasksPage> {
 
   @override
   Widget build(BuildContext context) {
-    final taskProvider = Provider.of<TaskProvider>(context);
+    final taskProvider = Provider.of<TaskCloudProvider>(context);
     final familyProvider = Provider.of<FamilyProvider>(context);
 
     // 🔎 Filtreleme: _filterMember null ise hepsi
     final List<Task> filteredTasks = _filterMember == null
         ? taskProvider.tasks
         : taskProvider.tasks
-              .where((t) => (t.assignedTo ?? '') == _filterMember)
+              .where((t) => (t.assignedToUid ?? '') == _filterMember)
               .toList();
 
     return Scaffold(
@@ -160,14 +162,16 @@ class _TasksPageState extends State<TasksPage> {
           return ListTile(
             leading: Checkbox(
               value: task.completed,
-              onChanged: (v) => Provider.of<TaskProvider>(
+              onChanged: (v) => Provider.of<TaskCloudProvider>(
                 context,
                 listen: false,
               ).toggleTask(task, v ?? false),
             ),
             title: Text(
               task.name +
-                  (task.assignedTo != null ? " (${task.assignedTo})" : ""),
+                  (task.assignedToUid != null
+                      ? " (${task.assignedToUid})"
+                      : ""),
               style: TextStyle(
                 decoration: task.completed ? TextDecoration.lineThrough : null,
               ),
@@ -177,7 +181,7 @@ class _TasksPageState extends State<TasksPage> {
                 if (val == 'assign') {
                   _showAssignSheet(context, task);
                 } else if (val == 'delete') {
-                  Provider.of<TaskProvider>(
+                  Provider.of<TaskCloudProvider>(
                     context,
                     listen: false,
                   ).removeTask(task);
@@ -206,8 +210,8 @@ class _TasksPageState extends State<TasksPage> {
       context,
       listen: false,
     ).familyMembers;
-    final taskProv = Provider.of<TaskProvider>(context, listen: false);
-    String? selected = task.assignedTo;
+    final taskProv = Provider.of<TaskCloudProvider>(context, listen: false);
+    String? selected = task.assignedToUid;
 
     showModalBottomSheet(
       context: context,

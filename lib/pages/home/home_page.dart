@@ -8,7 +8,8 @@ import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/weekly_cloud_provider.dart';
-import '../../providers/weekly_provider.dart';
+import '../../utils/assignee.dart';
+import '../../widgets/expenses_mini_summary.dart';
 import '../../widgets/mini_members_bar.dart';
 import '../config/config_page.dart';
 import '../expenses/expenses_card.dart';
@@ -42,7 +43,7 @@ class _HomePageState extends State<HomePage> {
     );
     // initialFilterMember geldiyse index’e çevir
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final weekly = context.read<WeeklyProvider>();
+      final weekly = context.read<WeeklyCloudProvider>();
       final taskProv = context.read<TaskCloudProvider>();
       await weekly.ensureTodaySynced(taskProv);
     });
@@ -64,6 +65,26 @@ class _HomePageState extends State<HomePage> {
     final famProv = context.watch<FamilyProvider>();
     final familyId = famProv.familyId;
     debugPrint('[HomePage] familyId=$familyId');
+
+    final taskError = context.select<TaskCloudProvider, String?>(
+      (p) => p.lastError,
+    );
+    final itemError = context.select<ItemCloudProvider, String?>(
+      (p) => p.lastError,
+    );
+    final weeklyError = context.select<WeeklyCloudProvider, String?>(
+      (p) => p.lastError,
+    );
+    final expenseError = context.select<ExpenseCloudProvider, String?>(
+      (p) => p.lastError,
+    );
+
+    final errors = [
+      taskError,
+      itemError,
+      weeklyError,
+      expenseError,
+    ].whereType<String>().toList();
 
     if (familyId == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -145,16 +166,6 @@ class _HomePageState extends State<HomePage> {
                 icon: const Icon(Icons.group),
                 onPressed: () => showFamilyManager(context),
               ),
-              // IconButton(
-              //   tooltip: 'Weekly plan',
-              //   icon: const Icon(Icons.calendar_today),
-              //   onPressed: () {
-              //     Navigator.push(
-              //       context,
-              //       MaterialPageRoute(builder: (_) => const WeeklyPage()),
-              //     );
-              //   },
-              // ),
               IconButton(
                 tooltip: 'Add Center',
                 icon: const Icon(Icons.add_circle_outline),
@@ -192,123 +203,181 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-          body: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 0, 10, 25),
-            child: LayoutBuilder(
-              builder: (ctx, c) {
-                final content = Column(
-                  children: [
-                    DashboardSummaryBar(
-                      onTap: (dest) {
-                        setState(() {
-                          switch (dest) {
-                            case SummaryDest.tasks:
-                              _section = HomeSection.tasks;
-                              break;
-                            case SummaryDest.items:
-                              _section = HomeSection.items;
-                              break;
-                            case SummaryDest.expenses:
-                              _section = HomeSection.expenses;
-                              break;
-                            case SummaryDest.weekly:
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const WeeklyPage(),
-                                ),
-                              );
-                              return;
-                          }
-                        });
+          body: Column(
+            children: [
+              if (errors.isNotEmpty)
+                MaterialBanner(
+                  backgroundColor: Colors.red.shade100,
+                  content: Text(
+                    errors.first, // sadece ilk hatayı gösteriyoruz
+                    style: const TextStyle(color: Colors.black),
+                  ),
+                  leading: const Icon(Icons.warning, color: Colors.red),
+                  actions: [
+                    TextButton(
+                      child: const Text('DISMISS'),
+                      onPressed: () {
+                        context.read<TaskCloudProvider>().clearError();
+                        context.read<ItemCloudProvider>().clearError();
+                        context.read<WeeklyCloudProvider>().clearError();
+                        context.read<ExpenseCloudProvider>().clearError();
                       },
                     ),
-
-                    const SizedBox(height: 4),
-
-                    // === ANA SWIPER ===
-                    Expanded(
-                      child: PageView.builder(
-                        controller: _pageController, // <-- DÜZELTME
-                        physics: const BouncingScrollPhysics(),
-                        onPageChanged: (i) => setState(() => _activeIndex = i),
-                        itemCount: orderedLabels.length,
-                        itemBuilder: (context, i) {
-                          final name = orderedLabels[i];
-                          final uid = orderedUids[i];
-                          final memberTasks = tasks
-                              .where(
-                                (t) => _matchesAssignee(t.assignedTo, name),
-                              )
-                              .toList();
-                          final memberItems = items
-                              .where(
-                                (it) => _matchesAssignee(it.assignedTo, name),
-                              )
-                              .toList();
-
-                          final card = (_section == HomeSection.expenses)
-                              ? ExpensesCard(memberUid: uid)
-                              : MemberCard(
-                                  memberName: name,
-                                  tasks: memberTasks,
-                                  items: memberItems,
-                                  section: _section,
-                                  onJumpSection: _jumpTo,
-                                );
-
-                          final versionKey = ValueKey<String>(
-                            'member-$i-t${memberTasks.length}-i${memberItems.length}-s${_section.name}',
-                          );
-                          return Center(
-                            child: _MemberPageKeepAlive(
-                              key: PageStorageKey('member-page-$i'),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 8,
-                                ),
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 180),
-                                  child: KeyedSubtree(
-                                    key: versionKey,
-                                    child: card,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    // === MİNİ BAR ===
-                    MiniMembersBar(
-                      names: orderedLabels,
-                      activeIndex: _activeIndex,
-                      onPickIndex: (i) {
-                        setState(() => _activeIndex = i);
-                        _pageController.animateToPage(
-                          i,
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.easeOutCubic,
-                        );
-                      },
-                    ),
-                    if (!isShort) const SizedBox(height: 12),
                   ],
-                );
-                return isShort
-                    ? SingleChildScrollView(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(minHeight: c.maxHeight),
-                          child: content,
-                        ),
-                      )
-                    : content;
-              },
-            ),
+                ),
+
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 25),
+                  child: LayoutBuilder(
+                    builder: (ctx, c) {
+                      final content = Column(
+                        children: [
+                          DashboardSummaryBar(
+                            onTap: (dest) {
+                              setState(() {
+                                switch (dest) {
+                                  case SummaryDest.tasks:
+                                    _section = HomeSection.tasks;
+                                    break;
+                                  case SummaryDest.items:
+                                    _section = HomeSection.items;
+                                    break;
+                                  case SummaryDest.expenses:
+                                    _section = HomeSection.expenses;
+                                    break;
+                                  case SummaryDest.weekly:
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const WeeklyPage(),
+                                      ),
+                                    );
+                                    return;
+                                }
+                              });
+                            },
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            child: (_section == HomeSection.expenses)
+                                ? Column(
+                                    key: const ValueKey('exp-mini'),
+                                    children: [
+                                      ExpensesMiniSummary(
+                                        expenses:
+                                            context
+                                                .watch<ExpenseCloudProvider?>()
+                                                ?.all ??
+                                            const <ExpenseDoc>[],
+                                        onTap:
+                                            null, // artık sekme zaten expenses; tıklamada iş yok
+                                        // padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8), // istersen
+                                      ),
+                                    ],
+                                  )
+                                : const SizedBox.shrink(
+                                    key: ValueKey('exp-mini-off'),
+                                  ),
+                          ),
+
+                          // const SizedBox(height: 4),
+                          // === ANA SWIPER ===
+                          Expanded(
+                            child: PageView.builder(
+                              controller: _pageController, // <-- DÜZELTME
+                              physics: const BouncingScrollPhysics(),
+                              onPageChanged: (i) =>
+                                  setState(() => _activeIndex = i),
+                              itemCount: orderedLabels.length,
+                              itemBuilder: (context, i) {
+                                final name = orderedLabels[i];
+                                final uid = orderedUids[i];
+                                final memberTasks = tasks
+                                    .where(
+                                      (t) =>
+                                          Assignee.match(t.assignedToUid, name),
+                                    )
+                                    .toList();
+                                final memberItems = items
+                                    .where(
+                                      (i) =>
+                                          Assignee.match(i.assignedToUid, name),
+                                    )
+                                    .toList();
+
+                                final card = (_section == HomeSection.expenses)
+                                    ? ExpensesCard(memberUid: uid)
+                                    : MemberCard(
+                                        memberName: name,
+                                        tasks: memberTasks,
+                                        items: memberItems,
+                                        section: _section,
+                                        onJumpSection: _jumpTo,
+                                      );
+
+                                final versionKey = ValueKey<String>(
+                                  'member-$i-t${memberTasks.length}-i${memberItems.length}-s${_section.name}',
+                                );
+                                return Center(
+                                  child: _MemberPageKeepAlive(
+                                    key: PageStorageKey('member-page-$i'),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      child: AnimatedSwitcher(
+                                        duration: const Duration(
+                                          milliseconds: 180,
+                                        ),
+                                        child: KeyedSubtree(
+                                          key: versionKey,
+                                          child: card,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          // === MİNİ BAR ===
+                          MiniMembersBar(
+                            names: orderedLabels,
+                            activeIndex: _activeIndex,
+                            onPickIndex: (i) {
+                              setState(() => _activeIndex = i);
+                              _pageController.animateToPage(
+                                i,
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeOutCubic,
+                              );
+                            },
+                          ),
+                          if (!isShort) const SizedBox(height: 12),
+                        ],
+                      );
+                      return isShort
+                          ? SingleChildScrollView(
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minHeight: c.maxHeight,
+                                ),
+                                child: content,
+                              ),
+                            )
+                          : content;
+                    },
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },

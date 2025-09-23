@@ -1,4 +1,4 @@
-// lib/widgets/quick_overview_sheets.dart
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -24,7 +24,7 @@ Future<void> showPendingTasksSheet(BuildContext context) async {
     onDelete: (ctx, t) => ctx.read<TaskCloudProvider>().removeTask(t),
     // isimlendirme
     getName: (t) => t.name,
-    getAssignedTo: (t) => (t.assignedTo ?? '').trim(),
+    getAssignedUid: (t) => t.assignedToUid,
     // başlık
     sectionTitle: 'Tasks',
   );
@@ -41,7 +41,7 @@ Future<void> showToBuyItemsSheet(BuildContext context) async {
         ctx.read<ItemCloudProvider>().toggleItem(it, true),
     onDelete: (ctx, it) => ctx.read<ItemCloudProvider>().removeItem(it),
     getName: (it) => it.name,
-    getAssignedTo: (it) => (it.assignedTo ?? '').trim(),
+    getAssignedUid: (it) => it.assignedToUid,
     sectionTitle: 'Market',
   );
 }
@@ -53,8 +53,9 @@ Future<void> _showGroupedSheet<T>({
   required String Function(BuildContext, List<T>) titleBuilder,
   required Iterable<T> Function(BuildContext) sourceSelector,
   required String Function(T) getName,
-  required String Function(T) getAssignedTo,
+  required String? Function(T) getAssignedUid,
   required IconData leadingIcon,
+
   required void Function(BuildContext, T) onTogglePrimary,
   required void Function(BuildContext, T) onDelete,
   required String sectionTitle,
@@ -72,181 +73,191 @@ Future<void> _showGroupedSheet<T>({
     builder: (_) {
       return StatefulBuilder(
         builder: (ctx, setLocal) {
-          // labels (You (...) dâhil)
-          final labels = context
+          final dictStream = context
               .read<FamilyProvider>()
-              .memberLabelsOrFallback; // hızlı başlangıç
-          // canlı stream yerine sheet basitliği için mevcut cache’i kullanıyoruz.
-          // isterseniz StreamBuilder ile FamilyProvider.watchMemberLabels() ekleyebilirsiniz.
+              .watchMemberDirectory();
 
-          // raw list
+          // ham liste
           final raw = sourceSelector(ctx).toList()
             ..sort(
               (a, b) =>
                   getName(a).toLowerCase().compareTo(getName(b).toLowerCase()),
             );
 
-          // filtrelenmiş
-          final myLabel =
-              labels.first; // memberLabelsOrFallback: "You (...)" ilk gelir
-          final filtered = raw.where((e) {
-            final asg = getAssignedTo(e);
-            switch (filter) {
-              case _AssigneeFilter.all:
-                return true;
-              case _AssigneeFilter.mine:
-                return asg == myLabel;
-              case _AssigneeFilter.unassigned:
-                return asg.isEmpty;
-            }
-          }).toList();
+          // current user uid (Mine filtresi için)
+          final myUid = FirebaseAuth.instance.currentUser?.uid;
 
-          // gruplama: key = label ("Unassigned" fallback)
-          final Map<String, List<T>> groups = {};
-          for (final e in filtered) {
-            final k = getAssignedTo(e).isEmpty
-                ? 'Unassigned'
-                : getAssignedTo(e);
-            (groups[k] ??= []).add(e);
-          }
+          return StreamBuilder<Map<String, String>>(
+            stream: dictStream, // {uid: label}
+            builder: (_, snap) {
+              final dict = snap.data ?? const <String, String>{};
+              // filtre
+              bool keepByFilter(T e) {
+                final uid = (getAssignedUid(e) ?? '').trim();
+                switch (filter) {
+                  case _AssigneeFilter.all:
+                    return true;
+                  case _AssigneeFilter.mine:
+                    return (myUid != null && uid == myUid);
+                  case _AssigneeFilter.unassigned:
+                    return uid.isEmpty;
+                }
+              }
 
-          // başlık ve action bar
-          return Column(
-            children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).dividerColor,
-                  borderRadius: BorderRadius.circular(99),
-                ),
-              ),
-              const SizedBox(height: 12),
+              final filtered = raw.where(keepByFilter).toList();
 
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        titleBuilder(ctx, raw),
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
+              // gruplama: anahtar = label ('Unassigned' fallback)
+              final Map<String, List<T>> groups = {};
+              for (final e in filtered) {
+                final uid = (getAssignedUid(e) ?? '').trim();
+                final key = uid.isEmpty
+                    ? 'Unassigned'
+                    : (dict[uid] ?? 'Member');
+                (groups[key] ??= []).add(e);
+              }
+              final groupKeys = groups.keys.toList()
+                ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+              // başlık ve action bar
+              return Column(
+                children: [
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).dividerColor,
+                      borderRadius: BorderRadius.circular(99),
                     ),
-                    IconButton(
-                      tooltip: 'Close',
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
+                  ),
+                  const SizedBox(height: 12),
 
-              // filtre çipleri
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Wrap(
-                  spacing: 6,
-                  children: [
-                    ChoiceChip(
-                      label: const Text('All'),
-                      selected: filter == _AssigneeFilter.all,
-                      onSelected: (_) =>
-                          setLocal(() => filter = _AssigneeFilter.all),
-                    ),
-                    ChoiceChip(
-                      label: const Text('Mine'),
-                      selected: filter == _AssigneeFilter.mine,
-                      onSelected: (_) =>
-                          setLocal(() => filter = _AssigneeFilter.mine),
-                    ),
-                    ChoiceChip(
-                      label: const Text('Unassigned'),
-                      selected: filter == _AssigneeFilter.unassigned,
-                      onSelected: (_) =>
-                          setLocal(() => filter = _AssigneeFilter.unassigned),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 8),
-              const Divider(height: 1),
-
-              // içerik
-              Expanded(
-                child: (filtered.isEmpty)
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        Expanded(
                           child: Text(
-                            filter == _AssigneeFilter.unassigned
-                                ? 'No $sectionTitle in Unassigned'
-                                : 'Nothing here',
+                            titleBuilder(ctx, raw),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        itemCount: groups.length,
-                        itemBuilder: (_, idx) {
-                          final key = groups.keys.elementAt(idx);
-                          final list = groups[key]!
-                            ..sort(
-                              (a, b) => getName(a).toLowerCase().compareTo(
-                                getName(b).toLowerCase(),
-                              ),
-                            );
+                        IconButton(
+                          tooltip: 'Close',
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ),
 
-                          return _GroupSection<T>(
-                            title: key,
-                            count: list.length,
-                            leadingChar: key.isNotEmpty
-                                ? key.characters.first.toUpperCase()
-                                : '?',
-                            child: Column(
-                              children: list
-                                  .map(
-                                    (e) => ListTile(
-                                      dense: true,
-                                      visualDensity: const VisualDensity(
-                                        horizontal: -2,
-                                        vertical: -2,
-                                      ),
-                                      leading: IconButton(
-                                        tooltip: sectionTitle == 'Market'
-                                            ? 'Mark as bought'
-                                            : 'Mark as completed',
-                                        icon: Icon(leadingIcon),
-                                        onPressed: () =>
-                                            onTogglePrimary(ctx, e),
-                                      ),
-                                      title: Text(
-                                        getName(e),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      subtitle: key == 'Unassigned'
-                                          ? null
-                                          : Text('👤 $key'),
-                                      trailing: IconButton(
-                                        tooltip: 'Delete',
-                                        icon: const Icon(
-                                          Icons.delete,
-                                          color: Colors.redAccent,
-                                        ),
-                                        onPressed: () => onDelete(ctx, e),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
+                  // filtre çipleri
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Wrap(
+                      spacing: 6,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('All'),
+                          selected: filter == _AssigneeFilter.all,
+                          onSelected: (_) =>
+                              setLocal(() => filter = _AssigneeFilter.all),
+                        ),
+                        ChoiceChip(
+                          label: const Text('Mine'),
+                          selected: filter == _AssigneeFilter.mine,
+                          onSelected: (_) =>
+                              setLocal(() => filter = _AssigneeFilter.mine),
+                        ),
+                        ChoiceChip(
+                          label: const Text('Unassigned'),
+                          selected: filter == _AssigneeFilter.unassigned,
+                          onSelected: (_) => setLocal(
+                            () => filter = _AssigneeFilter.unassigned,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+                  const Divider(height: 1),
+
+                  // içerik
+                  Expanded(
+                    child: (filtered.isEmpty)
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(
+                                filter == _AssigneeFilter.unassigned
+                                    ? 'No $sectionTitle in Unassigned'
+                                    : 'Nothing here',
+                              ),
                             ),
-                          );
-                        },
-                      ),
-              ),
-            ],
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            itemCount: groupKeys.length,
+                            itemBuilder: (_, idx) {
+                              final key = groupKeys[idx];
+                              final list = groups[key]!
+                                ..sort(
+                                  (a, b) => getName(a).toLowerCase().compareTo(
+                                    getName(b).toLowerCase(),
+                                  ),
+                                );
+
+                              return _GroupSection<T>(
+                                title: key,
+                                count: list.length,
+                                leadingChar: key.isNotEmpty
+                                    ? key.characters.first.toUpperCase()
+                                    : '?',
+                                child: Column(
+                                  children: list
+                                      .map(
+                                        (e) => ListTile(
+                                          dense: true,
+                                          visualDensity: const VisualDensity(
+                                            horizontal: -2,
+                                            vertical: -2,
+                                          ),
+                                          leading: IconButton(
+                                            tooltip: sectionTitle == 'Market'
+                                                ? 'Mark as bought'
+                                                : 'Mark as completed',
+                                            icon: Icon(leadingIcon),
+                                            onPressed: () =>
+                                                onTogglePrimary(ctx, e),
+                                          ),
+                                          title: Text(
+                                            getName(e),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          subtitle: key == 'Unassigned'
+                                              ? null
+                                              : Text('👤 $key'),
+                                          trailing: IconButton(
+                                            tooltip: 'Delete',
+                                            icon: const Icon(
+                                              Icons.delete,
+                                              color: Colors.redAccent,
+                                            ),
+                                            onPressed: () => onDelete(ctx, e),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              );
+            },
           );
         },
       );
@@ -285,7 +296,7 @@ class _GroupSection<T> extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
-        subtitle: Text('$count item'),
+        subtitle: Text('$count ${count == 1 ? "item" : "items"}'),
         children: [child, const SizedBox(height: 6)],
       ),
     );

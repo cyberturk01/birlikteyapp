@@ -5,8 +5,9 @@ import '../../constants/app_strings.dart';
 import '../../models/item.dart';
 import '../../models/task.dart';
 import '../../providers/family_provider.dart';
-import '../../providers/item_provider.dart';
-import '../../providers/task_provider.dart';
+import '../../providers/item_cloud_provider.dart';
+import '../../providers/task_cloud_provider.dart';
+import '../../widgets/member_dropdown_uid.dart';
 
 const String kAllFilter = '__ALL__';
 const String kNoOne = '__NONE__';
@@ -14,15 +15,13 @@ const String kNoOne = '__NONE__';
 /// Panel üstündeki küçük “hızlı ekle” satırı (input + kişi seçimi + Add)
 class _QuickAddRow extends StatefulWidget {
   final String hint;
-  final List<String> familyMembers;
-  final String? presetAssignee; // panel kişi filtresi varsa otomatik atama
-  final void Function(String text, String? assignedTo) onSubmit;
+  final String? presetAssigneeUid; // panel filtresi UID ise
+  final void Function(String text, String? assignedToUid) onSubmit;
 
   const _QuickAddRow({
     required this.hint,
-    required this.familyMembers,
     required this.onSubmit,
-    this.presetAssignee,
+    this.presetAssigneeUid,
   });
 
   @override
@@ -32,14 +31,12 @@ class _QuickAddRow extends StatefulWidget {
 class _QuickAddRowState extends State<_QuickAddRow> {
   final TextEditingController _c = TextEditingController();
   String _selected = kNoOne; // sentinel (null yerine)
+  String? _selectedUid;
 
   @override
   void initState() {
     super.initState();
-    if (widget.presetAssignee != null &&
-        widget.presetAssignee!.trim().isNotEmpty) {
-      _selected = widget.presetAssignee!;
-    }
+    _selectedUid = widget.presetAssigneeUid;
   }
 
   @override
@@ -61,16 +58,14 @@ class _QuickAddRowState extends State<_QuickAddRow> {
         ),
         const SizedBox(width: 8),
         // assignee
-        DropdownButton<String>(
-          value: _selected,
-          hint: const Text('Assign'),
-          items: [
-            const DropdownMenuItem(value: kNoOne, child: Text('No one')),
-            ...widget.familyMembers.map(
-              (m) => DropdownMenuItem(value: m, child: Text(m)),
-            ),
-          ],
-          onChanged: (v) => setState(() => _selected = v ?? kNoOne),
+        SizedBox(
+          width: 220,
+          child: MemberDropdownUid(
+            value: _selectedUid,
+            onChanged: (v) => setState(() => _selectedUid = v),
+            label: 'Assign',
+            nullLabel: 'No one',
+          ),
         ),
         const SizedBox(width: 8),
         ElevatedButton(onPressed: _submit, child: const Text(S.add)),
@@ -80,13 +75,13 @@ class _QuickAddRowState extends State<_QuickAddRow> {
 
   void _submit() {
     final text = _c.text.trim();
-    final assigned = (_selected == kNoOne) ? null : _selected;
+    final assigned = widget.presetAssigneeUid ?? _selectedUid;
     if (text.isNotEmpty) {
       widget.onSubmit(text, assigned);
       _c.clear();
       // panel kişi filtresi yoksa, seçim kNoOne'a dönebilir
-      if (widget.presetAssignee == null || widget.presetAssignee!.isEmpty) {
-        setState(() => _selected = kNoOne);
+      if (widget.presetAssigneeUid == null) {
+        setState(() => _selectedUid = null);
       }
     }
   }
@@ -94,7 +89,7 @@ class _QuickAddRowState extends State<_QuickAddRow> {
 
 class _TasksMiniPanel extends StatefulWidget {
   final String? filterMember; // null = All
-  const _TasksMiniPanel({Key? key, this.filterMember}) : super(key: key);
+  const _TasksMiniPanel({super.key, this.filterMember});
 
   @override
   State<_TasksMiniPanel> createState() => _TasksMiniPanelState();
@@ -107,14 +102,14 @@ class _TasksMiniPanelState extends State<_TasksMiniPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final taskProv = context.watch<TaskProvider>();
+    final taskProv = context.watch<TaskCloudProvider>();
     final family = context.watch<FamilyProvider>().familyMembers;
 
     // Kişi filtresi
     List<Task> base = widget.filterMember == null
         ? taskProv.tasks
         : taskProv.tasks
-              .where((t) => (t.assignedTo ?? '') == widget.filterMember)
+              .where((t) => (t.assignedToUid ?? '') == widget.filterMember)
               .toList();
 
     // Durum filtresi
@@ -180,16 +175,12 @@ class _TasksMiniPanelState extends State<_TasksMiniPanel> {
                 hint: widget.filterMember == null
                     ? 'Add task…'
                     : 'Add task for ${widget.filterMember}…',
-                familyMembers: family, // sadece mevcut üyeler
-                presetAssignee: widget.filterMember,
-                onSubmit: (text, assigned) {
-                  final t = text.trim();
-                  if (t.isEmpty) return;
-                  // preset varsa assigned’ı override et
-                  final target = widget.filterMember ?? assigned;
-                  if (target == null) return; // kimse seçilmediyse ekleme
-                  context.read<TaskProvider>().addTask(
-                    Task(t, assignedTo: target),
+                presetAssigneeUid: widget.filterMember, // filterMember UID ise
+                onSubmit: (text, assignedUid) {
+                  if (text.trim().isEmpty) return;
+                  final targetUid = widget.filterMember ?? assignedUid;
+                  context.read<TaskCloudProvider>().addTask(
+                    Task(text.trim(), assignedToUid: targetUid),
                   );
                 },
               ),
@@ -232,7 +223,7 @@ class _TasksMiniPanelState extends State<_TasksMiniPanel> {
                     ),
                   );
                   if (ok == true) {
-                    context.read<TaskProvider>().clearCompleted(
+                    context.read<TaskCloudProvider>().clearCompleted(
                       forMember: widget.filterMember,
                     );
                   }
@@ -252,14 +243,13 @@ class _TasksMiniPanelState extends State<_TasksMiniPanel> {
                     final task = list[index];
                     return CheckboxListTile(
                       value: task.completed,
-                      onChanged: (v) => context.read<TaskProvider>().toggleTask(
-                        task,
-                        v ?? false,
-                      ),
+                      onChanged: (v) => context
+                          .read<TaskCloudProvider>()
+                          .toggleTask(task, v ?? false),
                       title: Text(
                         task.name +
-                            (task.assignedTo != null
-                                ? ' (${task.assignedTo})'
+                            (task.assignedToUid != null
+                                ? ' (${task.assignedToUid})'
                                 : ''),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -268,7 +258,7 @@ class _TasksMiniPanelState extends State<_TasksMiniPanel> {
                           if (val == 'assign') {
                             _showAssignTaskSheet(context, task);
                           } else if (val == 'delete') {
-                            context.read<TaskProvider>().removeTask(task);
+                            context.read<TaskCloudProvider>().removeTask(task);
                           }
                         },
                         itemBuilder: (_) => const [
@@ -289,8 +279,8 @@ class _TasksMiniPanelState extends State<_TasksMiniPanel> {
 
   void _showAssignTaskSheet(BuildContext context, Task task) {
     final family = context.read<FamilyProvider>().familyMembers;
-    final prov = context.read<TaskProvider>();
-    String? selected = task.assignedTo;
+    final prov = context.read<TaskCloudProvider>();
+    String? selected = task.assignedToUid;
 
     showModalBottomSheet(
       context: context,
@@ -349,13 +339,13 @@ class _MarketMiniPanelState extends State<_MarketMiniPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final itemProv = context.watch<ItemProvider>();
+    final itemProv = context.watch<ItemCloudProvider>();
     final family = context.watch<FamilyProvider>().familyMembers;
 
     List<Item> base = widget.filterMember == null
         ? itemProv.items
         : itemProv.items
-              .where((i) => (i.assignedTo ?? '') == widget.filterMember)
+              .where((i) => (i.assignedToUid ?? '') == widget.filterMember)
               .toList();
 
     List<Item> list;
@@ -420,12 +410,12 @@ class _MarketMiniPanelState extends State<_MarketMiniPanel> {
                 hint: widget.filterMember == null
                     ? 'Add item…'
                     : 'Add item for ${widget.filterMember}…',
-                familyMembers: family,
-                presetAssignee: widget.filterMember,
-                onSubmit: (text, assigned) {
+                presetAssigneeUid: widget.filterMember,
+                onSubmit: (text, assignedUid) {
                   if (text.trim().isEmpty) return;
-                  context.read<ItemProvider>().addItem(
-                    Item(text.trim(), assignedTo: assigned),
+                  final targetUid = widget.filterMember ?? assignedUid;
+                  context.read<ItemCloudProvider>().addItem(
+                    Item(text.trim(), assignedToUid: targetUid),
                   );
                 },
               ),
@@ -468,7 +458,7 @@ class _MarketMiniPanelState extends State<_MarketMiniPanel> {
                     ),
                   );
                   if (ok == true) {
-                    context.read<ItemProvider>().clearBought(
+                    context.read<ItemCloudProvider>().clearBought(
                       forMember: widget.filterMember,
                     );
                   }
@@ -488,14 +478,13 @@ class _MarketMiniPanelState extends State<_MarketMiniPanel> {
                     final it = list[index];
                     return CheckboxListTile(
                       value: it.bought,
-                      onChanged: (v) => context.read<ItemProvider>().toggleItem(
-                        it,
-                        v ?? false,
-                      ),
+                      onChanged: (v) => context
+                          .read<ItemCloudProvider>()
+                          .toggleItem(it, v ?? false),
                       title: Text(
                         it.name +
-                            (it.assignedTo != null
-                                ? ' (${it.assignedTo})'
+                            (it.assignedToUid != null
+                                ? ' (${it.assignedToUid})'
                                 : ''),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -504,7 +493,7 @@ class _MarketMiniPanelState extends State<_MarketMiniPanel> {
                           if (val == 'assign') {
                             _showAssignItemSheet(context, it);
                           } else if (val == 'delete') {
-                            context.read<ItemProvider>().removeItem(it);
+                            context.read<ItemCloudProvider>().removeItem(it);
                           }
                         },
                         itemBuilder: (_) => const [
@@ -525,8 +514,8 @@ class _MarketMiniPanelState extends State<_MarketMiniPanel> {
 
   void _showAssignItemSheet(BuildContext context, Item item) {
     final family = context.read<FamilyProvider>().familyMembers;
-    final prov = context.read<ItemProvider>();
-    String? selected = item.assignedTo;
+    final prov = context.read<ItemCloudProvider>();
+    String? selected = item.assignedToUid;
 
     showModalBottomSheet(
       context: context,

@@ -11,7 +11,7 @@ class Expense extends HiveObject {
   double amount;
 
   @HiveField(2)
-  String? assignedTo;
+  String? assignedToUid;
 
   @HiveField(3)
   DateTime date;
@@ -25,11 +25,27 @@ class Expense extends HiveObject {
   }
 
   Expense(
-    String rawTitle,
-    this.amount, {
+    this.amount, { // <-- amount ilk positional
     DateTime? date,
-    this.assignedTo,
+    this.assignedToUid,
     this.category,
-  }) : title = _capitalize(rawTitle),
+  }) : title = '', // adapter zaten ..title = fields[0] yapıyor
        date = date ?? DateTime.now();
+
+  factory Expense.withTitle(
+    String rawTitle,
+    double amount, {
+    DateTime? date,
+    String? assignedToUid,
+    String? category,
+  }) {
+    final e = Expense(
+      amount,
+      date: date,
+      assignedToUid: assignedToUid,
+      category: category,
+    );
+    e.title = _capitalize(rawTitle);
+    return e;
+  }
 }

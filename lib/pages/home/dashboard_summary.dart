@@ -1,18 +1,17 @@
-// lib/pages/home/dashboard_summary.dart
 import 'dart:async';
 
+import 'package:birlikteyapp/models/weekly_task_cloud.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/item.dart';
 import '../../models/task.dart';
-import '../../models/weekly_task.dart';
 import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
-import '../../providers/weekly_provider.dart';
-import '../../widgets/member_dropdown.dart';
+import '../../providers/weekly_cloud_provider.dart';
+import '../../widgets/member_dropdown_uid.dart';
 import '../../widgets/section_lists.dart';
 import 'grouped_sheet.dart';
 
@@ -51,8 +50,8 @@ class DashboardSummaryBar extends StatelessWidget {
 
     // BUGÜN'e ait weekly sayısı
     final String todayName = _weekdayName(DateTime.now());
-    final weeklyProv = Provider.of<WeeklyProvider?>(context, listen: true);
-    final List<WeeklyTask> todaysWeekly =
+    final weeklyProv = Provider.of<WeeklyCloudProvider?>(context, listen: true);
+    final List<WeeklyTaskCloud> todaysWeekly =
         weeklyProv?.tasksForDay(todayName) ?? const [];
 
     final expProv = context.watch<ExpenseCloudProvider>();
@@ -298,7 +297,7 @@ Future<void> showPendingTasksSheet(BuildContext context) async {
     sourceSelector: (ctx) =>
         ctx.watch<TaskCloudProvider>().tasks.where((t) => !t.completed),
     getName: (t) => t.name,
-    getAssignedTo: (t) => (t.assignedTo ?? '').trim(),
+    getAssignedTo: (t) => (t.assignedToUid ?? '').trim(),
     onTogglePrimary: (ctx, t) =>
         ctx.read<TaskCloudProvider>().toggleTask(t, true),
     onDelete: (ctx, t) => ctx.read<TaskCloudProvider>().removeTask(t),
@@ -316,7 +315,7 @@ Future<void> showToBuyItemsSheet(BuildContext context) async {
     sourceSelector: (ctx) =>
         ctx.watch<ItemCloudProvider>().items.where((i) => !i.bought),
     getName: (it) => it.name,
-    getAssignedTo: (it) => (it.assignedTo ?? '').trim(),
+    getAssignedTo: (it) => (it.assignedToUid ?? '').trim(),
     onTogglePrimary: (ctx, it) =>
         ctx.read<ItemCloudProvider>().toggleItem(it, true),
     onDelete: (ctx, it) => ctx.read<ItemCloudProvider>().removeItem(it),
@@ -404,7 +403,8 @@ void _showRenameItemDialog(BuildContext context, Item item) {
 }
 
 void _showAssignTaskSheet(BuildContext context, Task task) {
-  String? selected = task.assignedTo;
+  String? selectedUid = task.assignedToUid;
+
   final taskCloud = context.read<TaskCloudProvider>();
   showModalBottomSheet(
     context: context,
@@ -419,9 +419,9 @@ void _showAssignTaskSheet(BuildContext context, Task task) {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            MemberDropdown(
-              value: selected,
-              onChanged: (v) => setLocal(() => selected = v),
+            MemberDropdownUid(
+              value: selectedUid,
+              onChanged: (v) => setLocal(() => selectedUid = v),
               label: 'Assign to',
               nullLabel: 'No one',
             ),
@@ -432,8 +432,8 @@ void _showAssignTaskSheet(BuildContext context, Task task) {
                 onPressed: () async {
                   await taskCloud.updateAssignment(
                     task,
-                    (selected != null && selected!.trim().isNotEmpty)
-                        ? selected
+                    (selectedUid != null && selectedUid!.trim().isNotEmpty)
+                        ? selectedUid
                         : null,
                   );
                   taskCloud.refreshNow();
@@ -450,7 +450,7 @@ void _showAssignTaskSheet(BuildContext context, Task task) {
 }
 
 void _showAssignItemSheet(BuildContext context, Item item) {
-  String? selected = item.assignedTo;
+  String? selectedUid = item.assignedToUid;
   showModalBottomSheet(
     context: context,
     builder: (_) => Padding(
@@ -463,29 +463,54 @@ void _showAssignItemSheet(BuildContext context, Item item) {
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          StreamBuilder<List<String>>(
-            stream: context.read<FamilyProvider>().watchMemberLabels(),
-            builder: (ctx, snap) {
-              final labels = (snap.data ?? const <String>[]).toSet().toList();
-              final items = <DropdownMenuItem<String>>[
-                const DropdownMenuItem(value: '', child: Text('No one')),
-                ...labels.map(
-                  (m) => DropdownMenuItem(value: m, child: Text(m)),
-                ),
-              ];
-              final value = labels.contains(selected) ? selected! : '';
-              return DropdownButtonFormField<String>(
-                value: value,
-                isExpanded: true,
-                items: items,
-                onChanged: (v) => selected = v ?? '',
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
+
+          StatefulBuilder(
+            builder: (ctx, setLocal) {
+              return StreamBuilder<Map<String, String>>(
+                stream: context
+                    .read<FamilyProvider>()
+                    .watchMemberDirectory(), // {uid: label}
+                builder: (ctx, snap) {
+                  final dict = snap.data ?? const <String, String>{};
+                  final display = selectedUid == null
+                      ? 'Unassigned'
+                      : (dict[selectedUid] ?? 'Member');
+
+                  // Dropdown item'ları: value = uid, görünen = label
+                  final items = <DropdownMenuItem<String?>>[
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('No one'),
+                    ),
+                    ...dict.entries.map(
+                      (e) => DropdownMenuItem<String?>(
+                        value: e.key,
+                        child: Text(e.value),
+                      ),
+                    ),
+                  ];
+
+                  // Eğer selectedUid artık dict'te yoksa (ör. üye ayrıldı) null'a düş
+                  final value = dict.containsKey(selectedUid)
+                      ? selectedUid
+                      : null;
+
+                  return DropdownButtonFormField<String?>(
+                    value: value,
+                    isExpanded: true,
+                    items: items,
+                    onChanged: (v) => setLocal(() => selectedUid = v),
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      labelText: 'Assign to',
+                    ),
+                  );
+                },
               );
             },
           ),
+
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
@@ -493,8 +518,8 @@ void _showAssignItemSheet(BuildContext context, Item item) {
               onPressed: () {
                 context.read<ItemCloudProvider>().updateAssignment(
                   item,
-                  (selected != null && selected!.trim().isNotEmpty)
-                      ? selected
+                  (selectedUid != null && selectedUid!.trim().isNotEmpty)
+                      ? selectedUid
                       : null,
                 );
                 Navigator.pop(context);

@@ -8,23 +8,23 @@ import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/templates_provider.dart';
-import '../../providers/weekly_provider.dart';
+import '../../providers/weekly_cloud_provider.dart';
 
 class TemplatesPage extends StatefulWidget {
-  const TemplatesPage({Key? key}) : super(key: key);
+  const TemplatesPage({super.key});
 
   @override
   State<TemplatesPage> createState() => _TemplatesPageState();
 }
 
 class _TemplatesPageState extends State<TemplatesPage> {
-  String? _assignTo; // opsiyonel atama
+  String? _assignToUid; // opsiyonel atama
   bool _skipDuplicates = true; // tasks/items için
 
   @override
   Widget build(BuildContext context) {
-    final family = context.watch<FamilyProvider>().familyMembers;
     final userTemplates = context.watch<TemplatesProvider>().all;
+    final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Templates')),
@@ -59,25 +59,45 @@ class _TemplatesPageState extends State<TemplatesPage> {
                         const SizedBox(height: 8),
                         ConstrainedBox(
                           constraints: BoxConstraints(maxWidth: ddWidth),
-                          child: DropdownButtonFormField<String>(
-                            value: _assignTo,
-                            isExpanded: true, // metin taşmasın
-                            items: [
-                              const DropdownMenuItem(
-                                value: null,
-                                child: Text('Select ...'),
-                              ),
-                              ...family.map(
-                                (m) =>
-                                    DropdownMenuItem(value: m, child: Text(m)),
-                              ),
-                            ],
-                            onChanged: (v) => setState(() => _assignTo = v),
-                            decoration: const InputDecoration(
-                              labelText: 'Assign to (optional)',
-                              border: OutlineInputBorder(gapPadding: 2),
-                              isDense: true,
-                            ),
+                          child: StreamBuilder<Map<String, String>>(
+                            stream: dictStream,
+                            builder: (_, snap) {
+                              final dict =
+                                  snap.data ?? const <String, String>{};
+                              final items = <DropdownMenuItem<String?>>[
+                                const DropdownMenuItem(
+                                  value: null,
+                                  child: Text('Select ...'),
+                                ),
+                                ...dict.entries.map(
+                                  (e) => DropdownMenuItem<String?>(
+                                    value: e.key, // <-- UID
+                                    child: Text(e.value), // <-- label
+                                  ),
+                                ),
+                              ];
+
+                              // seçili UID dict’te yoksa null’a düş
+                              final value = dict.containsKey(_assignToUid)
+                                  ? _assignToUid
+                                  : null;
+
+                              return ConstrainedBox(
+                                constraints: BoxConstraints(maxWidth: ddWidth),
+                                child: DropdownButtonFormField<String?>(
+                                  value: value,
+                                  isExpanded: true,
+                                  items: items,
+                                  onChanged: (v) =>
+                                      setState(() => _assignToUid = v),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Assign to (optional)',
+                                    border: OutlineInputBorder(gapPadding: 2),
+                                    isDense: true,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
                         TextButton.icon(
@@ -180,28 +200,28 @@ class _TemplatesPageState extends State<TemplatesPage> {
     return entries.map<(String, String)>((e) => (e.day, e.title)).toList();
   }
 
-  void _applyUserTemplate(BuildContext context, UserTemplate utpl) {
+  void _applyUserTemplate(BuildContext context, UserTemplate utpl) async {
     final taskProv = context.read<TaskCloudProvider>();
     final itemProv = context.read<ItemCloudProvider>();
-    final weeklyProv = context.read<WeeklyProvider>();
+    final weeklyProv = context.read<WeeklyCloudProvider>();
 
     // Bunlar senin var olan bulk metodlarınla eşleştirilmeli.
-    final createdTasks = taskProv.addTasksBulk(
+    final createdTasks = await taskProv.addTasksBulk(
       utpl.tasks,
-      assignedTo: _assignTo, // varsa state alanın
+      assignedToUid: _assignToUid, // varsa state alanın
       skipDuplicates: _skipDuplicates, // varsa state alanın
     );
 
-    final createdItems = itemProv.addItemsBulk(
+    final createdItems = await itemProv.addItemsBulk(
       utpl.items,
-      assignedTo: _assignTo,
+      assignedToUid: _assignToUid,
       skipDuplicates: _skipDuplicates,
     );
 
-    final createdWeekly = weeklyProv.addWeeklyBulk(
+    final createdWeekly = await weeklyProv.addWeeklyBulk(
       // WeeklyEntry → (day,title) record
       weeklyEntriesToRecords(utpl.weekly),
-      assignedTo: _assignTo,
+      assignedToUid: _assignToUid,
     );
 
     final total =
@@ -219,10 +239,10 @@ class _TemplatesPageState extends State<TemplatesPage> {
         content: Text('Added $total from "${utpl.name}"'),
         action: SnackBarAction(
           label: 'Undo',
-          onPressed: () {
+          onPressed: () async {
             taskProv.removeManyTasks(createdTasks);
             itemProv.removeManyItems(createdItems);
-            weeklyProv.removeManyWeekly(createdWeekly);
+            weeklyProv.removeManyWeekly(await createdWeekly);
           },
         ),
       ),
@@ -545,24 +565,24 @@ class _TemplatesPageState extends State<TemplatesPage> {
     );
   }
 
-  void _applyAll(BuildContext context, TemplatePack tpl) {
+  void _applyAll(BuildContext context, TemplatePack tpl) async {
     final taskProv = context.read<TaskCloudProvider>();
     final itemProv = context.read<ItemCloudProvider>();
-    final weeklyProv = context.read<WeeklyProvider>();
+    final weeklyProv = context.read<WeeklyCloudProvider>();
 
-    final createdTasks = taskProv.addTasksBulk(
+    final createdTasks = await taskProv.addTasksBulk(
       tpl.tasks,
-      assignedTo: _assignTo,
+      assignedToUid: _assignToUid,
       skipDuplicates: _skipDuplicates,
     );
-    final createdItems = itemProv.addItemsBulk(
+    final createdItems = await itemProv.addItemsBulk(
       tpl.items,
-      assignedTo: _assignTo,
+      assignedToUid: _assignToUid,
       skipDuplicates: _skipDuplicates,
     );
-    final createdWeekly = weeklyProv.addWeeklyBulk(
+    final createdWeekly = await weeklyProv.addWeeklyBulk(
       tpl.weekly,
-      assignedTo: _assignTo,
+      assignedToUid: _assignToUid,
     );
 
     final total =
@@ -592,11 +612,13 @@ class _TemplatesPageState extends State<TemplatesPage> {
     );
   }
 
-  void _applyWeeklyOnly(BuildContext context, TemplatePack tpl) {
-    final weeklyProv = context.read<WeeklyProvider>();
-    final createdWeekly = weeklyProv.addWeeklyBulk(
+  void _applyWeeklyOnly(BuildContext context, TemplatePack tpl) async {
+    final weeklyProv = context.read<WeeklyCloudProvider>();
+
+    // Future<List<...>> -> await
+    final createdWeekly = await weeklyProv.addWeeklyBulk(
       tpl.weekly,
-      assignedTo: _assignTo,
+      assignedToUid: _assignToUid,
     );
 
     if (createdWeekly.isEmpty) {

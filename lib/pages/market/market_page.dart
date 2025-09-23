@@ -128,7 +128,9 @@ class _MarketPageState extends State<MarketPage> {
               onPressed: () {
                 final text = controller.text.trim();
                 if (text.isNotEmpty) {
-                  itemProvider.addItem(Item(text, assignedTo: selectedMember));
+                  itemProvider.addItem(
+                    Item(text, assignedToUid: selectedMember),
+                  );
                   Navigator.pop(context);
                 }
               },
@@ -147,7 +149,7 @@ class _MarketPageState extends State<MarketPage> {
     final List<Item> filteredItems = _filterMember == null
         ? itemProvider.items
         : itemProvider.items
-              .where((i) => (i.assignedTo ?? '') == _filterMember)
+              .where((i) => (i.assignedToUid ?? '') == _filterMember)
               .toList();
 
     return Scaffold(
@@ -185,7 +187,9 @@ class _MarketPageState extends State<MarketPage> {
             ),
             title: Text(
               item.name +
-                  (item.assignedTo != null ? " (${item.assignedTo})" : ""),
+                  (item.assignedToUid != null
+                      ? " (${item.assignedToUid})"
+                      : ""),
               style: TextStyle(
                 decoration: item.bought ? TextDecoration.lineThrough : null,
               ),
@@ -225,7 +229,7 @@ class _MarketPageState extends State<MarketPage> {
       listen: false,
     ).familyMembers;
     final itemProv = Provider.of<ItemCloudProvider>(context, listen: false);
-    String? selected = item.assignedTo;
+    String? selected = item.assignedToUid;
 
     showModalBottomSheet(
       context: context,

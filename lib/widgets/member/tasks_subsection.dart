@@ -48,7 +48,7 @@ class TasksSubsection extends StatelessWidget {
             return Dismissible(
               direction: DismissDirection.endToStart,
               key: ValueKey(
-                task.remoteId ?? '${task.name}|${task.assignedTo ?? ""}',
+                task.remoteId ?? '${task.name}|${task.assignedToUid ?? ""}',
               ),
               background: const SwipeBg(
                 color: Colors.green,

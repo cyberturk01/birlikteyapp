@@ -374,9 +374,13 @@ class _MemberCardState extends State<MemberCard> {
 
     // Undo için anlık snapshot
     final removed = prov.tasks
-        .where((t) => (t.assignedTo ?? '') == member && t.completed)
+        .where((t) => (t.assignedToUid ?? '') == member && t.completed)
         .map(
-          (t) => Task(t.name, completed: t.completed, assignedTo: t.assignedTo),
+          (t) => Task(
+            t.name,
+            completed: t.completed,
+            assignedToUid: t.assignedToUid,
+          ),
         )
         .toList();
 
@@ -398,16 +402,18 @@ class _MemberCardState extends State<MemberCard> {
     );
   }
 
-  void _clearBoughtForMember(BuildContext context, String member) {
+  void _clearBoughtForMember(BuildContext context, String memberUid) {
     final prov = context.read<ItemCloudProvider>();
 
     // Undo için snapshot
     final removed = prov.items
-        .where((i) => (i.assignedTo ?? '') == member && i.bought)
-        .map((i) => Item(i.name, bought: i.bought, assignedTo: i.assignedTo))
+        .where((i) => (i.assignedToUid ?? '') == memberUid && i.bought)
+        .map(
+          (i) => Item(i.name, bought: i.bought, assignedToUid: i.assignedToUid),
+        )
         .toList();
 
-    prov.clearBought(forMember: member);
+    prov.clearBought(forMember: memberUid);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -708,7 +714,7 @@ class _TasksSubsection extends StatelessWidget {
               direction: DismissDirection.endToStart,
               key: ValueKey(
                 task.remoteId ??
-                    '${task.name}|${task.assignedTo ?? //
+                    '${task.name}|${task.assignedToUid ?? //
                         ""}',
               ), // HiveObject.key (Task, HiveObject'tan türemeli)
               background: const SwipeBg(
@@ -857,7 +863,7 @@ class _ItemsSubsection extends StatelessWidget {
                   final copy = Item(
                     removed.name,
                     bought: removed.bought,
-                    assignedTo: removed.assignedTo,
+                    assignedToUid: removed.assignedToUid,
                   );
                   context.read<ItemCloudProvider>().removeItem(removed);
 
@@ -952,7 +958,7 @@ Task? _pickTaskByName(List<Task> list, String name) {
   final unassigned = list.where(
     (t) =>
         t.name.toLowerCase() == lower &&
-        (t.assignedTo == null || t.assignedTo!.isEmpty) &&
+        (t.assignedToUid == null || t.assignedToUid!.isEmpty) &&
         !t.completed,
   );
   if (unassigned.isNotEmpty) return unassigned.first;
@@ -960,7 +966,7 @@ Task? _pickTaskByName(List<Task> list, String name) {
   final anyUnassigned = list.where(
     (t) =>
         t.name.toLowerCase() == lower &&
-        (t.assignedTo == null || t.assignedTo!.isEmpty),
+        (t.assignedToUid == null || t.assignedToUid!.isEmpty),
   );
   if (anyUnassigned.isNotEmpty) return anyUnassigned.first;
 
@@ -976,7 +982,7 @@ Item? _pickItemByName(List<Item> list, String name) {
   final unassigned = list.where(
     (i) =>
         i.name.toLowerCase() == lower &&
-        (i.assignedTo == null || i.assignedTo!.isEmpty) &&
+        (i.assignedToUid == null || i.assignedToUid!.isEmpty) &&
         !i.bought,
   );
   if (unassigned.isNotEmpty) return unassigned.first;
@@ -984,7 +990,7 @@ Item? _pickItemByName(List<Item> list, String name) {
   final anyUnassigned = list.where(
     (i) =>
         i.name.toLowerCase() == lower &&
-        (i.assignedTo == null || i.assignedTo!.isEmpty),
+        (i.assignedToUid == null || i.assignedToUid!.isEmpty),
   );
   if (anyUnassigned.isNotEmpty) return anyUnassigned.first;
 
@@ -995,30 +1001,30 @@ Item? _pickItemByName(List<Item> list, String name) {
   }
 }
 
-void _assignOrCreateTask(BuildContext context, String name, String member) {
+void _assignOrCreateTask(BuildContext context, String name, String memberUid) {
   final prov = context.read<TaskCloudProvider>();
   final trimmed = name.trim();
   if (trimmed.isEmpty) return;
 
   final existing = _pickTaskByName(prov.tasks, trimmed);
   if (existing != null) {
-    context.read<TaskCloudProvider>().updateAssignment(existing, member);
+    context.read<TaskCloudProvider>().updateAssignment(existing, memberUid);
   } else {
-    prov.addTask(Task(trimmed, assignedTo: member));
+    prov.addTask(Task(trimmed, assignedToUid: memberUid));
   }
   Navigator.pop(context);
 }
 
-void _assignOrCreateItem(BuildContext context, String name, String member) {
+void _assignOrCreateItem(BuildContext context, String name, String memberUid) {
   final prov = context.read<ItemCloudProvider>();
   final trimmed = name.trim();
   if (trimmed.isEmpty) return;
 
   final existing = _pickItemByName(prov.items, trimmed);
   if (existing != null) {
-    context.read<ItemCloudProvider>().updateAssignment(existing, member);
+    context.read<ItemCloudProvider>().updateAssignment(existing, memberUid);
   } else {
-    prov.addItem(Item(trimmed, assignedTo: member));
+    prov.addItem(Item(trimmed, assignedToUid: memberUid));
   }
   Navigator.pop(context);
 }

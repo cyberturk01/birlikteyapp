@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hive/hive.dart';
 
 part 'task.g.dart';
@@ -11,15 +12,34 @@ class Task extends HiveObject {
   bool completed;
 
   @HiveField(2)
-  String? assignedTo;
+  String? assignedToUid;
 
   String? remoteId;
+
+  @HiveField(3)
+  String? origin;
 
   static String _capitalize(String input) {
     if (input.isEmpty) return input;
     return input[0].toUpperCase() + input.substring(1);
   }
 
-  Task(String name, {this.completed = false, this.assignedTo, this.remoteId})
-    : name = _capitalize(name);
+  Task(
+    String name, {
+    this.completed = false,
+    this.assignedToUid,
+    this.remoteId,
+    this.origin,
+  }) : name = _capitalize(name);
+
+  factory Task.fromSnap(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data()!;
+    return Task(
+      (d['name'] as String).trim(),
+      completed: (d['completed'] as bool?) ?? false,
+      assignedToUid:
+          (d['assignedToUid'] as String?) ??
+          (d['assignedTo'] as String?), // GERİYE DÖNÜK
+    )..remoteId = doc.id;
+  }
 }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/family_provider.dart';
-import 'member_dropdown.dart';
+import 'member_dropdown_uid.dart';
 
 class MemberAssignSheet extends StatelessWidget {
   final String title;
@@ -76,7 +76,7 @@ class MemberAssignSheet extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  MemberDropdown(
+                  MemberDropdownUid(
                     value: selected,
                     onChanged: (v) => setLocal(() => selected = v),
                     label: 'Assign to',

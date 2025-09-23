@@ -1,12 +1,12 @@
-// lib/pages/weekly/weekly_page.dart
 import 'package:birlikteyapp/constants/app_lists.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/weekly_task_cloud.dart';
+import '../../providers/family_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/weekly_cloud_provider.dart';
-import '../../widgets/member_dropdown.dart';
+import '../../widgets/member_dropdown_uid.dart';
 
 class WeeklyPage extends StatefulWidget {
   const WeeklyPage({super.key});
@@ -191,7 +191,7 @@ class _WeeklyPageState extends State<WeeklyPage> {
                 onSubmitted: (_) => Navigator.of(context).pop('submit'),
               ),
               const SizedBox(height: 20),
-              MemberDropdown(
+              MemberDropdownUid(
                 value: assign, // null olabilir
                 onChanged: (v) => assign = v, // v null => Unassigned
                 label: 'Assign to (optional)',
@@ -222,7 +222,7 @@ class _WeeklyPageState extends State<WeeklyPage> {
                               WeeklyTaskCloud(
                                 dayName,
                                 name,
-                                assignedTo: assign,
+                                assignedToUid: assign,
                               ),
                             );
                             if (weekday == DateTime.now().weekday) {
@@ -260,7 +260,7 @@ class _WeeklyPageState extends State<WeeklyPage> {
       if (text.isEmpty) return;
 
       await weekly.addWeeklyTask(
-        WeeklyTaskCloud(dayName, text, assignedTo: assign),
+        WeeklyTaskCloud(dayName, text, assignedToUid: assign),
       );
       if (weekday == DateTime.now().weekday) {
         await weekly.syncTodayToTasks(taskProv);
@@ -302,51 +302,68 @@ class _WeeklyTaskTile extends StatelessWidget {
       timeText = '$h:$m';
     }
 
+    final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
+
     final subtitle = [
-      if ((task.assignedTo ?? '').isNotEmpty) '👤 ${task.assignedTo}',
+      if ((task.assignedToUid ?? '').isNotEmpty) '👤 ${task.assignedToUid}',
       if (timeText != null) '⏰ $timeText',
     ].join('   •   ');
 
-    return ListTile(
-      leading: const Icon(Icons.event_repeat),
-      title: Text(task.title),
-      subtitle: subtitle.isEmpty ? null : Text(subtitle),
-      trailing: Wrap(
-        spacing: 2,
-        children: [
-          IconButton(
-            tooltip: 'Reminder time',
-            icon: const Icon(Icons.access_time),
-            onPressed: () async {
-              final initial = TimeOfDay(
-                hour: task.hour ?? 19,
-                minute: task.minute ?? 0,
-              );
-              final picked = await showTimePicker(
-                context: context,
-                initialTime: initial,
-                builder: (ctx, child) => MediaQuery(
-                  data: MediaQuery.of(
-                    ctx,
-                  ).copyWith(alwaysUse24HourFormat: true),
-                  child: child ?? const SizedBox.shrink(),
-                ),
-              );
-              if (picked != null) {
-                await weekly.updateWeeklyTask(task, timeOfDay: picked);
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Reminder updated')),
-                );
-              }
-            },
+    return StreamBuilder<Map<String, String>>(
+      stream: dictStream, // {uid: label}
+      builder: (_, snap) {
+        final dict = snap.data ?? const <String, String>{};
+        final label =
+            (task.assignedToUid == null || task.assignedToUid!.trim().isEmpty)
+            ? null
+            : (dict[task.assignedToUid] ?? 'Member'); // UID -> Label
+
+        final subtitle = [
+          if (label != null) '👤 $label',
+          if (timeText != null) '⏰ $timeText',
+        ].join('   •   ');
+        return ListTile(
+          leading: const Icon(Icons.event_repeat),
+          title: Text(task.title),
+          subtitle: subtitle.isEmpty ? null : Text(subtitle),
+          trailing: Wrap(
+            spacing: 2,
+            children: [
+              IconButton(
+                tooltip: 'Reminder time',
+                icon: const Icon(Icons.access_time),
+                onPressed: () async {
+                  final initial = TimeOfDay(
+                    hour: task.hour ?? 19,
+                    minute: task.minute ?? 0,
+                  );
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: initial,
+                    builder: (ctx, child) => MediaQuery(
+                      data: MediaQuery.of(
+                        ctx,
+                      ).copyWith(alwaysUse24HourFormat: true),
+                      child: child ?? const SizedBox.shrink(),
+                    ),
+                  );
+                  if (picked != null) {
+                    await weekly.updateWeeklyTask(task, timeOfDay: picked);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Reminder updated')),
+                    );
+                  }
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () => weekly.removeWeeklyTaskById(task.id),
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.delete, color: Colors.red),
-            onPressed: () => weekly.removeWeeklyTaskById(task.id),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
