@@ -297,7 +297,7 @@ Future<void> showPendingTasksSheet(BuildContext context) async {
     sourceSelector: (ctx) =>
         ctx.watch<TaskCloudProvider>().tasks.where((t) => !t.completed),
     getName: (t) => t.name,
-    getAssignedTo: (t) => (t.assignedToUid ?? '').trim(),
+    getAssignedUid: (t) => t.assignedToUid,
     onTogglePrimary: (ctx, t) =>
         ctx.read<TaskCloudProvider>().toggleTask(t, true),
     onDelete: (ctx, t) => ctx.read<TaskCloudProvider>().removeTask(t),
@@ -315,7 +315,7 @@ Future<void> showToBuyItemsSheet(BuildContext context) async {
     sourceSelector: (ctx) =>
         ctx.watch<ItemCloudProvider>().items.where((i) => !i.bought),
     getName: (it) => it.name,
-    getAssignedTo: (it) => (it.assignedToUid ?? '').trim(),
+    getAssignedUid: (it) => it.assignedToUid,
     onTogglePrimary: (ctx, it) =>
         ctx.read<ItemCloudProvider>().toggleItem(it, true),
     onDelete: (ctx, it) => ctx.read<ItemCloudProvider>().removeItem(it),

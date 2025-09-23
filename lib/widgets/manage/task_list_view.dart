@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../constants/app_strings.dart';
 import '../../models/task.dart';
+import '../../providers/family_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../widgets/swipe_bg.dart';
 import '../member_dropdown_uid.dart';
@@ -18,6 +19,7 @@ class TaskListView extends StatelessWidget {
     if (tasks.isEmpty) {
       return const Text('No tasks yet');
     }
+    final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
 
     return ListView.separated(
       shrinkWrap: true,
@@ -62,51 +64,65 @@ class TaskListView extends StatelessWidget {
               return true;
             }
           },
-          child: ListTile(
-            dense: true,
-            visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
-            leading: Checkbox(
-              value: t.completed,
-              onChanged: (v) =>
-                  context.read<TaskCloudProvider>().toggleTask(t, v ?? false),
-            ),
-            title: Text(
-              t.name,
-              overflow: TextOverflow.ellipsis,
-              style: t.completed
-                  ? const TextStyle(decoration: TextDecoration.lineThrough)
-                  : null,
-            ),
-            subtitle: (t.assignedToUid != null && t.assignedToUid!.isNotEmpty)
-                ? Text('👤 ${t.assignedToUid}')
-                : null,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Assign',
-                  icon: const Icon(Icons.person_add_alt),
-                  onPressed: () => _showAssignTaskSheetCloud(context, t),
+          child: StreamBuilder<Map<String, String>>(
+            stream: dictStream, // {uid: label}
+            builder: (_, snap) {
+              final dict = snap.data ?? const <String, String>{};
+              final uid = t.assignedToUid;
+              final display = (uid == null || uid.isEmpty)
+                  ? 'Unassigned'
+                  : (dict[uid] ?? 'Member');
+              return ListTile(
+                dense: true,
+                visualDensity: const VisualDensity(
+                  horizontal: -4,
+                  vertical: -2,
                 ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Edit',
-                  icon: const Icon(Icons.edit),
-                  onPressed: () => _showRenameTaskDialogCloud(context, t),
+                leading: Checkbox(
+                  value: t.completed,
+                  onChanged: (v) => context
+                      .read<TaskCloudProvider>()
+                      .toggleTask(t, v ?? false),
                 ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: S.delete,
-                  icon: const Icon(Icons.delete, color: Colors.redAccent),
-                  onPressed: () =>
-                      context.read<TaskCloudProvider>().removeTask(t),
+                title: Text(
+                  t.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: t.completed
+                      ? const TextStyle(decoration: TextDecoration.lineThrough)
+                      : null,
                 ),
-              ],
-            ),
+                subtitle: (display == 'Unassigned')
+                    ? null
+                    : Text('👤 $display'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Assign',
+                      icon: const Icon(Icons.person_add_alt),
+                      onPressed: () => _showAssignTaskSheetCloud(context, t),
+                    ),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Edit',
+                      icon: const Icon(Icons.edit),
+                      onPressed: () => _showRenameTaskDialogCloud(context, t),
+                    ),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: S.delete,
+                      icon: const Icon(Icons.delete, color: Colors.redAccent),
+                      onPressed: () =>
+                          context.read<TaskCloudProvider>().removeTask(t),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         );
       },

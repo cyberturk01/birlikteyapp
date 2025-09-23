@@ -294,7 +294,7 @@ class _WeeklyTaskTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final weekly = context.read<WeeklyCloudProvider>();
-
+    final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
     String? timeText;
     if (task.hour != null && task.minute != null) {
       final h = task.hour!.toString().padLeft(2, '0');
@@ -302,26 +302,25 @@ class _WeeklyTaskTile extends StatelessWidget {
       timeText = '$h:$m';
     }
 
-    final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
-
-    final subtitle = [
-      if ((task.assignedToUid ?? '').isNotEmpty) '👤 ${task.assignedToUid}',
-      if (timeText != null) '⏰ $timeText',
-    ].join('   •   ');
-
     return StreamBuilder<Map<String, String>>(
       stream: dictStream, // {uid: label}
       builder: (_, snap) {
         final dict = snap.data ?? const <String, String>{};
-        final label =
-            (task.assignedToUid == null || task.assignedToUid!.trim().isEmpty)
-            ? null
-            : (dict[task.assignedToUid] ?? 'Member'); // UID -> Label
+        final uid = task.assignedToUid;
+        final who = (uid == null || uid.isEmpty) ? '' : (dict[uid] ?? 'Member');
+
+        String? timeText;
+        if (task.hour != null && task.minute != null) {
+          final h = task.hour!.toString().padLeft(2, '0');
+          final m = task.minute!.toString().padLeft(2, '0');
+          timeText = '$h:$m';
+        }
 
         final subtitle = [
-          if (label != null) '👤 $label',
+          if (who.isNotEmpty) '👤 $who',
           if (timeText != null) '⏰ $timeText',
         ].join('   •   ');
+
         return ListTile(
           leading: const Icon(Icons.event_repeat),
           title: Text(task.title),

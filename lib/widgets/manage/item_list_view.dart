@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../constants/app_strings.dart';
 import '../../models/item.dart';
+import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../widgets/swipe_bg.dart';
 import '../member_assign_sheet.dart';
@@ -18,6 +19,7 @@ class ItemListView extends StatelessWidget {
     if (items.isEmpty) {
       return const Text('No items yet');
     }
+    final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
 
     return ListView.separated(
       shrinkWrap: true,
@@ -62,51 +64,65 @@ class ItemListView extends StatelessWidget {
               return true;
             }
           },
-          child: ListTile(
-            dense: true,
-            visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
-            leading: Checkbox(
-              value: it.bought,
-              onChanged: (v) =>
-                  context.read<ItemCloudProvider>().toggleItem(it, v ?? false),
-            ),
-            title: Text(
-              it.name,
-              overflow: TextOverflow.ellipsis,
-              style: it.bought
-                  ? const TextStyle(decoration: TextDecoration.lineThrough)
-                  : null,
-            ),
-            subtitle: (it.assignedToUid != null && it.assignedToUid!.isNotEmpty)
-                ? Text('👤 ${it.assignedToUid}')
-                : null,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Assign',
-                  icon: const Icon(Icons.person_add_alt),
-                  onPressed: () => _showAssignItemSheet(context, it),
+          child: StreamBuilder<Map<String, String>>(
+            stream: dictStream,
+            builder: (_, snap) {
+              final dict = snap.data ?? const <String, String>{};
+              final uid = it.assignedToUid;
+              final display = (uid == null || uid.isEmpty)
+                  ? 'Unassigned'
+                  : (dict[uid] ?? 'Member');
+              return ListTile(
+                dense: true,
+                visualDensity: const VisualDensity(
+                  horizontal: -4,
+                  vertical: -2,
                 ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Edit',
-                  icon: const Icon(Icons.edit),
-                  onPressed: () => _showRenameItemDialog(context, it),
+                leading: Checkbox(
+                  value: it.bought,
+                  onChanged: (v) => context
+                      .read<ItemCloudProvider>()
+                      .toggleItem(it, v ?? false),
                 ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: S.delete,
-                  icon: const Icon(Icons.delete, color: Colors.redAccent),
-                  onPressed: () =>
-                      context.read<ItemCloudProvider>().removeItem(it),
+                title: Text(
+                  it.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: it.bought
+                      ? const TextStyle(decoration: TextDecoration.lineThrough)
+                      : null,
                 ),
-              ],
-            ),
+                subtitle: (display == 'Unassigned')
+                    ? null
+                    : Text('👤 $display'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Assign',
+                      icon: const Icon(Icons.person_add_alt),
+                      onPressed: () => _showAssignItemSheet(context, it),
+                    ),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Edit',
+                      icon: const Icon(Icons.edit),
+                      onPressed: () => _showRenameItemDialog(context, it),
+                    ),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: S.delete,
+                      icon: const Icon(Icons.delete, color: Colors.redAccent),
+                      onPressed: () =>
+                          context.read<ItemCloudProvider>().removeItem(it),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         );
       },

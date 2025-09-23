@@ -8,7 +8,6 @@ import 'package:birlikteyapp/models/weekly_task.dart';
 import 'package:birlikteyapp/pages/family/family_onboarding_page.dart';
 import 'package:birlikteyapp/pages/home/home_page.dart';
 import 'package:birlikteyapp/providers/expense_cloud_provider.dart';
-import 'package:birlikteyapp/providers/expense_provider.dart';
 import 'package:birlikteyapp/providers/family_provider.dart';
 import 'package:birlikteyapp/providers/item_cloud_provider.dart';
 import 'package:birlikteyapp/providers/task_cloud_provider.dart';
@@ -129,7 +128,6 @@ class _RootState extends State<_Root> {
           providers: [
             ChangeNotifierProvider(create: (_) => FamilyProvider()),
             ChangeNotifierProvider(create: (_) => TemplatesProvider()),
-            ChangeNotifierProvider(create: (_) => ExpenseProvider()),
             ChangeNotifierProvider(create: (_) => ui..loadPrefs()),
             Provider<AuthService>(create: (_) => AuthService()),
             Provider<TaskService>(create: (_) => TaskService()),
