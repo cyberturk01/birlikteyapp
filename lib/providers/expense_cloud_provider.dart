@@ -60,8 +60,6 @@ class ExpenseCloudProvider extends ChangeNotifier {
   String? _lastError;
   String? get lastError => _lastError;
 
-  void updateAuthAndDb(FirebaseAuth a, FirebaseFirestore d) {}
-
   List<ExpenseDoc> get all {
     final list = _expenses.toList();
     list.sort((a, b) => b.date.compareTo(a.date)); // newest first
@@ -114,22 +112,6 @@ class ExpenseCloudProvider extends ChangeNotifier {
   void dispose() {
     _sub?.cancel();
     super.dispose();
-  }
-
-  Future<void> addExpense({
-    required String title,
-    required double amount,
-    required DateTime date,
-    String? assignedTo, // eski isim
-    String? category,
-  }) {
-    return add(
-      title: title,
-      amount: amount,
-      date: date,
-      assignedToUid: assignedTo,
-      category: category,
-    );
   }
 
   Future<void> add({

@@ -225,14 +225,6 @@ class ItemsSection extends StatelessWidget {
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 0),
                 onTap: () => onToggleItem(it),
-                // leading: IconButton(
-                //   icon: Icon(
-                //     bought
-                //         ? Icons.radio_button_checked
-                //         : Icons.radio_button_unchecked,
-                //   ),
-                //   onPressed: () => onToggleItem(it),
-                // ),
                 title: Text(
                   '${it.name}${(it.assignedToUid != null && it.assignedToUid!.isNotEmpty) ? " " : ""}',
                   overflow: TextOverflow.ellipsis,

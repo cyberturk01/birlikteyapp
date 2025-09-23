@@ -13,10 +13,10 @@ import '../../widgets/expenses_mini_summary.dart';
 import '../../widgets/mini_members_bar.dart';
 import '../config/config_page.dart';
 import '../expenses/expenses_card.dart';
+import '../family/family_manager.dart';
 import '../manage/manage_page.dart';
 import '../weekly/weekly_page.dart';
 import 'dashboard_summary.dart';
-import 'family_manager.dart';
 import 'member_card.dart';
 
 class HomePage extends StatefulWidget {

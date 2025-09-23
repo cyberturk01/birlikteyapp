@@ -220,11 +220,11 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
                         final prov = context.read<ExpenseCloudProvider>();
                         if (id == null) {
                           // create
-                          await prov.addExpense(
+                          await prov.add(
                             title: t,
                             amount: a,
                             date: date,
-                            assignedTo: assignUid,
+                            assignedToUid: assignUid,
                             category: category,
                           );
                         } else {

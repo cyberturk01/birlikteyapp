@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class AvatarWithRing extends StatelessWidget {
   final String text;
-  const AvatarWithRing({required this.text});
+  const AvatarWithRing({super.key, required this.text});
   @override
   Widget build(BuildContext context) {
     final initial = text.isNotEmpty ? text[0].toUpperCase() : '?';

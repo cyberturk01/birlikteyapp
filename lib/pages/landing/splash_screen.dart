@@ -26,7 +26,7 @@ class _SplashScreenState extends State<SplashScreen> {
     final fam = context.read<FamilyProvider>();
 
     // 🔽 Üye display name akışını bir defa oku
-    final members = await fam.watchMemberDisplayNames().first;
+    final members = await fam.watchMemberDirectory().first;
 
     if (!mounted) return;
 

@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/family_provider.dart';
 import '../../providers/ui_provider.dart';
-import '../home/family_manager.dart';
+import '../family/family_manager.dart';
 import '../home/home_page.dart';
 
 class LandingPage extends StatefulWidget {

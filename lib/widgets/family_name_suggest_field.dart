@@ -5,9 +5,6 @@ import 'package:provider/provider.dart';
 
 import '../providers/family_provider.dart';
 
-/// Aile adı yazarken kullanılabilecek akıllı öneri alanı.
-/// - TextField + altında öneri chip'leri
-/// - Input değişince debounce ile FamilyProvider.suggestFamilyNames çağırır
 class FamilyNameSuggestField extends StatefulWidget {
   final TextEditingController controller;
 

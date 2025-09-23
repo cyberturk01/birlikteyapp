@@ -10,7 +10,6 @@ import 'package:share_plus/share_plus.dart';
 import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
 import '../../utils/formatting.dart';
-import '../../widgets/expense_edit_dialog.dart';
 import '../../widgets/member_dropdown_uid.dart';
 import 'expenses_by_category_page.dart';
 
@@ -36,7 +35,6 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
   @override
   Widget build(BuildContext context) {
     final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
-
     return Scaffold(
       appBar: AppBar(title: const Text('Expenses — Insights')),
       body: ListView(
@@ -48,221 +46,140 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              // Member seçici (CANLI: Firestore labels)
               ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: Builder(
-                  builder: (context) {
-                    final expProv = context.watch<ExpenseCloudProvider>();
-                    final expenses = expProv.forMemberFiltered(
-                      _memberUid,
-                      _filter,
-                    );
-                    final total = expProv.totalForMember(
-                      _memberUid,
-                      filter: _filter,
-                    );
-                    final year = DateTime.now().year;
-                    final monthly = expProv.monthlyTotals(
-                      year: year,
-                      uid: _memberUid,
-                    );
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                constraints: const BoxConstraints(maxWidth: 280),
+                child: MemberDropdownUid(
+                  value: _memberUid,
+                  onChanged: (v) => setState(() => _memberUid = v),
+                  label: 'Member',
+                  nullLabel: 'All members',
+                ),
+              ), // Tarih filtresi ve aksiyonlar aşağı taşındı (StreamBuilder’a gerek yok)
+              SegmentedButton<ExpenseDateFilter>(
+                segments: const [
+                  ButtonSegment(
+                    value: ExpenseDateFilter.thisMonth,
+                    label: Text('This month'),
+                    icon: Icon(Icons.today),
+                  ),
+                  ButtonSegment(
+                    value: ExpenseDateFilter.lastMonth,
+                    label: Text('Last month'),
+                    icon: Icon(Icons.calendar_today_outlined),
+                  ),
+                  ButtonSegment(
+                    value: ExpenseDateFilter.all,
+                    label: Text('All'),
+                    icon: Icon(Icons.all_inclusive),
+                  ),
+                ],
+                selected: {_filter},
+                onSelectionChanged: (s) => setState(() => _filter = s.first),
+                showSelectedIcon: false,
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ExpensesByCategoryPage(initialMember: _memberUid),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.pie_chart_outline),
+                    label: const Text('By category'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _pickRangeAndExport(context, _memberUid),
+                    icon: const Icon(Icons.download_for_offline_outlined),
+                    label: const Text('Export'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _pickRangeAndShare(context, _memberUid),
+                    icon: const Icon(Icons.ios_share_outlined),
+                    label: const Text('Share'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // === Toplam başlık  aylık grafik ===
+              _HeaderAndChart(memberUid: _memberUid, filter: _filter),
+
+              const SizedBox(height: 16),
+              // === Transaction listesi (tek StreamBuilder ile dict) ===
+              StreamBuilder<Map<String, String>>(
+                stream: dictStream,
+                builder: (_, snap) {
+                  final dict = snap.data ?? const {};
+                  final expProv = context.watch<ExpenseCloudProvider>();
+                  final expenses = expProv.forMemberFiltered(
+                    _memberUid,
+                    _filter,
+                  );
+
+                  return Card(
+                    elevation: 2,
+                    child: Column(
                       children: [
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 8,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            // 1) Üye seçici sadece 280px ile sınırlı
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 280),
-                              child: MemberDropdownUid(
-                                value: _memberUid,
-                                onChanged: (v) =>
-                                    setState(() => _memberUid = v),
-                                label: 'Member',
-                                nullLabel: 'All members',
-                              ),
-                            ),
-
-                            // 2) Tarih filtresi — wrap içinde serbest
-                            SegmentedButton<ExpenseDateFilter>(
-                              segments: const [
-                                ButtonSegment(
-                                  value: ExpenseDateFilter.thisMonth,
-                                  label: Text('This month'),
-                                  icon: Icon(Icons.today),
-                                ),
-                                ButtonSegment(
-                                  value: ExpenseDateFilter.lastMonth,
-                                  label: Text('Last month'),
-                                  icon: Icon(Icons.calendar_today_outlined),
-                                ),
-                                ButtonSegment(
-                                  value: ExpenseDateFilter.all,
-                                  label: Text('All'),
-                                  icon: Icon(Icons.all_inclusive),
-                                ),
-                              ],
-                              selected: {_filter},
-                              onSelectionChanged: (s) =>
-                                  setState(() => _filter = s.first),
-                              showSelectedIcon: false,
-                            ),
-
-                            // 3) Aksiyonlar — ROW DEĞİL, WRAP!
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                TextButton.icon(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => ExpensesByCategoryPage(
-                                          initialMember: _memberUid,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.pie_chart_outline),
-                                  label: const Text('By category'),
-                                ),
-                                TextButton.icon(
-                                  onPressed: () =>
-                                      _exportCsv(context, expenses),
-                                  icon: const Icon(Icons.download),
-                                  label: const Text('Export CSV'),
-                                ),
-                                TextButton.icon(
-                                  onPressed: () => _shareCsv(context, expenses),
-                                  icon: const Icon(Icons.share),
-                                  label: const Text('Share'),
-                                ),
-                                TextButton.icon(
-                                  onPressed: () =>
-                                      _pickRangeAndExport(context, _memberUid),
-                                  icon: const Icon(Icons.calendar_month),
-                                  label: const Text('Export (range)'),
-                                ),
-                                TextButton.icon(
-                                  onPressed: () =>
-                                      _pickRangeAndShare(context, _memberUid),
-                                  icon: const Icon(Icons.ios_share),
-                                  label: const Text('Share (range)'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        // Toplam başlık
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _titleWithMonth(_filter),
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                            ),
-                            Text(
-                              fmtMoney(context, total),
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 8),
-                        _MonthlyBarChart(data: monthly),
-                        const SizedBox(height: 16),
-
-                        // Liste
-                        Card(
-                          elevation: 2,
-                          child: Column(
+                        ListTile(
+                          title: const Text('Transactions'),
+                          subtitle: Text(
+                            '${expenses.length} record${expenses.length == 1 ? '' : 's'}',
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              ListTile(
-                                title: const Text('Transactions'),
-                                subtitle: Text(
-                                  '${expenses.length} record${expenses.length == 1 ? '' : 's'}',
-                                ),
+                              IconButton(
+                                tooltip: 'Export CSV',
+                                icon: const Icon(Icons.download),
+                                onPressed: () => _exportCsv(context, expenses),
                               ),
-                              const Divider(height: 1),
-                              if (expenses.isEmpty)
-                                const Padding(
-                                  padding: EdgeInsets.all(16),
-                                  child: Text(
-                                    'No expenses for selected range.',
-                                  ),
-                                )
-                              else
-                                StreamBuilder<Map<String, String>>(
-                                  stream: dictStream,
-                                  builder: (_, snapDict) {
-                                    final dict = snapDict.data ?? const {};
-                                    if (expenses.isEmpty) {
-                                      return const Padding(
-                                        padding: EdgeInsets.all(16),
-                                        child: Text(
-                                          'No expenses for selected range.',
-                                        ),
-                                      );
-                                    }
-                                    return Column(
-                                      children: expenses.map((e) {
-                                        final memberLabel =
-                                            e.assignedToUid == null
-                                            ? 'Unassigned'
-                                            : (dict[e.assignedToUid] ??
-                                                  'Member');
-                                        return ListTile(
-                                          dense: true,
-                                          title: Text(
-                                            e.title,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          subtitle: Text(
-                                            '${_fmtDate(e.date)} • $memberLabel'
-                                            '${e.category == null ? '' : ' • ${e.category}'}',
-                                          ),
-                                          trailing: Text(
-                                            fmtMoney(context, e.amount),
-                                          ),
-                                          onLongPress: () =>
-                                              _showChangeCategorySheet(
-                                                context,
-                                                e,
-                                              ),
-                                          onTap: () async {
-                                            await showExpenseEditDialog(
-                                              context: context,
-                                              id: e.id,
-                                              initialTitle: e.title,
-                                              initialAmount: e.amount,
-                                              initialDate: e.date,
-                                              initialAssignedToUid:
-                                                  e.assignedToUid,
-                                              initialCategory: e.category,
-                                            );
-                                          },
-                                        );
-                                      }).toList(),
-                                    );
-                                  },
-                                ),
+                              IconButton(
+                                tooltip: 'Share',
+                                icon: const Icon(Icons.share),
+                                onPressed: () => _shareCsv(context, expenses),
+                              ),
                             ],
                           ),
                         ),
+                        const Divider(height: 1),
+                        if (expenses.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text('No expenses for selected range.'),
+                          )
+                        else
+                          ...expenses.map((e) {
+                            final memberLabel = e.assignedToUid == null
+                                ? 'Unassigned'
+                                : (dict[e.assignedToUid] ?? 'Member');
+                            return ListTile(
+                              dense: true,
+                              title: Text(
+                                e.title,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                '${fmtDateYmd(e.date)} • $memberLabel'
+                                '${e.category == null ? '' : ' • ${e.category}'}',
+                              ),
+                              trailing: Text(
+                                // para için mevcut fmtMoney’n varsa onu kullanmaya devam et
+                                '€ ${e.amount.toStringAsFixed(2)}',
+                              ),
+                              onLongPress: () =>
+                                  _showChangeCategorySheet(context, e),
+                            );
+                          }),
                       ],
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -744,6 +661,45 @@ class _MonthlyBarChart extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _HeaderAndChart extends StatelessWidget {
+  final String? memberUid;
+  final ExpenseDateFilter filter;
+  const _HeaderAndChart({required this.memberUid, required this.filter});
+
+  @override
+  Widget build(BuildContext context) {
+    final expProv = context.watch<ExpenseCloudProvider>();
+    final total = expProv.totalForMember(memberUid, filter: filter);
+    final monthly = expProv.monthlyTotals(
+      year: DateTime.now().year,
+      uid: memberUid,
+    );
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                monthTitle(filter, DateTime.now()), // 👈 utils
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            Text(
+              '€ ${total.toStringAsFixed(2)}', // istersen burada fmtMoney
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        _MonthlyBarChart(data: monthly),
+      ],
     );
   }
 }

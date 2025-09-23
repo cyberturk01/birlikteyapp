@@ -11,7 +11,7 @@ import '../../providers/task_cloud_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../widgets/muted_text.dart';
 import '../../widgets/swipe_bg.dart';
-import 'family_manager.dart';
+import '../family/family_manager.dart';
 
 enum _TaskStatus { pending, completed }
 

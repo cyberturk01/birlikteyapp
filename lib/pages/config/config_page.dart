@@ -2,6 +2,7 @@
 import 'dart:io';
 
 import 'package:android_intent_plus/android_intent.dart';
+import 'package:birlikteyapp/widgets/manage/section_title.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -17,15 +18,6 @@ class ConfigurationPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ui = context.watch<UiProvider>();
-
-    String _fmt(TimeOfDay tod) {
-      final h = tod.hour.toString().padLeft(2, '0');
-      final m = tod.minute.toString().padLeft(2, '0');
-      return '$h:$m';
-    }
-
-    final current =
-        ui.weeklyDefaultReminder ?? const TimeOfDay(hour: 19, minute: 0);
 
     return Scaffold(
       appBar: AppBar(
@@ -49,15 +41,12 @@ class ConfigurationPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          Text(
-            'Family Invitation Code',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          SectionTitle('Family Invitation Code'),
           const SizedBox(height: 8),
           const InviteCodeCard(),
           const SizedBox(height: 8),
           const Divider(height: 24),
-          Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
+          SectionTitle('Appearance'),
           const SizedBox(height: 6),
           SegmentedButton<ThemeMode>(
             segments: const [
@@ -86,7 +75,7 @@ class ConfigurationPage extends StatelessWidget {
           const Divider(height: 24),
 
           // === Theme ===
-          Text('App color', style: Theme.of(context).textTheme.titleMedium),
+          SectionTitle('App color'),
           const SizedBox(height: 8),
           DropdownButtonFormField<BrandSeed>(
             value: context.watch<UiProvider>().brand,
@@ -116,7 +105,7 @@ class ConfigurationPage extends StatelessWidget {
           ),
 
           const SizedBox(height: 16),
-          Text('Templates', style: Theme.of(context).textTheme.titleMedium),
+          SectionTitle('Templates'),
           ListTile(
             leading: const Icon(Icons.dashboard_customize),
             title: const Text('Templates'),
@@ -132,7 +121,7 @@ class ConfigurationPage extends StatelessWidget {
           const Divider(),
           const SizedBox(height: 8),
           // === Debug / Notifications ===
-          Text('Notifications', style: Theme.of(context).textTheme.titleMedium),
+          SectionTitle('Notifications'),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,

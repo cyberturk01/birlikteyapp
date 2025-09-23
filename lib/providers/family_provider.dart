@@ -13,7 +13,7 @@ class FamilyProvider extends ChangeNotifier {
   String? _familyId;
   String? get familyId => _familyId;
 
-  List<String> _labelsCache = const [];
+  final List<String> _labelsCache = const [];
   List<String> get familyMembers => _labelsCache;
   static const _kActiveFamilyKey = 'activeFamilyId';
   static const _kOwnerUidKey = 'activeFamilyOwnerUid';
@@ -338,135 +338,6 @@ class FamilyProvider extends ChangeNotifier {
     if (uid == null) return;
     if (!await _amIMemberOf(famId)) return;
     await _persistActive(famId, ownerUid: uid);
-  }
-
-  Stream<List<String>> watchMemberDisplayNames() {
-    final famId = _familyId;
-    if (famId == null || famId.isEmpty) return Stream.value(const []);
-
-    final me = FirebaseAuth.instance.currentUser;
-
-    // family doc değiştikçe uid listesi çıkar → users sorgularına zincirle
-    return FirebaseFirestore.instance
-        .collection('families')
-        .doc(famId)
-        .snapshots()
-        .asyncMap((snap) async {
-          if (!snap.exists) {
-            _familyId = null;
-            await _familyBox.delete(_kActiveFamilyKey);
-            notifyListeners();
-            return <String>[];
-          }
-          final data = snap.data() ?? {};
-          final membersMap = (data['members'] as Map<String, dynamic>? ?? {});
-          final uids = membersMap.keys.map((e) => e.toString()).toList();
-          if (uids.isEmpty) return <String>[];
-
-          // 10'arlı parça
-          final chunks = <List<String>>[];
-          for (var i = 0; i < uids.length; i += 10) {
-            chunks.add(uids.sublist(i, (i + 10).clamp(0, uids.length)));
-          }
-
-          // her chunk için users whereIn
-          final db = FirebaseFirestore.instance;
-          final futures = chunks.map((part) {
-            return db
-                .collection('users')
-                .where(FieldPath.documentId, whereIn: part)
-                .get();
-          }).toList();
-          final results = await Future.wait(futures);
-
-          // uid -> displayName haritası
-          final Map<String, String> names = {};
-          for (final qs in results) {
-            for (final d in qs.docs) {
-              final dn = (d.data()['displayName'] as String?)?.trim();
-              names[d.id] = (dn == null || dn.isEmpty)
-                  ? (d.data()['email'] as String?)?.split('@').first ?? d.id
-                  : dn;
-            }
-          }
-          // listedeki sırayı bozmamak için uids üzerinden yürü
-          final labels = <String>[];
-          for (final uid in uids) {
-            final base = names[uid] ?? 'Member';
-            if (uid == me?.uid) {
-              labels.add('You ($base)');
-            } else {
-              labels.add(base);
-            }
-          }
-
-          _labelsCache = labels;
-          notifyListeners();
-          return labels;
-        });
-  }
-
-  Stream<List<String>> watchMemberLabels() {
-    final famId = _familyId;
-    if (famId == null || famId.isEmpty) return Stream.value(const <String>[]);
-
-    final me = FirebaseAuth.instance.currentUser;
-
-    return FirebaseFirestore.instance
-        .collection('families')
-        .doc(famId)
-        .snapshots()
-        .map((doc) {
-          if (!doc.exists) {
-            // family silinmiş → local temizle (ama burada notify etme)
-            _familyId = null;
-            _familyBox.delete(_kActiveFamilyKey);
-            return <String>[];
-          }
-
-          final data = doc.data() ?? {};
-          final members = (data['members'] as Map<String, dynamic>? ?? {});
-          final namesMap = (data['memberNames'] as Map<String, dynamic>? ?? {});
-          final meUid = FirebaseAuth.instance.currentUser?.uid;
-
-          if (meUid != null && !members.containsKey(meUid)) {
-            // Artık üye değilim → aktif aileyi düşür
-            _familyId = null;
-            _familyBox.delete(_kActiveFamilyKey);
-            notifyListeners(); // UI onboarding’e döner
-            return <String>[];
-          }
-
-          // UID’leri tekilleştir + sıralı
-          final uids = members.keys.toSet().toList()..sort();
-
-          // Etiketleri üret
-          final labels = <String>[];
-          for (final uid in uids) {
-            final nm = (namesMap[uid] as String?)?.trim();
-            final base = (nm != null && nm.isNotEmpty)
-                ? nm
-                : 'Member • ${uid.substring(0, 6)}';
-
-            if (uid == me?.uid) {
-              labels.add('You ($base)'); // <- artık memberNames’e bağlı
-            } else {
-              labels.add(base);
-            }
-          }
-
-          // Cache’i sessiz güncelle
-          _labelsCache = labels;
-          return labels;
-        })
-        // Aynı liste tekrar gelirse StreamBuilder’ı boşuna tetikleme
-        .distinct((a, b) {
-          if (a.length != b.length) return false;
-          for (var i = 0; i < a.length; i++) {
-            if (a[i] != b[i]) return false;
-          }
-          return true;
-        });
   }
 
   Future<bool> amIOwner() async {
