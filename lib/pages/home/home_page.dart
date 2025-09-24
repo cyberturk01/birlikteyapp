@@ -8,7 +8,6 @@ import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/weekly_cloud_provider.dart';
-import '../../utils/assignee.dart';
 import '../../widgets/expenses_mini_summary.dart';
 import '../../widgets/mini_members_bar.dart';
 import '../config/config_page.dart';
@@ -104,28 +103,15 @@ class _HomePageState extends State<HomePage> {
       stream: famProv.watchMemberEntries(),
       builder: (context, snap) {
         final entries = snap.data ?? const <FamilyMemberEntry>[];
-        final labels = entries.map((e) => e.label).toList();
-        final uids = entries.map((e) => e.uid).toList();
-
-        final names = labels.isEmpty
-            ? context.read<FamilyProvider>().memberLabelsOrFallback
-            : labels;
-
-        if (snap.connectionState == ConnectionState.waiting && labels.isEmpty) {
+        if (snap.connectionState == ConnectionState.waiting &&
+            entries.isEmpty) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        // ❷ Giriş yapanı en başa taşı (aşağıda kod var)
-        final idxMe = labels.indexWhere((s) => s.startsWith('You ('));
-        final orderedLabels = [...labels];
-        final orderedUids = [...uids];
-        if (idxMe > 0) {
-          final meLabel = orderedLabels.removeAt(idxMe);
-          final meUid = orderedUids.removeAt(idxMe);
-          orderedLabels.insert(0, meLabel);
-          orderedUids.insert(0, meUid);
-        }
+
+        final ordered = _orderWithMeFirstEntries(entries);
+
         // ❸ sadece ilk kez aktif index’i set et
         if (!_appliedInitial) {
           _activeIndex = 0; // me first
@@ -136,8 +122,8 @@ class _HomePageState extends State<HomePage> {
           _appliedInitial = true;
         }
 
-        if (_activeIndex >= names.length) {
-          _activeIndex = names.length - 1;
+        if (_activeIndex >= ordered.length) {
+          _activeIndex = ordered.length - 1;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (_pageController.hasClients) {
               _pageController.jumpToPage(_activeIndex);
@@ -150,7 +136,7 @@ class _HomePageState extends State<HomePage> {
         final items = context.watch<ItemCloudProvider>().items;
         final h = MediaQuery.of(context).size.height;
         final isShort = h < 640;
-        debugPrint('Home labels=$labels');
+        debugPrint('Home labels=$ordered');
         return Scaffold(
           appBar: AppBar(
             title: Row(
@@ -292,27 +278,28 @@ class _HomePageState extends State<HomePage> {
                               physics: const BouncingScrollPhysics(),
                               onPageChanged: (i) =>
                                   setState(() => _activeIndex = i),
-                              itemCount: orderedLabels.length,
+                              itemCount: ordered.length,
                               itemBuilder: (context, i) {
-                                final name = orderedLabels[i];
-                                final uid = orderedUids[i];
+                                final ent = ordered[i]; // FamilyMemberEntry
+                                final uid = ent.uid; // ← filtre artık UID
+                                final label = ent.label;
+
                                 final memberTasks = tasks
-                                    .where(
-                                      (t) =>
-                                          Assignee.match(t.assignedToUid, name),
-                                    )
+                                    .where((t) => t.assignedToUid == uid)
                                     .toList();
                                 final memberItems = items
-                                    .where(
-                                      (i) =>
-                                          Assignee.match(i.assignedToUid, name),
-                                    )
+                                    .where((it) => it.assignedToUid == uid)
                                     .toList();
 
                                 final card = (_section == HomeSection.expenses)
-                                    ? ExpensesCard(memberUid: uid)
+                                    ? ExpensesCard(
+                                        memberUid: uid,
+                                      ) // ExpensesCard zaten UID’i destekliyordu
                                     : MemberCard(
-                                        memberName: name,
+                                        memberUid:
+                                            uid, // MemberCard da UID alsın
+                                        memberName:
+                                            label, // gösterim için label
                                         tasks: memberTasks,
                                         items: memberItems,
                                         section: _section,
@@ -349,7 +336,7 @@ class _HomePageState extends State<HomePage> {
 
                           // === MİNİ BAR ===
                           MiniMembersBar(
-                            names: orderedLabels,
+                            names: ordered.map((e) => e.label).toList(),
                             activeIndex: _activeIndex,
                             onPickIndex: (i) {
                               setState(() => _activeIndex = i);
@@ -385,6 +372,15 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+List<FamilyMemberEntry> _orderWithMeFirstEntries(List<FamilyMemberEntry> list) {
+  final idx = list.indexWhere((e) => e.label.startsWith('You ('));
+  if (idx <= 0) return list;
+  final copy = [...list];
+  final me = copy.removeAt(idx);
+  copy.insert(0, me);
+  return copy;
+}
+
 class _MemberPageKeepAlive extends StatefulWidget {
   final Widget child;
   const _MemberPageKeepAlive({super.key, required this.child});
@@ -403,26 +399,4 @@ class _MemberPageKeepAliveState extends State<_MemberPageKeepAlive>
     super.build(context);
     return widget.child;
   }
-}
-
-bool _matchesAssignee(String? assignedTo, String cardLabel) {
-  if (assignedTo == null || assignedTo.trim().isEmpty) return false;
-  if (assignedTo == cardLabel) return true;
-
-  // "You (xxx)" <-> "xxx" simetrik eşleşme
-  final re = RegExp(r'^You \((.+)\)$');
-
-  final mAssigned = re.firstMatch(assignedTo);
-  if (mAssigned != null) {
-    final base = mAssigned.group(1)!; // xxx
-    return cardLabel == base || cardLabel == 'You ($base)';
-  }
-
-  final mCard = re.firstMatch(cardLabel);
-  if (mCard != null) {
-    final base = mCard.group(1)!;
-    return assignedTo == base || assignedTo == 'You ($base)';
-  }
-
-  return false;
 }

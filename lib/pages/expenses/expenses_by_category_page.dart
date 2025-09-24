@@ -28,8 +28,7 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
   Widget build(BuildContext context) {
     final expProv = context.watch<ExpenseCloudProvider>();
 
-    final memberForFilter = (_member == "All members") ? null : _member;
-    final map = expProv.totalsByCategory(uid: memberForFilter, filter: _filter);
+    final map = expProv.totalsByCategory(uid: _member, filter: _filter);
     final entries = map.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value)); // büyükten küçüğe
 

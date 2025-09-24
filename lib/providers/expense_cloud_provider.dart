@@ -154,9 +154,18 @@ class ExpenseCloudProvider extends ChangeNotifier {
 
   // yardımcılar (UI filtreleri)
   List<ExpenseDoc> forMemberFiltered(String? uid, ExpenseDateFilter filter) {
-    final base = (uid == null)
-        ? _expenses
-        : _expenses.where((e) => e.assignedToUid == uid).toList();
+    List<ExpenseDoc> base;
+
+    if (uid == null) {
+      // All members
+      base = _expenses;
+    } else if (uid.isEmpty) {
+      // Unassigned
+      base = _expenses.where((e) => e.assignedToUid == null).toList();
+    } else {
+      // Belirli üye UID
+      base = _expenses.where((e) => e.assignedToUid == uid).toList();
+    }
 
     if (filter == ExpenseDateFilter.all) return base;
 

@@ -20,6 +20,7 @@ enum _ItemStatus { toBuy, bought }
 enum _MemberStatus { tasks, items }
 
 class MemberCard extends StatefulWidget {
+  final String memberUid;
   final String memberName;
   final List<Task> tasks;
   final List<Item> items;
@@ -27,6 +28,7 @@ class MemberCard extends StatefulWidget {
   final void Function(HomeSection section)? onJumpSection;
   const MemberCard({
     super.key,
+    required this.memberUid,
     required this.memberName,
     required this.tasks,
     required this.items,
