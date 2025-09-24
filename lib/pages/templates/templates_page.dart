@@ -206,16 +206,14 @@ class _TemplatesPageState extends State<TemplatesPage> {
     final weeklyProv = context.read<WeeklyCloudProvider>();
 
     // Bunlar senin var olan bulk metodlarınla eşleştirilmeli.
-    final createdTasks = await taskProv.addTasksBulk(
+    final createdTasks = await taskProv.addTasksBulkCloud(
       utpl.tasks,
-      assignedToUid: _assignToUid, // varsa state alanın
-      skipDuplicates: _skipDuplicates, // varsa state alanın
+      assignedToUid: _assignToUid,
     );
 
-    final createdItems = await itemProv.addItemsBulk(
+    final createdItems = await itemProv.addItemsBulkCloud(
       utpl.items,
       assignedToUid: _assignToUid,
-      skipDuplicates: _skipDuplicates,
     );
 
     final createdWeekly = await weeklyProv.addWeeklyBulk(
@@ -570,15 +568,13 @@ class _TemplatesPageState extends State<TemplatesPage> {
     final itemProv = context.read<ItemCloudProvider>();
     final weeklyProv = context.read<WeeklyCloudProvider>();
 
-    final createdTasks = await taskProv.addTasksBulk(
+    final createdTasks = await taskProv.addTasksBulkCloud(
       tpl.tasks,
       assignedToUid: _assignToUid,
-      skipDuplicates: _skipDuplicates,
     );
-    final createdItems = await itemProv.addItemsBulk(
+    final createdItems = await itemProv.addItemsBulkCloud(
       tpl.items,
       assignedToUid: _assignToUid,
-      skipDuplicates: _skipDuplicates,
     );
     final createdWeekly = await weeklyProv.addWeeklyBulk(
       tpl.weekly,

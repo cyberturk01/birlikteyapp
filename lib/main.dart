@@ -236,6 +236,7 @@ class _RootState extends State<_Root> {
       Hive.openBox<int>('itemCountBox'),
       Hive.openBox<WeeklyTask>('weeklyBox'),
       Hive.openBox<int>('weeklyNotifBox'),
+      Hive.openBox<String>('recentExpenseCats'),
     ]);
 
     // İlk seed (sadece boşsa)

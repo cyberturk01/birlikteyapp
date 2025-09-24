@@ -7,8 +7,9 @@ import 'package:flutter/foundation.dart';
 import '../models/task.dart';
 import '../services/auth_service.dart';
 import '../services/task_service.dart';
+import '_base_cloud.dart';
 
-class TaskCloudProvider extends ChangeNotifier {
+class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   AuthService _auth;
   TaskService _service;
 
@@ -19,9 +20,6 @@ class TaskCloudProvider extends ChangeNotifier {
   // Ekranda gösterilen liste
   final List<Task> _tasks = [];
   List<Task> get tasks => List.unmodifiable(_tasks);
-
-  String? _lastError;
-  String? get lastError => _lastError;
 
   // Abonelikler
   StreamSubscription<User?>? _authSub;
@@ -69,13 +67,6 @@ class TaskCloudProvider extends ChangeNotifier {
     _bindAuth();
   }
 
-  void _setError(String? msg) {
-    _lastError = msg;
-    notifyListeners();
-  }
-
-  void clearError() => _setError(null);
-
   void _rebindTasks() {
     debugPrint('[TaskCloud] REBIND → user=${_currentUser?.uid} fam=$_familyId');
 
@@ -103,6 +94,7 @@ class TaskCloudProvider extends ChangeNotifier {
         .snapshots()
         .listen(
           (qs) {
+            clearError();
             debugPrint('[TaskCloud] SNAP size=${qs.size}');
             _tasks
               ..clear()
@@ -123,12 +115,12 @@ class TaskCloudProvider extends ChangeNotifier {
                   return t;
                 }),
               );
-            _setError(null);
+            clearError();
             notifyListeners();
           },
           onError: (e, st) {
             debugPrint('[TaskCloud] STREAM ERROR: $e');
-            _setError('Tasks: $e'); // UI’da banner çıkacak
+            setError(e);
           },
         );
   }
@@ -185,24 +177,18 @@ class TaskCloudProvider extends ChangeNotifier {
   }
 
   // TaskCloudProvider.dart
-  List<Task> addTasksBulk(
+  Future<List<Task>> addTasksBulkCloud(
     List<String> names, {
     String? assignedToUid,
-    bool skipDuplicates = true,
-  }) {
+  }) async {
     final created = <Task>[];
-    final existing = tasks.map((t) => t.name.toLowerCase()).toSet();
-
-    for (final n in names) {
-      final name = n.trim();
+    for (final raw in names) {
+      final name = raw.trim();
       if (name.isEmpty) continue;
-      if (skipDuplicates && existing.contains(name.toLowerCase())) continue;
-
       final t = Task(name, assignedToUid: assignedToUid);
-      _tasks.add(t);
+      await addTask(t); // Firestore’a yazar ve remoteId setler
       created.add(t);
     }
-    if (created.isNotEmpty) notifyListeners();
     return created;
   }
 

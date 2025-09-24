@@ -26,7 +26,7 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
 }) async {
   final titleC = TextEditingController(text: initialTitle ?? '');
   final amountC = TextEditingController(
-    text: initialAmount == null ? '' : initialAmount.toStringAsFixed(2),
+    text: initialAmount == null ? '' : fmtMoney(context, initialAmount),
   );
   DateTime date = initialDate ?? DateTime.now();
   String? assignUid = initialAssignedToUid;

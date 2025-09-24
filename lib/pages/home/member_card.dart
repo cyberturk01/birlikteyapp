@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../constants/app_lists.dart';
-import '../../constants/app_strings.dart';
 import '../../models/item.dart';
 import '../../models/task.dart';
 import '../../models/view_section.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
-import '../../providers/ui_provider.dart';
-import '../../widgets/muted_text.dart';
-import '../../widgets/swipe_bg.dart';
+import '../../widgets/member/items_subsection.dart';
+import '../../widgets/member/tasks_subsection.dart';
 
 enum _TaskStatus { pending, completed }
 
@@ -273,7 +271,7 @@ class _MemberCardState extends State<MemberCard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         (widget.section == HomeSection.tasks)
-                            ? _TasksSubsection(
+                            ? TasksSubsection(
                                 tasksFiltered: tasksFiltered,
                                 expanded: _expandTasks,
                                 previewCount: previewTasks,
@@ -282,7 +280,7 @@ class _MemberCardState extends State<MemberCard> {
                                 ),
                                 onToggleTask: _toggleTask,
                               )
-                            : _ItemsSubsection(
+                            : ItemsSubsection(
                                 itemsFiltered: itemsFiltered,
                                 expanded: _expandItems,
                                 previewCount: previewItems,
@@ -429,19 +427,22 @@ class _MemberCardState extends State<MemberCard> {
   }
 
   void _openQuickAddTaskSheet(BuildContext context, String memberUid) {
-    final memberLabel = widget.memberName; // sadece başlıkta göstermek için
+    final memberLabel = widget.memberName;
     final taskProv = context.read<TaskCloudProvider>();
 
     const defaultTasks = AppLists.defaultTasks;
     final frequent = taskProv.suggestedTasks;
     final existing = taskProv.tasks.map((t) => t.name).toList();
-    final suggestions = {
-      ...frequent,
-      ...defaultTasks,
-      ...existing,
-    }.where((s) => s.trim().isNotEmpty).toList();
+    final suggestions =
+        {
+            ...frequent,
+            ...defaultTasks,
+            ...existing,
+          }.where((s) => s.trim().isNotEmpty).toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
     final c = TextEditingController();
+    final selected = <String>{};
 
     showModalBottomSheet(
       context: context,
@@ -449,7 +450,7 @@ class _MemberCardState extends State<MemberCard> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) {
+      builder: (sheetCtx) {
         return Padding(
           padding: EdgeInsets.only(
             left: 16,
@@ -459,11 +460,39 @@ class _MemberCardState extends State<MemberCard> {
           ),
           child: StatefulBuilder(
             builder: (ctx, setLocal) {
+              Future<void> addSelected() async {
+                if (selected.isEmpty) return;
+                await taskProv.addTasksBulkCloud(
+                  selected.toList(),
+                  assignedToUid: memberUid,
+                );
+                if (Navigator.canPop(sheetCtx)) Navigator.pop(sheetCtx);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Added ${selected.length} task(s)')),
+                  );
+                }
+              }
+
+              Future<void> addTyped() async {
+                final names = _splitNames(c.text);
+                if (names.isEmpty) return;
+                await taskProv.addTasksBulkCloud(
+                  names,
+                  assignedToUid: memberUid,
+                );
+                if (Navigator.canPop(sheetCtx)) Navigator.pop(sheetCtx);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Added ${names.length} task(s)')),
+                  );
+                }
+              }
+
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // handle + başlık
                   Center(
                     child: Container(
                       width: 36,
@@ -488,7 +517,7 @@ class _MemberCardState extends State<MemberCard> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () => Navigator.pop(sheetCtx),
                       ),
                     ],
                   ),
@@ -496,15 +525,17 @@ class _MemberCardState extends State<MemberCard> {
                   TextField(
                     controller: c,
                     decoration: const InputDecoration(
-                      hintText: "Enter task…",
+                      hintText: "Enter tasks (comma or new line)…",
+                      helperText: "Example: Laundry, Dishes, Take out trash",
                       prefixIcon: Icon(Icons.task_alt),
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
-                    onSubmitted: (_) =>
-                        _assignOrCreateTask(context, c.text, memberUid),
+                    onSubmitted: (_) => addTyped(),
+                    maxLines: 3,
+                    minLines: 1,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   if (suggestions.isNotEmpty) ...[
                     Text(
                       "Suggestions",
@@ -512,31 +543,51 @@ class _MemberCardState extends State<MemberCard> {
                     ),
                     const SizedBox(height: 6),
                     ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 150),
+                      constraints: const BoxConstraints(maxHeight: 160),
                       child: SingleChildScrollView(
                         child: Wrap(
                           spacing: 6,
                           runSpacing: 6,
                           children: suggestions.map((name) {
-                            return ActionChip(
+                            final isSel = selected.contains(name);
+                            return FilterChip(
                               label: Text(name),
-                              onPressed: () =>
-                                  _assignOrCreateTask(context, name, memberUid),
+                              selected: isSel,
+                              onSelected: (v) {
+                                setLocal(() {
+                                  if (v) {
+                                    selected.add(name);
+                                  } else {
+                                    selected.remove(name);
+                                  }
+                                });
+                              },
                             );
                           }).toList(),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
                   ],
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton.icon(
-                      icon: const Icon(Icons.add),
-                      label: const Text("Add"),
-                      onPressed: () =>
-                          _assignOrCreateTask(context, c.text, memberUid),
-                    ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.playlist_add),
+                        label: const Text("Add typed list"),
+                        onPressed: addTyped,
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        icon: const Icon(Icons.library_add_check),
+                        label: Text(
+                          selected.isEmpty
+                              ? "Add selected"
+                              : "Add selected (${selected.length})",
+                        ),
+                        onPressed: selected.isEmpty ? null : addSelected,
+                      ),
+                    ],
                   ),
                 ],
               );
@@ -548,19 +599,22 @@ class _MemberCardState extends State<MemberCard> {
   }
 
   void _openQuickAddItemSheet(BuildContext context, String memberUid) {
-    final memberLabel = widget.memberName; // sadece başlık için
+    final memberLabel = widget.memberName;
     final itemProv = context.read<ItemCloudProvider>();
 
     const defaultItems = AppLists.defaultItems;
     final frequent = itemProv.frequentItems;
     final existing = itemProv.items.map((i) => i.name).toList();
-    final suggestions = {
-      ...frequent,
-      ...defaultItems,
-      ...existing,
-    }.where((s) => s.trim().isNotEmpty).toList();
+    final suggestions =
+        {
+            ...frequent,
+            ...defaultItems,
+            ...existing,
+          }.where((s) => s.trim().isNotEmpty).toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
     final c = TextEditingController();
+    final selected = <String>{};
 
     showModalBottomSheet(
       context: context,
@@ -568,7 +622,7 @@ class _MemberCardState extends State<MemberCard> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) {
+      builder: (sheetCtx) {
         return Padding(
           padding: EdgeInsets.only(
             left: 16,
@@ -578,6 +632,35 @@ class _MemberCardState extends State<MemberCard> {
           ),
           child: StatefulBuilder(
             builder: (ctx, setLocal) {
+              Future<void> addSelected() async {
+                if (selected.isEmpty) return;
+                await itemProv.addItemsBulkCloud(
+                  selected.toList(),
+                  assignedToUid: memberUid,
+                );
+                if (Navigator.canPop(sheetCtx)) Navigator.pop(sheetCtx);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Added ${selected.length} item(s)')),
+                  );
+                }
+              }
+
+              Future<void> addTyped() async {
+                final names = _splitNames(c.text);
+                if (names.isEmpty) return;
+                await itemProv.addItemsBulkCloud(
+                  names,
+                  assignedToUid: memberUid,
+                );
+                if (Navigator.canPop(sheetCtx)) Navigator.pop(sheetCtx);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Added ${names.length} item(s)')),
+                  );
+                }
+              }
+
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -606,7 +689,7 @@ class _MemberCardState extends State<MemberCard> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () => Navigator.pop(sheetCtx),
                       ),
                     ],
                   ),
@@ -614,15 +697,17 @@ class _MemberCardState extends State<MemberCard> {
                   TextField(
                     controller: c,
                     decoration: const InputDecoration(
-                      hintText: "Enter item…",
+                      hintText: "Enter items (comma or new line)…",
+                      helperText: "Example: Milk, Bread, Eggs",
                       prefixIcon: Icon(Icons.shopping_bag),
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
-                    onSubmitted: (_) =>
-                        _assignOrCreateItem(context, c.text, memberUid),
+                    onSubmitted: (_) => addTyped(),
+                    maxLines: 3,
+                    minLines: 1,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   if (suggestions.isNotEmpty) ...[
                     Text(
                       "Suggestions",
@@ -630,31 +715,51 @@ class _MemberCardState extends State<MemberCard> {
                     ),
                     const SizedBox(height: 6),
                     ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 150),
+                      constraints: const BoxConstraints(maxHeight: 160),
                       child: SingleChildScrollView(
                         child: Wrap(
                           spacing: 6,
                           runSpacing: 6,
                           children: suggestions.map((name) {
-                            return ActionChip(
+                            final isSel = selected.contains(name);
+                            return FilterChip(
                               label: Text(name),
-                              onPressed: () =>
-                                  _assignOrCreateItem(context, name, memberUid),
+                              selected: isSel,
+                              onSelected: (v) {
+                                setLocal(() {
+                                  if (v) {
+                                    selected.add(name);
+                                  } else {
+                                    selected.remove(name);
+                                  }
+                                });
+                              },
                             );
                           }).toList(),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
                   ],
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton.icon(
-                      icon: const Icon(Icons.add),
-                      label: const Text("Add"),
-                      onPressed: () =>
-                          _assignOrCreateItem(context, c.text, memberUid),
-                    ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.playlist_add),
+                        label: const Text("Add typed list"),
+                        onPressed: addTyped,
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        icon: const Icon(Icons.library_add_check),
+                        label: Text(
+                          selected.isEmpty
+                              ? "Add selected"
+                              : "Add selected (${selected.length})",
+                        ),
+                        onPressed: selected.isEmpty ? null : addSelected,
+                      ),
+                    ],
                   ),
                 ],
               );
@@ -664,290 +769,243 @@ class _MemberCardState extends State<MemberCard> {
       },
     );
   }
-}
 
-// ====== Subsections ======
+  // void _openQuickAddTaskSheet(BuildContext context, String memberUid) {
+  //   final memberLabel = widget.memberName; // sadece başlıkta göstermek için
+  //   final taskProv = context.read<TaskCloudProvider>();
+  //
+  //   const defaultTasks = AppLists.defaultTasks;
+  //   final frequent = taskProv.suggestedTasks;
+  //   final existing = taskProv.tasks.map((t) => t.name).toList();
+  //   final suggestions = {
+  //     ...frequent,
+  //     ...defaultTasks,
+  //     ...existing,
+  //   }.where((s) => s.trim().isNotEmpty).toList();
+  //
+  //   final c = TextEditingController();
+  //
+  //   showModalBottomSheet(
+  //     context: context,
+  //     isScrollControlled: true,
+  //     shape: const RoundedRectangleBorder(
+  //       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+  //     ),
+  //     builder: (_) {
+  //       return Padding(
+  //         padding: EdgeInsets.only(
+  //           left: 16,
+  //           right: 16,
+  //           top: 12,
+  //           bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+  //         ),
+  //         child: StatefulBuilder(
+  //           builder: (ctx, setLocal) {
+  //             return Column(
+  //               mainAxisSize: MainAxisSize.min,
+  //               crossAxisAlignment: CrossAxisAlignment.start,
+  //               children: [
+  //                 // handle + başlık
+  //                 Center(
+  //                   child: Container(
+  //                     width: 36,
+  //                     height: 4,
+  //                     margin: const EdgeInsets.only(bottom: 10),
+  //                     decoration: BoxDecoration(
+  //                       color: Theme.of(context).dividerColor,
+  //                       borderRadius: BorderRadius.circular(99),
+  //                     ),
+  //                   ),
+  //                 ),
+  //                 Row(
+  //                   children: [
+  //                     Expanded(
+  //                       child: Text(
+  //                         "Add task for $memberLabel",
+  //                         style: const TextStyle(
+  //                           fontWeight: FontWeight.bold,
+  //                           fontSize: 16,
+  //                         ),
+  //                       ),
+  //                     ),
+  //                     IconButton(
+  //                       icon: const Icon(Icons.close),
+  //                       onPressed: () => Navigator.pop(context),
+  //                     ),
+  //                   ],
+  //                 ),
+  //                 const SizedBox(height: 8),
+  //                 TextField(
+  //                   controller: c,
+  //                   decoration: const InputDecoration(
+  //                     hintText: "Enter task…",
+  //                     prefixIcon: Icon(Icons.task_alt),
+  //                     border: OutlineInputBorder(),
+  //                     isDense: true,
+  //                   ),
+  //                   onSubmitted: (_) =>
+  //                       _assignOrCreateTask(context, c.text, memberUid),
+  //                 ),
+  //                 const SizedBox(height: 12),
+  //                 if (suggestions.isNotEmpty) ...[
+  //                   Text(
+  //                     "Suggestions",
+  //                     style: Theme.of(context).textTheme.labelLarge,
+  //                   ),
+  //                   const SizedBox(height: 6),
+  //                   ConstrainedBox(
+  //                     constraints: const BoxConstraints(maxHeight: 150),
+  //                     child: SingleChildScrollView(
+  //                       child: Wrap(
+  //                         spacing: 6,
+  //                         runSpacing: 6,
+  //                         children: suggestions.map((name) {
+  //                           return ActionChip(
+  //                             label: Text(name),
+  //                             onPressed: () =>
+  //                                 _assignOrCreateTask(context, name, memberUid),
+  //                           );
+  //                         }).toList(),
+  //                       ),
+  //                     ),
+  //                   ),
+  //                   const SizedBox(height: 12),
+  //                 ],
+  //                 Align(
+  //                   alignment: Alignment.centerRight,
+  //                   child: FilledButton.icon(
+  //                     icon: const Icon(Icons.add),
+  //                     label: const Text("Add"),
+  //                     onPressed: () =>
+  //                         _assignOrCreateTask(context, c.text, memberUid),
+  //                   ),
+  //                 ),
+  //               ],
+  //             );
+  //           },
+  //         ),
+  //       );
+  //     },
+  //   );
+  // }
 
-class _TasksSubsection extends StatelessWidget {
-  final List<Task> tasksFiltered;
-  final bool expanded;
-  final int previewCount;
-  final VoidCallback onToggleExpand;
-  final void Function(Task) onToggleTask;
-
-  const _TasksSubsection({
-    required this.tasksFiltered,
-    required this.expanded,
-    required this.previewCount,
-    required this.onToggleExpand,
-    required this.onToggleTask,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    final total = tasksFiltered.length;
-    final showAll = expanded || total <= previewCount;
-    final visible = showAll
-        ? tasksFiltered
-        : tasksFiltered.take(previewCount).toList();
-    final hiddenCount = showAll ? 0 : (total - previewCount);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Tasks',
-          style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        if (tasksFiltered.isEmpty)
-          const MutedText('No tasks')
-        else
-          ...visible.map((task) {
-            final isDone = task.completed;
-            return Dismissible(
-              direction: DismissDirection.endToStart,
-              key: ValueKey(
-                task.remoteId ??
-                    '${task.name}|${task.assignedToUid ?? //
-                        ""}',
-              ), // HiveObject.key (Task, HiveObject'tan türemeli)
-              background: const SwipeBg(
-                color: Colors.green,
-                icon: Icons.check,
-                align: Alignment.centerLeft,
-              ),
-              secondaryBackground: const SwipeBg(
-                color: Colors.red,
-                icon: Icons.delete,
-                align: Alignment.centerRight,
-              ),
-
-              // Kaydırma davranışı:
-              confirmDismiss: (direction) async {
-                if (direction == DismissDirection.startToEnd) {
-                  // SOL → SAĞ : Toggle (tamamla/geri al) — dismiss ETME
-                  onToggleTask(task);
-                  return false; // tile listeden düşmesin
-                } else {
-                  // SAĞ → SOL : Delete — dismiss ET
-                  final removed = task;
-                  // Önce Hive’dan sil
-                  context.read<TaskCloudProvider>().removeTask(task);
-
-                  // Undo SnackBar
-                  ScaffoldMessenger.of(context).clearSnackBars();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Task deleted'),
-                      action: SnackBarAction(
-                        label: 'Undo',
-                        onPressed: () {
-                          // Not: yeniden eklenir (yeni key alır); sıra üstte olur
-                          context.read<TaskCloudProvider>().addTask(removed);
-                        },
-                      ),
-                    ),
-                  );
-                  return true;
-                }
-              },
-              child: ListTile(
-                dense: true,
-                visualDensity: const VisualDensity(
-                  horizontal: -4,
-                  vertical: -2,
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                leading: Checkbox(
-                  value: isDone,
-                  onChanged: (v) async {
-                    await _handleToggleTask(context, task);
-                    if (v == true && context.mounted) {
-                      _celebrate(context, '🎉 Task ${task.name} is completed!');
-                    }
-                  },
-                ),
-
-                title: Text(
-                  task.name,
-                  overflow: TextOverflow.ellipsis,
-                  style: isDone
-                      ? const TextStyle(decoration: TextDecoration.lineThrough)
-                      : null,
-                ),
-                onTap: () => _handleToggleTask(context, task),
-                trailing: IconButton(
-                  tooltip: S.delete,
-                  icon: const Icon(Icons.delete, color: Colors.redAccent),
-                  onPressed: () =>
-                      context.read<TaskCloudProvider>().removeTask(task),
-                ),
-              ),
-            );
-          }),
-        if (hiddenCount > 0 || expanded)
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: onToggleExpand,
-              child: Text(showAll ? 'Show less' : 'Show all (+$hiddenCount)'),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _ItemsSubsection extends StatelessWidget {
-  final List<Item> itemsFiltered;
-  final bool expanded;
-  final int previewCount;
-  final VoidCallback onToggleExpand;
-  final void Function(Item) onToggleItem;
-
-  const _ItemsSubsection({
-    required this.itemsFiltered,
-    required this.expanded,
-    required this.previewCount,
-    required this.onToggleExpand,
-    required this.onToggleItem,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    final total = itemsFiltered.length;
-    final showAll = expanded || total <= previewCount;
-    final visible = showAll
-        ? itemsFiltered
-        : itemsFiltered.take(previewCount).toList();
-    final hiddenCount = showAll ? 0 : (total - previewCount);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Market',
-          style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        if (itemsFiltered.isEmpty)
-          const MutedText('No items')
-        else
-          ...visible.map((it) {
-            final bought = it.bought;
-            return Dismissible(
-              key: ValueKey('item-${it.remoteId ?? it.name}-${it.hashCode}'),
-              background: const SwipeBg(
-                color: Colors.green,
-                icon: Icons.check,
-                align: Alignment.centerLeft,
-              ),
-              secondaryBackground: const SwipeBg(
-                color: Colors.red,
-                icon: Icons.delete,
-                align: Alignment.centerRight,
-              ),
-              confirmDismiss: (dir) async {
-                if (dir == DismissDirection.startToEnd) {
-                  // Toggle (satırı listeden ÇIKARMA)
-                  _handleToggleItem(context, it);
-                  return false;
-                } else {
-                  // Delete + Undo
-                  final removed = it;
-                  final copy = Item(
-                    removed.name,
-                    bought: removed.bought,
-                    assignedToUid: removed.assignedToUid,
-                  );
-                  context.read<ItemCloudProvider>().removeItem(removed);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Item deleted'),
-                      action: SnackBarAction(
-                        label: 'Undo',
-                        onPressed: () =>
-                            context.read<ItemCloudProvider>().addItem(copy),
-                      ),
-                      duration: const Duration(seconds: 5),
-                    ),
-                  );
-                  return true;
-                }
-              },
-              child: ListTile(
-                dense: true,
-                visualDensity: const VisualDensity(
-                  horizontal: -4,
-                  vertical: -2,
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                onTap: () => _handleToggleItem(context, it),
-                leading: IconButton(
-                  icon: Icon(
-                    bought
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                  ),
-                  onPressed: () => _handleToggleItem(context, it),
-                ),
-                title: Text(
-                  it.name,
-                  overflow: TextOverflow.ellipsis,
-                  style: bought
-                      ? const TextStyle(decoration: TextDecoration.lineThrough)
-                      : null,
-                ),
-                trailing: IconButton(
-                  tooltip: S.delete,
-                  icon: const Icon(Icons.delete, color: Colors.redAccent),
-                  onPressed: () =>
-                      context.read<ItemCloudProvider>().removeItem(it),
-                ),
-              ),
-            );
-          }),
-        if (hiddenCount > 0 || expanded)
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: onToggleExpand,
-              child: Text(showAll ? 'Show less' : 'Show all (+$hiddenCount)'),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-// ---- toggle handlers keep auto-switch behavior via UiProvider ----
-Future<void> _handleToggleTask(BuildContext context, Task t) async {
-  final ui = context.read<UiProvider>();
-  final newVal = !t.completed;
-
-  // toggleTask zaten Future dönüyorsa bunu await’le
-  await context.read<TaskCloudProvider>().toggleTask(t, newVal);
-
-  if (newVal && ui.taskFilter == TaskViewFilter.pending) {
-    context.read<UiProvider>().setTaskFilter(TaskViewFilter.completed);
-  } else if (!newVal && ui.taskFilter == TaskViewFilter.completed) {
-    context.read<UiProvider>().setTaskFilter(TaskViewFilter.pending);
-  }
-}
-
-Future<void> _handleToggleItem(BuildContext context, Item it) async {
-  final ui = context.read<UiProvider>();
-  final newVal = !it.bought;
-
-  await context.read<ItemCloudProvider>().toggleItem(it, newVal);
-
-  if (newVal && ui.itemFilter == ItemViewFilter.toBuy) {
-    context.read<UiProvider>().setItemFilter(ItemViewFilter.bought);
-  } else if (!newVal && ui.itemFilter == ItemViewFilter.bought) {
-    context.read<UiProvider>().setItemFilter(ItemViewFilter.toBuy);
-  }
+  // void _openQuickAddItemSheet(BuildContext context, String memberUid) {
+  //   final memberLabel = widget.memberName; // sadece başlık için
+  //   final itemProv = context.read<ItemCloudProvider>();
+  //
+  //   const defaultItems = AppLists.defaultItems;
+  //   final frequent = itemProv.frequentItems;
+  //   final existing = itemProv.items.map((i) => i.name).toList();
+  //   final suggestions = {
+  //     ...frequent,
+  //     ...defaultItems,
+  //     ...existing,
+  //   }.where((s) => s.trim().isNotEmpty).toList();
+  //
+  //   final c = TextEditingController();
+  //
+  //   showModalBottomSheet(
+  //     context: context,
+  //     isScrollControlled: true,
+  //     shape: const RoundedRectangleBorder(
+  //       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+  //     ),
+  //     builder: (_) {
+  //       return Padding(
+  //         padding: EdgeInsets.only(
+  //           left: 16,
+  //           right: 16,
+  //           top: 12,
+  //           bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+  //         ),
+  //         child: StatefulBuilder(
+  //           builder: (ctx, setLocal) {
+  //             return Column(
+  //               mainAxisSize: MainAxisSize.min,
+  //               crossAxisAlignment: CrossAxisAlignment.start,
+  //               children: [
+  //                 Center(
+  //                   child: Container(
+  //                     width: 36,
+  //                     height: 4,
+  //                     margin: const EdgeInsets.only(bottom: 10),
+  //                     decoration: BoxDecoration(
+  //                       color: Theme.of(context).dividerColor,
+  //                       borderRadius: BorderRadius.circular(99),
+  //                     ),
+  //                   ),
+  //                 ),
+  //                 Row(
+  //                   children: [
+  //                     Expanded(
+  //                       child: Text(
+  //                         "Add item for $memberLabel",
+  //                         style: const TextStyle(
+  //                           fontWeight: FontWeight.bold,
+  //                           fontSize: 16,
+  //                         ),
+  //                       ),
+  //                     ),
+  //                     IconButton(
+  //                       icon: const Icon(Icons.close),
+  //                       onPressed: () => Navigator.pop(context),
+  //                     ),
+  //                   ],
+  //                 ),
+  //                 const SizedBox(height: 8),
+  //                 TextField(
+  //                   controller: c,
+  //                   decoration: const InputDecoration(
+  //                     hintText: "Enter item…",
+  //                     prefixIcon: Icon(Icons.shopping_bag),
+  //                     border: OutlineInputBorder(),
+  //                     isDense: true,
+  //                   ),
+  //                   onSubmitted: (_) =>
+  //                       _assignOrCreateItem(context, c.text, memberUid),
+  //                 ),
+  //                 const SizedBox(height: 12),
+  //                 if (suggestions.isNotEmpty) ...[
+  //                   Text(
+  //                     "Suggestions",
+  //                     style: Theme.of(context).textTheme.labelLarge,
+  //                   ),
+  //                   const SizedBox(height: 6),
+  //                   ConstrainedBox(
+  //                     constraints: const BoxConstraints(maxHeight: 150),
+  //                     child: SingleChildScrollView(
+  //                       child: Wrap(
+  //                         spacing: 6,
+  //                         runSpacing: 6,
+  //                         children: suggestions.map((name) {
+  //                           return ActionChip(
+  //                             label: Text(name),
+  //                             onPressed: () =>
+  //                                 _assignOrCreateItem(context, name, memberUid),
+  //                           );
+  //                         }).toList(),
+  //                       ),
+  //                     ),
+  //                   ),
+  //                   const SizedBox(height: 12),
+  //                 ],
+  //                 Align(
+  //                   alignment: Alignment.centerRight,
+  //                   child: FilledButton.icon(
+  //                     icon: const Icon(Icons.add),
+  //                     label: const Text("Add"),
+  //                     onPressed: () =>
+  //                         _assignOrCreateItem(context, c.text, memberUid),
+  //                   ),
+  //                 ),
+  //               ],
+  //             );
+  //           },
+  //         ),
+  //       );
+  //     },
+  //   );
+  // }
 }
 
 // ====== assign or create helpers ======
@@ -999,19 +1057,6 @@ Item? _pickItemByName(List<Item> list, String name) {
   }
 }
 
-void _celebrate(BuildContext context, String message) {
-  if (!context.mounted) return;
-  final messenger = ScaffoldMessenger.of(context);
-  messenger.clearSnackBars();
-  messenger.showSnackBar(
-    SnackBar(
-      content: Text(message),
-      duration: const Duration(seconds: 2),
-      behavior: SnackBarBehavior.floating,
-    ),
-  );
-}
-
 void _assignOrCreateTask(BuildContext context, String name, String memberUid) {
   final prov = context.read<TaskCloudProvider>();
   final trimmed = name.trim();
@@ -1024,6 +1069,23 @@ void _assignOrCreateTask(BuildContext context, String name, String memberUid) {
     prov.addTask(Task(trimmed, assignedToUid: memberUid));
   }
   Navigator.pop(context);
+}
+
+List<String> _splitNames(String raw) {
+  // virgül, satır sonu, noktalı virgül ayırıcıları
+  final parts = raw
+      .split(RegExp(r'[,;\n]'))
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
+  // tekrarları kaldır
+  final seen = <String>{};
+  final out = <String>[];
+  for (final p in parts) {
+    final key = p.toLowerCase();
+    if (seen.add(key)) out.add(p);
+  }
+  return out;
 }
 
 void _assignOrCreateItem(BuildContext context, String name, String memberUid) {

@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../utils/recent_categories.dart';
+import '_base_cloud.dart';
 
 enum ExpenseDateFilter { thisMonth, lastMonth, all }
 
@@ -47,7 +48,7 @@ class ExpenseDoc {
   };
 }
 
-class ExpenseCloudProvider extends ChangeNotifier {
+class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
 
@@ -57,8 +58,6 @@ class ExpenseCloudProvider extends ChangeNotifier {
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
   List<ExpenseDoc> _expenses = [];
   List<ExpenseDoc> get expenses => _expenses;
-  String? _lastError;
-  String? get lastError => _lastError;
 
   List<ExpenseDoc> get all {
     final list = _expenses.toList();
@@ -78,12 +77,6 @@ class ExpenseCloudProvider extends ChangeNotifier {
     return _db.collection('families/$fid/expenses');
   }
 
-  void _setError(String? msg) {
-    _lastError = msg;
-    notifyListeners();
-  }
-
-  void clearError() => _setError(null);
   void _bind() {
     _sub?.cancel();
     final c = _col;
@@ -98,12 +91,12 @@ class ExpenseCloudProvider extends ChangeNotifier {
         .listen(
           (snap) {
             _expenses = snap.docs.map((d) => ExpenseDoc.fromSnap(d)).toList();
-            _setError(null);
+            clearError();
             notifyListeners();
           },
           onError: (e) {
             debugPrint('[ExpenseCloud] STREAM ERROR: $e');
-            _setError('ExpenseCloud: $e');
+            setError(e);
           },
         );
   }

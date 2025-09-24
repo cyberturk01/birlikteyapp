@@ -10,8 +10,9 @@ import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/task.dart';
+import '_base_cloud.dart';
 
-class WeeklyCloudProvider extends ChangeNotifier {
+class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
   final _db = FirebaseFirestore.instance;
 
   String? _familyId;
@@ -19,9 +20,6 @@ class WeeklyCloudProvider extends ChangeNotifier {
 
   final List<WeeklyTaskCloud> _list = [];
   List<WeeklyTaskCloud> get tasks => List.unmodifiable(_list);
-
-  String? _lastError;
-  String? get lastError => _lastError;
 
   /// Bildirim id’leri: key=docId, value=notificationId
   final Box<int> _notifBox = Hive.box<int>('weeklyNotifCloudBox');
@@ -33,13 +31,6 @@ class WeeklyCloudProvider extends ChangeNotifier {
     _familyId = fam;
     _rebind();
   }
-
-  void _setError(String? msg) {
-    _lastError = msg;
-    notifyListeners();
-  }
-
-  void clearError() => _setError(null);
 
   void _rebind() {
     _sub?.cancel();
@@ -55,10 +46,11 @@ class WeeklyCloudProvider extends ChangeNotifier {
         .snapshots()
         .listen(
           (snap) async {
+            clearError();
             _list
               ..clear()
               ..addAll(snap.docs.map(WeeklyTaskCloud.fromDoc));
-            _setError(null);
+            clearError();
             notifyListeners();
 
             // Auto-reschedule safety (opsiyonel): yeni gelenler için id yoksa planla
@@ -70,7 +62,7 @@ class WeeklyCloudProvider extends ChangeNotifier {
           },
           onError: (e) {
             debugPrint('[WeeklyTaskCloud] STREAM ERROR: $e');
-            _setError('WeeklyTaskCloud: $e'); // UI’da banner çıkacak
+            setError(e);
           },
         );
   }

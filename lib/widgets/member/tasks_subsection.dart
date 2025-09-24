@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../constants/app_strings.dart';
 import '../../models/task.dart';
 import '../../providers/task_cloud_provider.dart';
+import '../../providers/ui_provider.dart';
 import '../../widgets/muted_text.dart';
 import '../../widgets/swipe_bg.dart';
 
@@ -46,9 +47,11 @@ class TasksSubsection extends StatelessWidget {
           ...visible.map((task) {
             final isDone = task.completed;
             return Dismissible(
-              direction: DismissDirection.endToStart,
+              direction: DismissDirection.horizontal,
               key: ValueKey(
-                task.remoteId ?? '${task.name}|${task.assignedToUid ?? ""}',
+                task.remoteId ??
+                    '${task.name}|${task.assignedToUid ?? //
+                        ""}',
               ),
               background: const SwipeBg(
                 color: Colors.green,
@@ -60,26 +63,32 @@ class TasksSubsection extends StatelessWidget {
                 icon: Icons.delete,
                 align: Alignment.centerRight,
               ),
-              confirmDismiss: (direction) async {
-                if (direction == DismissDirection.startToEnd) {
-                  onToggleTask(task);
-                  return false;
+              confirmDismiss: (dir) async {
+                if (dir == DismissDirection.startToEnd) {
+                  await _handleToggleTask(
+                    context,
+                    task,
+                    withCelebrate: !task.completed,
+                  );
+                  return false; // tile listeden düşmesin
                 } else {
                   final removed = task;
                   context.read<TaskCloudProvider>().removeTask(task);
-                  ScaffoldMessenger.of(context)
-                    ..clearSnackBars()
-                    ..showSnackBar(
-                      SnackBar(
-                        content: const Text('Task deleted'),
-                        action: SnackBarAction(
-                          label: 'Undo',
-                          onPressed: () => context
-                              .read<TaskCloudProvider>()
-                              .addTask(removed),
-                        ),
+
+                  // Undo SnackBar
+                  ScaffoldMessenger.of(context).clearSnackBars();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Task deleted'),
+                      action: SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () {
+                          // Not: yeniden eklenir (yeni key alır); sıra üstte olur
+                          context.read<TaskCloudProvider>().addTask(removed);
+                        },
                       ),
-                    );
+                    ),
+                  );
                   return true;
                 }
               },
@@ -90,15 +99,17 @@ class TasksSubsection extends StatelessWidget {
                   vertical: -2,
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                leading: IconButton(
-                  tooltip: isDone ? 'Mark as pending' : 'Mark as completed',
-                  icon: Icon(
-                    isDone
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                  ),
-                  onPressed: () => onToggleTask(task),
+                leading: Checkbox(
+                  value: isDone,
+                  onChanged: (v) async {
+                    await _handleToggleTask(
+                      context,
+                      task,
+                      withCelebrate: v == true,
+                    );
+                  },
                 ),
+
                 title: Text(
                   task.name,
                   overflow: TextOverflow.ellipsis,
@@ -106,7 +117,7 @@ class TasksSubsection extends StatelessWidget {
                       ? const TextStyle(decoration: TextDecoration.lineThrough)
                       : null,
                 ),
-                onTap: () => onToggleTask(task),
+                onTap: () => _handleToggleTask(context, task),
                 trailing: IconButton(
                   tooltip: S.delete,
                   icon: const Icon(Icons.delete, color: Colors.redAccent),
@@ -126,5 +137,37 @@ class TasksSubsection extends StatelessWidget {
           ),
       ],
     );
+  }
+}
+
+// ---- toggle handlers keep auto-switch behavior via UiProvider ----
+Future<void> _handleToggleTask(
+  BuildContext context,
+  Task t, {
+  bool withCelebrate = false,
+}) async {
+  final ui = context.read<UiProvider>();
+  final willComplete = !t.completed;
+
+  await context.read<TaskCloudProvider>().toggleTask(t, willComplete);
+
+  if (withCelebrate && willComplete) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      final m = ScaffoldMessenger.of(context);
+      m.clearSnackBars();
+      m.showSnackBar(
+        const SnackBar(
+          content: Text('🎉 Task completed!'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    });
+  }
+  if (willComplete && ui.taskFilter == TaskViewFilter.pending) {
+    context.read<UiProvider>().setTaskFilter(TaskViewFilter.completed);
+  } else if (!willComplete && ui.taskFilter == TaskViewFilter.completed) {
+    context.read<UiProvider>().setTaskFilter(TaskViewFilter.pending);
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../constants/app_strings.dart';
@@ -160,6 +161,8 @@ class _ManagePageState extends State<ManagePage> {
     final text = _input.text.trim();
     if (text.isEmpty) return;
 
+    String what = _tab == _ManageTab.tasks ? 'Task' : 'Item';
+
     if (_tab == _ManageTab.tasks) {
       final dup = taskProv.tasks.any(
         (t) => t.name.toLowerCase() == text.toLowerCase(),
@@ -186,9 +189,22 @@ class _ManagePageState extends State<ManagePage> {
 
     _input.clear();
     FocusScope.of(context).unfocus();
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Added')));
+
+    // 🎉 minik haptic + “başarılı” snackbar (tasks ve items için aynı)
+    HapticFeedback.selectionClick();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline),
+            const SizedBox(width: 8),
+            Text('$what added'),
+          ],
+        ),
+        duration: const Duration(milliseconds: 1400),
+      ),
+    );
   }
 }
 
@@ -516,78 +532,47 @@ Future<void> _showRenameDialog({
 // ITEM
 void _showAssignItemSheet(BuildContext context, Item item) {
   String? selectedUid = item.assignedToUid; // mevcut atamayı UID olarak başlat
-  final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
+  // final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
 
   showModalBottomSheet(
     context: context,
     builder: (_) => Padding(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'Assign item',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-
-          StatefulBuilder(
-            builder: (ctx, setLocal) {
-              return StreamBuilder<Map<String, String>>(
-                stream: dictStream, // {uid: label}
-                builder: (ctx, snap) {
-                  final dict = snap.data ?? const <String, String>{};
-
-                  final items = <DropdownMenuItem<String?>>[
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('No one'),
-                    ),
-                    ...dict.entries.map(
-                      (e) => DropdownMenuItem<String?>(
-                        value: e.key,
-                        child: Text(e.value),
-                      ),
-                    ),
-                  ];
-
-                  final value = dict.containsKey(selectedUid)
-                      ? selectedUid
-                      : null;
-
-                  return DropdownButtonFormField<String?>(
-                    value: value,
-                    isExpanded: true,
-                    items: items,
-                    onChanged: (v) => setLocal(() => selectedUid = v),
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      labelText: 'Assign to',
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () async {
-                await context.read<ItemCloudProvider>().updateAssignment(
-                  item,
-                  (selectedUid != null && selectedUid!.trim().isNotEmpty)
-                      ? selectedUid
-                      : null,
-                );
-                if (context.mounted) Navigator.pop(context);
-              },
-              child: const Text('Save'),
-            ),
-          ),
-        ],
+      child: StatefulBuilder(
+        builder: (ctx, setLocal) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Assign item',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              MemberDropdownUid(
+                value: selectedUid,
+                onChanged: (v) => setLocal(() => selectedUid = v),
+                label: 'Assign to',
+                nullLabel: 'No one',
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () async {
+                    await context.read<ItemCloudProvider>().updateAssignment(
+                      item,
+                      (selectedUid != null && selectedUid!.trim().isNotEmpty)
+                          ? selectedUid
+                          : null,
+                    );
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  child: const Text('Save'),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     ),
   );
@@ -612,14 +597,12 @@ void _showAssignTaskSheet(BuildContext context, Task task) {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-
               MemberDropdownUid(
                 value: selectedUid,
                 onChanged: (v) => setLocal(() => selectedUid = v),
                 label: 'Assign to',
                 nullLabel: 'No one',
               ),
-
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,

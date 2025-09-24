@@ -6,17 +6,16 @@ import 'package:flutter/foundation.dart';
 
 import '../models/item.dart';
 import '../services/auth_service.dart';
-import '../services/task_service.dart'; // Eğer gerekmiyorsa kaldırabilirsiniz
+import '../services/task_service.dart';
+import '_base_cloud.dart'; // Eğer gerekmiyorsa kaldırabilirsiniz
 
-class ItemCloudProvider extends ChangeNotifier {
+class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
   AuthService _auth;
   TaskService _service; // opsiyonel; simetri için duruyor
 
   User? _currentUser;
   String? _familyId;
   CollectionReference<Map<String, dynamic>>? _col;
-  String? _lastError;
-  String? get lastError => _lastError;
 
   final List<Item> _items = [];
   List<Item> get items => List.unmodifiable(_items);
@@ -62,13 +61,6 @@ class ItemCloudProvider extends ChangeNotifier {
     _bindAuth();
   }
 
-  void _setError(String? msg) {
-    _lastError = msg;
-    notifyListeners();
-  }
-
-  void clearError() => _setError(null);
-
   void _rebindItems() {
     debugPrint('[ItemCloud] REBIND → user=${_currentUser?.uid} fam=$_familyId');
 
@@ -95,6 +87,7 @@ class ItemCloudProvider extends ChangeNotifier {
         .snapshots()
         .listen(
           (qs) {
+            clearError();
             debugPrint('[ItemCloud] SNAP size=${qs.size}');
             _items
               ..clear()
@@ -114,13 +107,13 @@ class ItemCloudProvider extends ChangeNotifier {
                   return it;
                 }),
               );
-            _setError(null);
+            clearError();
             notifyListeners();
           },
           onError: (e, st) {
             debugPrint('[ItemCloud] STREAM ERROR: $e');
             _items.clear();
-            _setError('ItemCloud: $e');
+            setError(e);
             notifyListeners();
           },
         );
@@ -227,29 +220,18 @@ class ItemCloudProvider extends ChangeNotifier {
     throw StateError('Cloud doc not found for item "${it.name}"');
   }
 
-  List<Item> addItemsBulk(
+  Future<List<Item>> addItemsBulkCloud(
     List<String> names, {
     String? assignedToUid,
-    bool skipDuplicates = true,
-  }) {
+  }) async {
     final created = <Item>[];
-    final existing = items.map((i) => i.name.toLowerCase()).toSet();
-
-    for (final n in names) {
-      final name = n.trim();
+    for (final raw in names) {
+      final name = raw.trim();
       if (name.isEmpty) continue;
-      if (skipDuplicates && existing.contains(name.toLowerCase())) continue;
-
       final it = Item(name, assignedToUid: assignedToUid);
-      _items.add(it);
-
-      // (İsteğe bağlı) frekans sayacı artırmak istemezsen, burayı atla:
-      // final current = _itemCountBox.get(name, defaultValue: 0)!;
-      // _itemCountBox.put(name, current + 1);
-
+      await addItem(it);
       created.add(it);
     }
-    if (created.isNotEmpty) notifyListeners();
     return created;
   }
 

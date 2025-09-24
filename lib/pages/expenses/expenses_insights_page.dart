@@ -109,8 +109,6 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
               const SizedBox(height: 12),
               // === Toplam başlık  aylık grafik ===
               _HeaderAndChart(memberUid: _memberUid, filter: _filter),
-
-              const SizedBox(height: 16),
               // === Transaction listesi (tek StreamBuilder ile dict) ===
               StreamBuilder<Map<String, String>>(
                 stream: dictStream,
@@ -168,10 +166,7 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                                 '${fmtDateYmd(e.date)} • $memberLabel'
                                 '${e.category == null ? '' : ' • ${e.category}'}',
                               ),
-                              trailing: Text(
-                                // para için mevcut fmtMoney’n varsa onu kullanmaya devam et
-                                '€ ${e.amount.toStringAsFixed(2)}',
-                              ),
+                              trailing: Text(fmtMoney(context, e.amount)),
                               onLongPress: () =>
                                   _showChangeCategorySheet(context, e),
                             );
@@ -188,36 +183,10 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
     );
   }
 
-  String _titleWithMonth(ExpenseDateFilter f) {
-    final now = DateTime.now();
-    final months = const [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    if (f == ExpenseDateFilter.thisMonth) {
-      return 'This month • ${months[now.month - 1]} ${now.year}';
-    }
-    if (f == ExpenseDateFilter.lastMonth) {
-      final prev = DateTime(now.year, now.month - 1, 1);
-      return 'Last month • ${months[prev.month - 1]} ${prev.year}';
-    }
-    return 'All time';
-  }
-
-  static String _fmtDate(DateTime d) {
-    final mm = d.month.toString().padLeft(2, '0');
-    final dd = d.day.toString().padLeft(2, '0');
-    return '${d.year}-$mm-$dd';
+  String _fileStamp() {
+    final n = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${n.year}${two(n.month)}${two(n.day)}-${two(n.hour)}${two(n.minute)}';
   }
 
   String _stampNow() {
@@ -299,8 +268,9 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
       final dir = await getTemporaryDirectory();
       final famId = context.read<FamilyProvider>().familyId ?? 'noFamily';
       final file = File(
-        '${dir.path}/expenses_${famId}_${_fmtDate(picked.start)}_${_fmtDate(picked.end)}_${_stampNow()}.csv',
-      );
+        '${dir.path}/$famId${_fmtDate(picked.start)}-${_fmtDate(picked.end)}_${_fileStamp()}.csv',
+      ); // aralıklı export
+
       await file.writeAsString(csv);
 
       if (!mounted) return;
@@ -335,7 +305,7 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
           (e) => [
             _fmtDate(e.date),
             e.title,
-            e.amount.toStringAsFixed(2),
+            fmtMoney(context, e.amount),
             (e.assignedToUid == null
                 ? ''
                 : (dict[e.assignedToUid] ?? e.assignedToUid!)),
@@ -451,12 +421,6 @@ String _fmtDate(DateTime d) {
   return '${d.year}-$mm-$dd';
 }
 
-String _stampNow() {
-  final now = DateTime.now();
-  String two(int v) => v.toString().padLeft(2, '0');
-  return '${now.year}-${two(now.month)}-${two(now.day)}_${two(now.hour)}${two(now.minute)}';
-}
-
 void _showChangeCategorySheet(BuildContext context, ExpenseDoc e) {
   const categories = <String>[
     'Groceries',
@@ -507,7 +471,6 @@ void _showChangeCategorySheet(BuildContext context, ExpenseDoc e) {
               ],
             ),
             const SizedBox(height: 8),
-            // Hızlı seçimler
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -690,7 +653,7 @@ class _HeaderAndChart extends StatelessWidget {
               ),
             ),
             Text(
-              '€ ${total.toStringAsFixed(2)}', // istersen burada fmtMoney
+              fmtMoney(context, total),
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),

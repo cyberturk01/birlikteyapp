@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../constants/app_strings.dart';
 import '../../models/item.dart';
 import '../../providers/item_cloud_provider.dart';
+import '../../providers/ui_provider.dart';
 import '../../widgets/muted_text.dart';
 import '../../widgets/swipe_bg.dart';
 
@@ -46,7 +47,7 @@ class ItemsSubsection extends StatelessWidget {
           ...visible.map((it) {
             final bought = it.bought;
             return Dismissible(
-              key: ValueKey('item-${it.key ?? it.name}-${it.hashCode}'),
+              key: ValueKey('item-${it.remoteId ?? it.name}-${it.hashCode}'),
               background: const SwipeBg(
                 color: Colors.green,
                 icon: Icons.check,
@@ -59,9 +60,10 @@ class ItemsSubsection extends StatelessWidget {
               ),
               confirmDismiss: (dir) async {
                 if (dir == DismissDirection.startToEnd) {
-                  onToggleItem(it);
+                  _handleToggleItem(context, it, withCelebrate: !it.bought);
                   return false;
                 } else {
+                  // Delete + Undo
                   final removed = it;
                   final copy = Item(
                     removed.name,
@@ -69,6 +71,7 @@ class ItemsSubsection extends StatelessWidget {
                     assignedToUid: removed.assignedToUid,
                   );
                   context.read<ItemCloudProvider>().removeItem(removed);
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: const Text('Item deleted'),
@@ -90,14 +93,15 @@ class ItemsSubsection extends StatelessWidget {
                   vertical: -2,
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                onTap: () => onToggleItem(it),
-                leading: IconButton(
-                  icon: Icon(
-                    bought
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                  ),
-                  onPressed: () => onToggleItem(it),
+                leading: Checkbox(
+                  value: bought,
+                  onChanged: (v) async {
+                    await _handleToggleItem(
+                      context,
+                      it,
+                      withCelebrate: v == true,
+                    );
+                  },
                 ),
                 title: Text(
                   it.name,
@@ -125,5 +129,37 @@ class ItemsSubsection extends StatelessWidget {
           ),
       ],
     );
+  }
+}
+
+Future<void> _handleToggleItem(
+  BuildContext context,
+  Item it, {
+  bool withCelebrate = false,
+}) async {
+  final ui = context.read<UiProvider>();
+  final willComplete = !it.bought;
+
+  await context.read<ItemCloudProvider>().toggleItem(it, willComplete);
+
+  if (withCelebrate && willComplete) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      final m = ScaffoldMessenger.of(context);
+      m.clearSnackBars();
+      m.showSnackBar(
+        const SnackBar(
+          content: Text('🎉 Item Bought!'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    });
+  }
+
+  if (willComplete && ui.itemFilter == ItemViewFilter.toBuy) {
+    context.read<UiProvider>().setItemFilter(ItemViewFilter.bought);
+  } else if (!willComplete && ui.itemFilter == ItemViewFilter.bought) {
+    context.read<UiProvider>().setItemFilter(ItemViewFilter.toBuy);
   }
 }
