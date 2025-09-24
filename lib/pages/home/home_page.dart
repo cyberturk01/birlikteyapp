@@ -136,13 +136,13 @@ class _HomePageState extends State<HomePage> {
         final items = context.watch<ItemCloudProvider>().items;
         final h = MediaQuery.of(context).size.height;
         final isShort = h < 640;
-        debugPrint('Home labels=$ordered');
+        debugPrint('Home labels=$ordered.map((e)=>e.label)');
         return Scaffold(
           appBar: AppBar(
             title: Row(
               children: const [
                 Icon(Icons.family_restroom),
-                SizedBox(width: 4),
+                SizedBox(width: 8),
                 Text('Togetherly'),
               ],
             ),
@@ -254,11 +254,9 @@ class _HomePageState extends State<HomePage> {
                                     key: const ValueKey('exp-mini'),
                                     children: [
                                       ExpensesMiniSummary(
-                                        expenses:
-                                            context
-                                                .watch<ExpenseCloudProvider?>()
-                                                ?.all ??
-                                            const <ExpenseDoc>[],
+                                        expenses: context
+                                            .watch<ExpenseCloudProvider>()
+                                            .expenses,
                                         onTap:
                                             null, // artık sekme zaten expenses; tıklamada iş yok
                                         // padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8), // istersen
@@ -296,10 +294,8 @@ class _HomePageState extends State<HomePage> {
                                         memberUid: uid,
                                       ) // ExpensesCard zaten UID’i destekliyordu
                                     : MemberCard(
-                                        memberUid:
-                                            uid, // MemberCard da UID alsın
-                                        memberName:
-                                            label, // gösterim için label
+                                        memberUid: uid,
+                                        memberName: label,
                                         tasks: memberTasks,
                                         items: memberItems,
                                         section: _section,

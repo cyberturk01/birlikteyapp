@@ -21,7 +21,6 @@ class _ExpensesCardState extends State<ExpensesCard> {
   @override
   Widget build(BuildContext context) {
     final expProv = context.watch<ExpenseCloudProvider>();
-    final family = context.watch<FamilyProvider>().memberLabelsOrFallback;
 
     final expenses = expProv.forMemberFiltered(widget.memberUid, _filter);
     final total = expProv.totalForMember(widget.memberUid, filter: _filter);

@@ -265,9 +265,20 @@ class _TaskListView extends StatelessWidget {
                 ),
                 leading: Checkbox(
                   value: t.completed,
-                  onChanged: (v) => context
-                      .read<TaskCloudProvider>()
-                      .toggleTask(t, v ?? false),
+                  onChanged: (v) async {
+                    await context.read<TaskCloudProvider>().toggleTask(
+                      t,
+                      v ?? false,
+                    );
+                    if (v == true && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('🎉 Great job! Task completed!'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
                 ),
                 title: Text(
                   t.name,
@@ -394,9 +405,20 @@ class _ItemListView extends StatelessWidget {
                 ),
                 leading: Checkbox(
                   value: it.bought,
-                  onChanged: (v) => context
-                      .read<ItemCloudProvider>()
-                      .toggleItem(it, v ?? false),
+                  onChanged: (v) async {
+                    await context.read<ItemCloudProvider>().toggleItem(
+                      it,
+                      v ?? false,
+                    );
+                    if (v == true && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('🛒 Item purchased! Well done!'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
                 ),
                 title: Text(
                   it.name,

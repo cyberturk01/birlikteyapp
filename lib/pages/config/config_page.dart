@@ -172,60 +172,6 @@ class ConfigurationPage extends StatelessWidget {
   }
 }
 
-class _BrandSwatch extends StatelessWidget {
-  final BrandSeed brand;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _BrandSwatch({
-    super.key,
-    required this.brand,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = brand.seed; // BrandSeed extension’dan
-    final cs = Theme.of(context).colorScheme;
-    final label = brand.label;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? cs.primary : cs.outlineVariant,
-            width: selected ? 2 : 1,
-          ),
-          color: cs.surfaceContainerLow,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _Dot(color: color),
-            const SizedBox(width: 8),
-            Text(
-              brand.name, // enum ismi: teal/coral/deepPurple/forest
-              style: TextStyle(
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-            if (selected) ...[
-              const SizedBox(width: 6),
-              const Icon(Icons.check, size: 16),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _Dot extends StatelessWidget {
   final Color color;
   const _Dot({required this.color});

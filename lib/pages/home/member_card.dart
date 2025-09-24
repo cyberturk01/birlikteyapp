@@ -11,13 +11,10 @@ import '../../providers/task_cloud_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../widgets/muted_text.dart';
 import '../../widgets/swipe_bg.dart';
-import '../family/family_manager.dart';
 
 enum _TaskStatus { pending, completed }
 
 enum _ItemStatus { toBuy, bought }
-
-enum _MemberStatus { tasks, items }
 
 class MemberCard extends StatefulWidget {
   final String memberUid;
@@ -306,7 +303,7 @@ class _MemberCardState extends State<MemberCard> {
                               label: const Text('Clear completed'),
                               onPressed: () => _clearCompletedForMember(
                                 context,
-                                widget.memberName,
+                                widget.memberUid,
                               ),
                             ),
                           )
@@ -320,7 +317,7 @@ class _MemberCardState extends State<MemberCard> {
                               label: const Text('Clear bought'),
                               onPressed: () => _clearBoughtForMember(
                                 context,
-                                widget.memberName,
+                                widget.memberUid,
                               ),
                             ),
                           ),
@@ -341,7 +338,7 @@ class _MemberCardState extends State<MemberCard> {
                       alignment: Alignment.centerLeft,
                       child: FilledButton.tonalIcon(
                         onPressed: () =>
-                            _openQuickAddTaskSheet(context, widget.memberName),
+                            _openQuickAddTaskSheet(context, widget.memberUid),
                         icon: const Icon(Icons.add_task),
                         label: const Text(
                           'Add task',
@@ -354,7 +351,7 @@ class _MemberCardState extends State<MemberCard> {
                       alignment: Alignment.centerLeft,
                       child: FilledButton.tonalIcon(
                         onPressed: () =>
-                            _openQuickAddItemSheet(context, widget.memberName),
+                            _openQuickAddItemSheet(context, widget.memberUid),
                         icon: const Icon(Icons.add_shopping_cart),
                         label: const Text(
                           'Add item',
@@ -371,12 +368,11 @@ class _MemberCardState extends State<MemberCard> {
     );
   }
 
-  void _clearCompletedForMember(BuildContext context, String member) {
+  void _clearCompletedForMember(BuildContext context, String memberUid) {
     final prov = context.read<TaskCloudProvider>();
 
-    // Undo için anlık snapshot
     final removed = prov.tasks
-        .where((t) => (t.assignedToUid ?? '') == member && t.completed)
+        .where((t) => (t.assignedToUid ?? '') == memberUid && t.completed)
         .map(
           (t) => Task(
             t.name,
@@ -386,7 +382,7 @@ class _MemberCardState extends State<MemberCard> {
         )
         .toList();
 
-    prov.clearCompleted(forMember: member);
+    prov.clearCompleted(forMember: memberUid);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -407,7 +403,6 @@ class _MemberCardState extends State<MemberCard> {
   void _clearBoughtForMember(BuildContext context, String memberUid) {
     final prov = context.read<ItemCloudProvider>();
 
-    // Undo için snapshot
     final removed = prov.items
         .where((i) => (i.assignedToUid ?? '') == memberUid && i.bought)
         .map(
@@ -433,13 +428,11 @@ class _MemberCardState extends State<MemberCard> {
     );
   }
 
-  // ===== Quick add sheets (assign OR create) =====
-
-  void _openQuickAddTaskSheet(BuildContext context, String member) {
+  void _openQuickAddTaskSheet(BuildContext context, String memberUid) {
+    final memberLabel = widget.memberName; // sadece başlıkta göstermek için
     final taskProv = context.read<TaskCloudProvider>();
 
     const defaultTasks = AppLists.defaultTasks;
-
     final frequent = taskProv.suggestedTasks;
     final existing = taskProv.tasks.map((t) => t.name).toList();
     final suggestions = {
@@ -470,6 +463,7 @@ class _MemberCardState extends State<MemberCard> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // handle + başlık
                   Center(
                     child: Container(
                       width: 36,
@@ -485,7 +479,7 @@ class _MemberCardState extends State<MemberCard> {
                     children: [
                       Expanded(
                         child: Text(
-                          "Add task for $member",
+                          "Add task for $memberLabel",
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -508,7 +502,7 @@ class _MemberCardState extends State<MemberCard> {
                       isDense: true,
                     ),
                     onSubmitted: (_) =>
-                        _assignOrCreateTask(context, c.text, member),
+                        _assignOrCreateTask(context, c.text, memberUid),
                   ),
                   const SizedBox(height: 12),
                   if (suggestions.isNotEmpty) ...[
@@ -527,7 +521,7 @@ class _MemberCardState extends State<MemberCard> {
                             return ActionChip(
                               label: Text(name),
                               onPressed: () =>
-                                  _assignOrCreateTask(context, name, member),
+                                  _assignOrCreateTask(context, name, memberUid),
                             );
                           }).toList(),
                         ),
@@ -535,14 +529,13 @@ class _MemberCardState extends State<MemberCard> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  // Assign dropdown kaldırıldı – sadece bu member’a ekliyoruz
                   Align(
                     alignment: Alignment.centerRight,
                     child: FilledButton.icon(
                       icon: const Icon(Icons.add),
                       label: const Text("Add"),
                       onPressed: () =>
-                          _assignOrCreateTask(context, c.text, member),
+                          _assignOrCreateTask(context, c.text, memberUid),
                     ),
                   ),
                 ],
@@ -554,11 +547,11 @@ class _MemberCardState extends State<MemberCard> {
     );
   }
 
-  void _openQuickAddItemSheet(BuildContext context, String member) {
+  void _openQuickAddItemSheet(BuildContext context, String memberUid) {
+    final memberLabel = widget.memberName; // sadece başlık için
     final itemProv = context.read<ItemCloudProvider>();
 
     const defaultItems = AppLists.defaultItems;
-
     final frequent = itemProv.frequentItems;
     final existing = itemProv.items.map((i) => i.name).toList();
     final suggestions = {
@@ -604,7 +597,7 @@ class _MemberCardState extends State<MemberCard> {
                     children: [
                       Expanded(
                         child: Text(
-                          "Add item for $member",
+                          "Add item for $memberLabel",
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -627,7 +620,7 @@ class _MemberCardState extends State<MemberCard> {
                       isDense: true,
                     ),
                     onSubmitted: (_) =>
-                        _assignOrCreateItem(context, c.text, member),
+                        _assignOrCreateItem(context, c.text, memberUid),
                   ),
                   const SizedBox(height: 12),
                   if (suggestions.isNotEmpty) ...[
@@ -646,7 +639,7 @@ class _MemberCardState extends State<MemberCard> {
                             return ActionChip(
                               label: Text(name),
                               onPressed: () =>
-                                  _assignOrCreateItem(context, name, member),
+                                  _assignOrCreateItem(context, name, memberUid),
                             );
                           }).toList(),
                         ),
@@ -660,7 +653,7 @@ class _MemberCardState extends State<MemberCard> {
                       icon: const Icon(Icons.add),
                       label: const Text("Add"),
                       onPressed: () =>
-                          _assignOrCreateItem(context, c.text, member),
+                          _assignOrCreateItem(context, c.text, memberUid),
                     ),
                   ),
                 ],
@@ -766,15 +759,16 @@ class _TasksSubsection extends StatelessWidget {
                   vertical: -2,
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                leading: IconButton(
-                  tooltip: isDone ? 'Mark as pending' : 'Mark as completed',
-                  icon: Icon(
-                    isDone
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                  ),
-                  onPressed: () => _handleToggleTask(context, task),
+                leading: Checkbox(
+                  value: isDone,
+                  onChanged: (v) async {
+                    await _handleToggleTask(context, task);
+                    if (v == true && context.mounted) {
+                      _celebrate(context, '🎉 Task ${task.name} is completed!');
+                    }
+                  },
                 ),
+
                 title: Text(
                   task.name,
                   overflow: TextOverflow.ellipsis,
@@ -929,10 +923,12 @@ class _ItemsSubsection extends StatelessWidget {
 }
 
 // ---- toggle handlers keep auto-switch behavior via UiProvider ----
-void _handleToggleTask(BuildContext context, Task t) {
+Future<void> _handleToggleTask(BuildContext context, Task t) async {
   final ui = context.read<UiProvider>();
   final newVal = !t.completed;
-  context.read<TaskCloudProvider>().toggleTask(t, newVal);
+
+  // toggleTask zaten Future dönüyorsa bunu await’le
+  await context.read<TaskCloudProvider>().toggleTask(t, newVal);
 
   if (newVal && ui.taskFilter == TaskViewFilter.pending) {
     context.read<UiProvider>().setTaskFilter(TaskViewFilter.completed);
@@ -941,10 +937,11 @@ void _handleToggleTask(BuildContext context, Task t) {
   }
 }
 
-void _handleToggleItem(BuildContext context, Item it) {
+Future<void> _handleToggleItem(BuildContext context, Item it) async {
   final ui = context.read<UiProvider>();
   final newVal = !it.bought;
-  context.read<ItemCloudProvider>().toggleItem(it, newVal);
+
+  await context.read<ItemCloudProvider>().toggleItem(it, newVal);
 
   if (newVal && ui.itemFilter == ItemViewFilter.toBuy) {
     context.read<UiProvider>().setItemFilter(ItemViewFilter.bought);
@@ -954,7 +951,6 @@ void _handleToggleItem(BuildContext context, Item it) {
 }
 
 // ====== assign or create helpers ======
-
 Task? _pickTaskByName(List<Task> list, String name) {
   final lower = name.trim().toLowerCase();
   final unassigned = list.where(
@@ -1003,6 +999,19 @@ Item? _pickItemByName(List<Item> list, String name) {
   }
 }
 
+void _celebrate(BuildContext context, String message) {
+  if (!context.mounted) return;
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.clearSnackBars();
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(message),
+      duration: const Duration(seconds: 2),
+      behavior: SnackBarBehavior.floating,
+    ),
+  );
+}
+
 void _assignOrCreateTask(BuildContext context, String name, String memberUid) {
   final prov = context.read<TaskCloudProvider>();
   final trimmed = name.trim();
@@ -1029,56 +1038,4 @@ void _assignOrCreateItem(BuildContext context, String name, String memberUid) {
     prov.addItem(Item(trimmed, assignedToUid: memberUid));
   }
   Navigator.pop(context);
-}
-
-class EmptyFamilyCard extends StatelessWidget {
-  final VoidCallback onAdd;
-  const EmptyFamilyCard({super.key, required this.onAdd});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 5,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: Ink(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-              theme.colorScheme.surface.withValues(alpha: 0.9),
-            ],
-          ),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
-          ),
-        ),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.family_restroom, size: 40),
-                const SizedBox(height: 10),
-                Text(
-                  'No family members yet',
-                  style: theme.textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                FilledButton.tonalIcon(
-                  onPressed: () => showFamilyManager(context),
-                  icon: const Icon(Icons.person_add),
-                  label: const Text('Add member'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

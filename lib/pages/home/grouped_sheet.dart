@@ -77,12 +77,6 @@ Future<void> showGroupedByMemberSheet<T>({
                 }
               }
 
-              // --- Sıra: me first + diğer herkes (veridekiler + family labels union)
-              final dataKeys = byMember.keys.toSet();
-              final labelSet = familyLabels.toSet();
-              final union = <String>{...dataKeys, ...labelSet}
-                ..remove(''); // '' unassigned
-
               final orderedHeaders = byMember.keys.toList()
                 ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
@@ -274,8 +268,8 @@ Future<void> showGroupedByMemberSheet<T>({
                                       if (hdr == meLabel && bareMe.isNotEmpty)
                                         ...?byMember[bareMe],
                                       if (hdr == bareMe &&
-                                          (meLabel?.isNotEmpty ?? false))
-                                        ...?byMember[meLabel!],
+                                          (meLabel.isNotEmpty ?? false))
+                                        ...?byMember[meLabel],
                                     ];
                                     return _buildSectionFor(hdr, bucket);
                                   }),
