@@ -7,6 +7,7 @@ import 'package:birlikteyapp/models/user_template.dart';
 import 'package:birlikteyapp/models/weekly_task.dart';
 import 'package:birlikteyapp/pages/family/family_onboarding_page.dart';
 import 'package:birlikteyapp/pages/home/home_page.dart';
+import 'package:birlikteyapp/pages/landing/landing_page.dart';
 import 'package:birlikteyapp/providers/expense_cloud_provider.dart';
 import 'package:birlikteyapp/providers/family_provider.dart';
 import 'package:birlikteyapp/providers/item_cloud_provider.dart';
@@ -16,6 +17,7 @@ import 'package:birlikteyapp/providers/ui_provider.dart';
 import 'package:birlikteyapp/providers/weekly_cloud_provider.dart';
 import 'package:birlikteyapp/services/auth_service.dart';
 import 'package:birlikteyapp/services/notification_service.dart';
+import 'package:birlikteyapp/services/scores_repo.dart';
 import 'package:birlikteyapp/services/task_service.dart';
 import 'package:birlikteyapp/theme/app_theme.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -129,6 +131,9 @@ class _RootState extends State<_Root> {
             ChangeNotifierProvider(create: (_) => FamilyProvider()),
             ChangeNotifierProvider(create: (_) => TemplatesProvider()),
             ChangeNotifierProvider(create: (_) => ui..loadPrefs()),
+            Provider<ScoresRepo>(
+              create: (_) => ScoresRepo(FirebaseFirestore.instance),
+            ),
             Provider<AuthService>(create: (_) => AuthService()),
             Provider<TaskService>(create: (_) => TaskService()),
             ChangeNotifierProvider(create: (_) => WeeklyCloudProvider()),
@@ -154,23 +159,6 @@ class _RootState extends State<_Root> {
               AuthService,
               TaskService,
               FamilyProvider,
-              TaskCloudProvider
-            >(
-              create: (ctx) => TaskCloudProvider(
-                ctx.read<AuthService>(),
-                ctx.read<TaskService>(),
-              ),
-              update: (ctx, auth, service, family, prev) {
-                final p = prev ?? TaskCloudProvider(auth, service);
-                p.update(auth, service);
-                p.setFamilyId(family.familyId);
-                return p;
-              },
-            ),
-            ChangeNotifierProxyProvider3<
-              AuthService,
-              TaskService,
-              FamilyProvider,
               ItemCloudProvider
             >(
               create: (ctx) => ItemCloudProvider(
@@ -181,6 +169,25 @@ class _RootState extends State<_Root> {
                 final p = previous ?? ItemCloudProvider(auth, service);
                 p.update(auth, service);
                 p.setFamilyId(family.familyId);
+                return p;
+              },
+            ),
+            // TaskCloudProvider: ScoresRepo’yu da ver
+            ChangeNotifierProxyProvider3<
+              AuthService,
+              TaskService,
+              ScoresRepo,
+              TaskCloudProvider
+            >(
+              create: (ctx) => TaskCloudProvider(
+                ctx.read<AuthService>(),
+                ctx.read<TaskService>(),
+                ctx.read<ScoresRepo>(),
+              ),
+              update: (ctx, auth, taskService, scores, prev) {
+                final p = prev ?? TaskCloudProvider(auth, taskService, scores);
+                p.update(auth, taskService, scores);
+                p.setFamilyId(ctx.read<FamilyProvider>().familyId);
                 return p;
               },
             ),
@@ -261,7 +268,7 @@ class _RootState extends State<_Root> {
   }
 }
 
-/// === Auth akışı ===
+/// === Auth akışı (birleştirilmiş) ===
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -270,45 +277,50 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (_, snap) {
-        // 1) Önce veriye bak
+        // 1) Kullanıcı yok → Login
         final user = snap.data;
         if (user == null) {
-          // Çıkış yapıldı → hemen Login
           return const LoginPage();
         }
 
-        // 2) familyId local state'te varsa direkt Home
+        // 2) familyId zaten localde varsa direkt Home
         final famProv = context.watch<FamilyProvider>();
-        if (famProv.familyId != null) {
-          return const HomePage();
+        final localFam = famProv.familyId;
+        if (localFam != null && localFam.isNotEmpty) {
+          return const LandingPage();
         }
 
-        // 3) users/{uid}.activeFamilyId dinle (ilk snapshot gelene kadar küçük loader)
+        // 3) Cloud'dan users/{uid}.activeFamilyId dinle
         final usersRef = FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid);
 
-        return StreamBuilder<String?>(
-          stream: usersRef
-              .snapshots()
-              .map((s) => (s.data()?['activeFamilyId'] as String?)?.trim())
-              .distinct(),
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: usersRef.snapshots(),
           builder: (_, idSnap) {
+            // İlk snapshot beklenirken küçük loader
             if (idSnap.connectionState == ConnectionState.waiting &&
                 !idSnap.hasData) {
-              // Native splash varsa bu çok kısa görünecek
               return const Scaffold(
                 body: Center(child: CircularProgressIndicator()),
               );
             }
 
-            final activeFam = idSnap.data;
+            final data = idSnap.data?.data() ?? const <String, dynamic>{};
+            final activeFam = (data['activeFamilyId'] as String?)?.trim();
+
             if (activeFam != null && activeFam.isNotEmpty) {
-              famProv.adoptActiveFromCloud(activeFam);
+              // build içinde notifyListeners tetiklememek için post-frame
+              if (famProv.familyId != activeFam) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  // adoptActiveFromCloud senin provider'ında mevcut
+                  famProv.adoptActiveFromCloud(activeFam);
+                });
+              }
               return const HomePage();
             }
 
-            // aktif aile yok → onboarding
+            // aktif aile yok → onboarding (aile kur / katıl)
             return const FamilyOnboardingPage();
           },
         );
@@ -317,6 +329,7 @@ class AuthGate extends StatelessWidget {
   }
 }
 
+// /// === Auth akışı ===
 // class AuthGate extends StatelessWidget {
 //   const AuthGate({super.key});
 //
@@ -324,15 +337,21 @@ class AuthGate extends StatelessWidget {
 //   Widget build(BuildContext context) {
 //     return StreamBuilder<User?>(
 //       stream: FirebaseAuth.instance.authStateChanges(),
-//       builder: (_, authSnap) {
-//         final user = authSnap.data;
-//         if (user == null) return const LoginPage();
-//
-//         final famProv = context.watch<FamilyProvider>();
-//         if (famProv.familyId != null) {
-//           return const SplashScreen();
+//       builder: (_, snap) {
+//         // 1) Önce veriye bak
+//         final user = snap.data;
+//         if (user == null) {
+//           // Çıkış yapıldı → hemen Login
+//           return const LoginPage();
 //         }
 //
+//         // 2) familyId local state'te varsa direkt Home
+//         final famProv = context.watch<FamilyProvider>();
+//         if (famProv.familyId != null) {
+//           return const HomePage();
+//         }
+//
+//         // 3) users/{uid}.activeFamilyId dinle (ilk snapshot gelene kadar küçük loader)
 //         final usersRef = FirebaseFirestore.instance
 //             .collection('users')
 //             .doc(user.uid);
@@ -343,16 +362,21 @@ class AuthGate extends StatelessWidget {
 //               .map((s) => (s.data()?['activeFamilyId'] as String?)?.trim())
 //               .distinct(),
 //           builder: (_, idSnap) {
-//             final activeFam = idSnap.data;
 //             if (idSnap.connectionState == ConnectionState.waiting &&
 //                 !idSnap.hasData) {
-//               return const SplashScreen();
+//               // Native splash varsa bu çok kısa görünecek
+//               return const Scaffold(
+//                 body: Center(child: CircularProgressIndicator()),
+//               );
 //             }
-//             if ((activeFam != null && activeFam.isNotEmpty)) {
+//
+//             final activeFam = idSnap.data;
+//             if (activeFam != null && activeFam.isNotEmpty) {
 //               famProv.adoptActiveFromCloud(activeFam);
-//               // ⬇️ yine SplashScreen
-//               return const SplashScreen();
+//               return const HomePage();
 //             }
+//
+//             // aktif aile yok → onboarding
 //             return const FamilyOnboardingPage();
 //           },
 //         );

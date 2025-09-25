@@ -6,12 +6,18 @@ import 'package:flutter/foundation.dart';
 
 import '../models/task.dart';
 import '../services/auth_service.dart';
+import '../services/scores_repo.dart';
 import '../services/task_service.dart';
 import '_base_cloud.dart';
 
 class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   AuthService _auth;
   TaskService _service;
+  final ScoresRepo _scores; // <- ekle
+
+  TaskCloudProvider(this._auth, this._service, this._scores) {
+    _bindAuth();
+  }
 
   User? _currentUser;
   String? _familyId; // <— eklendi
@@ -25,12 +31,8 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   StreamSubscription<User?>? _authSub;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _taskSub;
 
-  TaskCloudProvider(this._auth, this._service) {
-    _bindAuth();
-  }
-
   /// ProxyProvider.update(...) çağrısından gelir.
-  void update(AuthService newAuth, TaskService newService) {
+  void update(AuthService newAuth, TaskService newService, ScoresRepo scores) {
     var changed = false;
     if (!identical(_auth, newAuth)) {
       _auth = newAuth;
@@ -256,9 +258,30 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> toggleTask(Task t, bool value) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
+
     await col.doc(id).update({'completed': value});
     t.completed = value;
     notifyListeners();
+
+    try {
+      if (_familyId != null && _familyId!.isNotEmpty) {
+        final targetUid =
+            (t.assignedToUid != null && t.assignedToUid!.trim().isNotEmpty)
+            ? t.assignedToUid!.trim()
+            : _currentUser?.uid; // atama yoksa işi yapan kullanıcıya yaz
+        if (targetUid != null && targetUid.isNotEmpty) {
+          final delta = value ? 10 : -10;
+          await _scores.addPoints(
+            familyId: _familyId!,
+            uid: targetUid,
+            delta: delta,
+          );
+        }
+      }
+    } catch (e, st) {
+      debugPrint('[TaskCloud] score write failed: $e');
+      setError(e);
+    }
   }
 
   @override

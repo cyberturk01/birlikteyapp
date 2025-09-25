@@ -99,7 +99,34 @@ service cloud.firestore {
       match /items/{iid} {
         allow read, create, update, delete: if isOwner(fid) || isMember(fid);
       }
-      // diğer alt koleksiyonlar
+
+      // ✅ SCORES (day/week/month → periodId → uid)
+      // Path: families/{fid}/scores/{period}/{periodId}/{uid}
+      match /scores/{period}/{periodId}/{uid} {
+        function isAllowedPeriod() {
+          return period in ['day', 'week', 'month'];
+        }
+        function allowedShape() {
+          // sadece points & updatedAt
+          return request.resource.data.keys().hasOnly(['points','updatedAt'])
+                 && (request.resource.data.points is number);
+        }
+        function limitedDelta() {
+          // tek yazımda değişim -20..+20 ile sınırlı (create'de old=0)
+          let old = (resource.data.points is number) ? resource.data.points : 0;
+          let delta = request.resource.data.points - old;
+          return delta <= 20 && delta >= -20;
+        }
+
+        allow read: if (isOwner(fid) || isMember(fid)) && isAllowedPeriod();
+        allow create, update: if (isOwner(fid) || isMember(fid))
+                              && isAllowedPeriod()
+                              && allowedShape()
+                              && limitedDelta();
+        allow delete: if false; // istersen owner'a açabilirsin
+      }
+
+      // diğer alt koleksiyonlar (genel izin) — bırakabilirsin
       match /{sub=**}/{docId} {
         allow read, create, update, delete: if isOwner(fid) || isMember(fid);
       }

@@ -102,11 +102,21 @@ class TasksSubsection extends StatelessWidget {
                 leading: Checkbox(
                   value: isDone,
                   onChanged: (v) async {
+                    final willComplete = v == true && !task.completed;
                     await _handleToggleTask(
                       context,
                       task,
                       withCelebrate: v == true,
                     );
+                    if (willComplete && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('🎉 +10 points'),
+                          duration: Duration(seconds: 2),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
                   },
                 ),
 
@@ -160,6 +170,18 @@ Future<void> _handleToggleTask(
         const SnackBar(
           content: Text('🎉 Task completed!'),
           duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    });
+  }
+  if (withCelebrate && willComplete) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('➕ +10 points'),
+          duration: Duration(seconds: 1),
           behavior: SnackBarBehavior.floating,
         ),
       );

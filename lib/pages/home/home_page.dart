@@ -9,6 +9,7 @@ import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/weekly_cloud_provider.dart';
 import '../../widgets/expenses_mini_summary.dart';
+import '../../widgets/leaderboard_strip.dart';
 import '../../widgets/mini_members_bar.dart';
 import '../config/config_page.dart';
 import '../expenses/expenses_card.dart';
@@ -244,7 +245,7 @@ class _HomePageState extends State<HomePage> {
                               });
                             },
                           ),
-
+                          const LeaderboardStrip(),
                           const SizedBox(height: 4),
 
                           AnimatedSwitcher(
