@@ -6,6 +6,7 @@ import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
+import '../../providers/ui_provider.dart';
 import '../../providers/weekly_cloud_provider.dart';
 import '../../widgets/leaderboard_page.dart';
 import '../family/family_manager.dart';
@@ -66,12 +67,22 @@ class _LandingPageState extends State<LandingPage> {
               StreamBuilder<List<FamilyMemberEntry>>(
                 stream: famProv.watchMemberEntries(),
                 builder: (_, snap) {
-                  final entries = snap.data ?? const <FamilyMemberEntry>[];
+                  final raw = snap.data ?? const <FamilyMemberEntry>[];
                   if (snap.connectionState == ConnectionState.waiting &&
-                      entries.isEmpty) {
+                      raw.isEmpty) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  if (entries.isEmpty) return _buildEmpty(context);
+                  if (raw.isEmpty) return _buildEmpty(context);
+
+                  final meUid = FirebaseAuth.instance.currentUser?.uid;
+                  final entries = List<FamilyMemberEntry>.from(raw);
+                  entries.sort((a, b) {
+                    if (a.uid == meUid && b.uid != meUid) return -1;
+                    if (b.uid == meUid && a.uid != meUid) return 1;
+                    return a.label.toLowerCase().compareTo(
+                      b.label.toLowerCase(),
+                    );
+                  });
 
                   final filtered = _query.isEmpty
                       ? entries
@@ -141,12 +152,17 @@ class _LandingPageState extends State<LandingPage> {
                               final e = visible[i];
                               return _MemberTile(
                                 label: e.label,
-                                onTap: () {
+                                onTap: () async {
+                                  await context
+                                      .read<UiProvider>()
+                                      .setActiveMemberUid(e.uid);
+                                  if (!context.mounted) return;
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) =>
-                                          HomePage(initialFilterMember: e.uid),
+                                      builder: (_) => HomePage(
+                                        initialFilterMemberUid: e.uid,
+                                      ),
                                     ),
                                   );
                                 },
@@ -181,12 +197,16 @@ class _LandingPageState extends State<LandingPage> {
                                   builder: (_) => _AllMembersPageUid(
                                     initialList: entries,
                                     initialQuery: _query,
-                                    onPickUid: (uid) {
+                                    onPickUid: (uid) async {
+                                      await context
+                                          .read<UiProvider>()
+                                          .setActiveMemberUid(uid);
+                                      if (!context.mounted) return;
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                           builder: (_) => HomePage(
-                                            initialFilterMember: uid,
+                                            initialFilterMemberUid: uid,
                                           ),
                                         ),
                                       );

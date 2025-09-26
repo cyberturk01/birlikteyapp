@@ -27,6 +27,7 @@ class UiProvider extends ChangeNotifier {
   HomeSection get section => _section;
   TaskViewFilter get taskFilter => _taskFilter;
   ItemViewFilter get itemFilter => _itemFilter;
+  String? get activeMemberUid => _activeMember;
 
   TimeOfDay? _weeklyDefaultReminder; // null ise 19:00 fallback
   TimeOfDay? get weeklyDefaultReminder => _weeklyDefaultReminder;
@@ -72,31 +73,66 @@ class UiProvider extends ChangeNotifier {
     await prefs.setInt('weeklyReminderMinute', time.minute);
   }
 
-  // init (prefs yükle)
+  // --- load() içinde küçük ekler ---
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     final h = prefs.getInt('weeklyReminderHour');
     final m = prefs.getInt('weeklyReminderMinute');
-    final saved = prefs.getString('themeMode'); // 'system' | 'light' | 'dark'
+    final saved = prefs.getString('themeMode');
+
     if (saved != null) {
       _themeMode = _parseThemeMode(saved);
     }
-    _activeMember = prefs.getString('activeMember');
 
-    if (h != null && m != null)
+    // Önce yeni anahtar (UID), yoksa eskiyi oku
+    _activeMember =
+        prefs.getString('activeMemberUid') ?? prefs.getString('activeMember');
+
+    if (h != null && m != null) {
       _weeklyDefaultReminder = TimeOfDay(hour: h, minute: m);
+    }
     notifyListeners();
   }
 
-  Future<void> setActiveMember(String? name) async {
-    _activeMember = (name != null && name.trim().isEmpty) ? null : name;
+  @deprecated
+  Future<void> setActiveMember(String? nameOrUid) async {
+    // Eski anahtarı da yazmaya devam edelim ki geriye dönük çalışsın.
+    _activeMember = (nameOrUid != null && nameOrUid.trim().isEmpty)
+        ? null
+        : nameOrUid?.trim();
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     if (_activeMember == null) {
       await prefs.remove('activeMember');
+      await prefs.remove('activeMemberUid');
     } else {
       await prefs.setString('activeMember', _activeMember!);
+      await prefs.setString('activeMemberUid', _activeMember!);
     }
+  }
+
+  /// Yeni tercih edilen API: UID ver.
+  Future<void> setActiveMemberUid(String? uid) async {
+    _activeMember = (uid != null && uid.trim().isEmpty) ? null : uid?.trim();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    if (_activeMember == null) {
+      await prefs.remove('activeMemberUid');
+      // Eski anahtarı da temizle (opsiyonel)
+      await prefs.remove('activeMember');
+    } else {
+      await prefs.setString('activeMemberUid', _activeMember!);
+      // Eski anahtarı da doldur (geri uyumluluk için)
+      await prefs.setString('activeMember', _activeMember!);
+    }
+  }
+
+  /// UID listesi üzerinden aktif olanı çöz.
+  String? resolveActiveUid(List<String> memberUids) {
+    if (_activeMember != null && memberUids.contains(_activeMember)) {
+      return _activeMember;
+    }
+    return memberUids.isNotEmpty ? memberUids.first : null;
   }
 
   String? resolveActive(List<String> family) {

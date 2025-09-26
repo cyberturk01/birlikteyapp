@@ -8,6 +8,7 @@ import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
+import '../../providers/ui_provider.dart';
 import '../../providers/weekly_cloud_provider.dart';
 import '../../widgets/expenses_mini_summary.dart';
 import '../../widgets/mini_members_bar.dart';
@@ -20,8 +21,8 @@ import 'dashboard_summary.dart';
 import 'member_card.dart';
 
 class HomePage extends StatefulWidget {
-  final String? initialFilterMember;
-  const HomePage({super.key, this.initialFilterMember});
+  final String? initialFilterMemberUid;
+  const HomePage({super.key, this.initialFilterMemberUid});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -41,12 +42,18 @@ class _HomePageState extends State<HomePage> {
       // viewportFraction: 0.92, // yanlardan küçük boşluk
       initialPage: _activeIndex,
     );
+
     // initialFilterMember geldiyse index’e çevir
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final weekly = context.read<WeeklyCloudProvider>();
       final taskProv = context.read<TaskCloudProvider>();
       await weekly.ensureTodaySynced(taskProv);
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
   }
 
   @override
@@ -126,14 +133,32 @@ class _HomePageState extends State<HomePage> {
 
         final ordered = _orderWithMeFirstEntries(entries);
 
-        // ❸ sadece ilk kez aktif index’i set et
-        if (!_appliedInitial) {
-          _activeIndex = 0; // me first
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_pageController.hasClients) _pageController.jumpToPage(0);
-            setState(() {});
+        // ✅ İlk seçim: entries hazırken ve henüz yapılmamışken
+        if (!_appliedInitial && ordered.isNotEmpty) {
+          final ui = context.read<UiProvider>();
+          final targetUid =
+              widget.initialFilterMemberUid ??
+              ui.activeMemberUid ??
+              FirebaseAuth.instance.currentUser?.uid;
+
+          int idx = 0;
+          if (targetUid != null) {
+            final i = ordered.indexWhere((e) => e.uid == targetUid);
+            if (i >= 0) idx = i;
+          }
+
+          _activeIndex = idx;
+
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            if (!mounted) return;
+            if (_pageController.hasClients) {
+              _pageController.jumpToPage(_activeIndex);
+            }
+            await context.read<UiProvider>().setActiveMemberUid(
+              ordered[_activeIndex].uid,
+            );
+            setState(() => _appliedInitial = true);
           });
-          _appliedInitial = true;
         }
 
         if (_activeIndex >= ordered.length) {
@@ -381,15 +406,21 @@ class _HomePageState extends State<HomePage> {
                           MiniMembersBar(
                             names: ordered.map((e) => e.label).toList(),
                             activeIndex: _activeIndex,
-                            onPickIndex: (i) {
+                            onPickIndex: (i) async {
                               setState(() => _activeIndex = i);
-                              _pageController.animateToPage(
-                                i,
-                                duration: const Duration(milliseconds: 250),
-                                curve: Curves.easeOutCubic,
-                              );
+                              if (_pageController.hasClients) {
+                                await _pageController.animateToPage(
+                                  i,
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              }
+                              await context
+                                  .read<UiProvider>()
+                                  .setActiveMemberUid(ordered[i].uid);
                             },
                           ),
+
                           if (!isShort) const SizedBox(height: 12),
                         ],
                       );

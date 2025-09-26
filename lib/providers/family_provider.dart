@@ -17,6 +17,7 @@ class FamilyProvider extends ChangeNotifier {
   List<String> get familyMembers => _labelsCache;
   static const _kActiveFamilyKey = 'activeFamilyId';
   static const _kOwnerUidKey = 'activeFamilyOwnerUid';
+
   FamilyProvider() {
     FirebaseAuth.instance.authStateChanges().listen((u) async {
       // Kullanıcı tamamen çıktıysa temizle
