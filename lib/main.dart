@@ -6,7 +6,6 @@ import 'package:birlikteyapp/models/task.dart';
 import 'package:birlikteyapp/models/user_template.dart';
 import 'package:birlikteyapp/models/weekly_task.dart';
 import 'package:birlikteyapp/pages/family/family_onboarding_page.dart';
-import 'package:birlikteyapp/pages/home/home_page.dart';
 import 'package:birlikteyapp/pages/landing/landing_page.dart';
 import 'package:birlikteyapp/providers/expense_cloud_provider.dart';
 import 'package:birlikteyapp/providers/family_provider.dart';
@@ -317,7 +316,7 @@ class AuthGate extends StatelessWidget {
                   famProv.adoptActiveFromCloud(activeFam);
                 });
               }
-              return const HomePage();
+              return const LandingPage();
             }
 
             // aktif aile yok → onboarding (aile kur / katıl)

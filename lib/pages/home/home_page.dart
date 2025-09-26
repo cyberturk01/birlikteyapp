@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../main.dart';
 import '../../models/view_section.dart';
 import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
@@ -9,7 +10,6 @@ import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/weekly_cloud_provider.dart';
 import '../../widgets/expenses_mini_summary.dart';
-import '../../widgets/leaderboard_strip.dart';
 import '../../widgets/mini_members_bar.dart';
 import '../config/config_page.dart';
 import '../expenses/expenses_card.dart';
@@ -65,6 +65,19 @@ class _HomePageState extends State<HomePage> {
     final famProv = context.watch<FamilyProvider>();
     final familyId = famProv.familyId;
     debugPrint('[HomePage] familyId=$familyId');
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      // zaten çıkılmış → AuthGate’e al
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthGate()),
+          (_) => false,
+        );
+      });
+      return const SizedBox.shrink();
+    }
 
     final taskError = context.select<TaskCloudProvider, String?>(
       (p) => p.lastError,
@@ -141,55 +154,89 @@ class _HomePageState extends State<HomePage> {
         return Scaffold(
           appBar: AppBar(
             title: Row(
-              children: const [
-                Icon(Icons.family_restroom),
-                SizedBox(width: 8),
-                Text('Togetherly'),
+              children: [
+                IconButton(
+                  tooltip: 'Togetherly',
+                  icon: const Icon(Icons.family_restroom),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                const SizedBox(width: 2),
+                const Text('Togetherly'),
               ],
             ),
             actions: [
-              IconButton(
-                tooltip: 'Manage family',
-                icon: const Icon(Icons.group),
-                onPressed: () => showFamilyManager(context),
-              ),
-              IconButton(
-                tooltip: 'Add Center',
-                icon: const Icon(Icons.add_circle_outline),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ManagePage()),
-                  );
+              PopupMenuButton<String>(
+                onSelected: (value) async {
+                  switch (value) {
+                    case 'manage':
+                      showFamilyManager(context);
+                      break;
+                    case 'addCenter':
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ManagePage()),
+                      );
+                      break;
+                    case 'config':
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ConfigurationPage(),
+                        ),
+                      );
+                      break;
+                    case 'signout':
+                      context.read<TaskCloudProvider>().teardown();
+                      context.read<ItemCloudProvider>().teardown();
+                      context.read<WeeklyCloudProvider>().teardown();
+                      context.read<ExpenseCloudProvider>().teardown();
+                      context.read<FamilyProvider>().clearActive();
+
+                      await FirebaseAuth.instance.signOut();
+                      if (!context.mounted) return;
+
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const AuthGate()),
+                        (route) => false,
+                      );
+                      break;
+                  }
                 },
-              ),
-              IconButton(
-                tooltip: 'Configuration',
-                icon: const Icon(Icons.tune),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ConfigurationPage(),
+                itemBuilder: (ctx) => [
+                  const PopupMenuItem(
+                    value: 'manage',
+                    child: ListTile(
+                      leading: Icon(Icons.group),
+                      title: Text('Manage family'),
                     ),
-                  );
-                },
-              ),
-              IconButton(
-                tooltip: 'Sign out',
-                icon: const Icon(Icons.logout),
-                onPressed: () async {
-                  context.read<TaskCloudProvider>().teardown();
-                  context.read<ItemCloudProvider>().teardown();
-                  context.read<WeeklyCloudProvider>().teardown();
-                  context.read<ExpenseCloudProvider>().teardown();
-                  await FirebaseAuth.instance.signOut();
-                  if (!context.mounted) return;
-                  Navigator.of(context).popUntil((r) => r.isFirst);
-                },
+                  ),
+                  const PopupMenuItem(
+                    value: 'addCenter',
+                    child: ListTile(
+                      leading: Icon(Icons.add_circle_outline),
+                      title: Text('Add Center'),
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'config',
+                    child: ListTile(
+                      leading: Icon(Icons.tune),
+                      title: Text('Configuration'),
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: 'signout',
+                    child: ListTile(
+                      leading: Icon(Icons.logout, color: Colors.redAccent),
+                      title: Text('Sign out'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
+
           body: Column(
             children: [
               if (errors.isNotEmpty)
@@ -245,7 +292,6 @@ class _HomePageState extends State<HomePage> {
                               });
                             },
                           ),
-                          const LeaderboardStrip(),
                           const SizedBox(height: 4),
 
                           AnimatedSwitcher(

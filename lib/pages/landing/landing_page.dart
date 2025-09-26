@@ -1,7 +1,12 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
+import '../../providers/item_cloud_provider.dart';
+import '../../providers/task_cloud_provider.dart';
+import '../../providers/weekly_cloud_provider.dart';
 import '../../widgets/leaderboard_page.dart';
 import '../family/family_manager.dart';
 import '../home/home_page.dart';
@@ -33,15 +38,23 @@ class _LandingPageState extends State<LandingPage> {
           title: const Text('Togetherly — Welcome'),
           bottom: const TabBar(
             tabs: [
-              Tab(text: 'Leaderboard', icon: Icon(Icons.emoji_events)),
               Tab(text: 'Members', icon: Icon(Icons.group)),
+              Tab(text: 'Leaderboard', icon: Icon(Icons.emoji_events)),
             ],
           ),
           actions: [
             IconButton(
-              tooltip: 'Manage Family',
-              icon: const Icon(Icons.manage_accounts),
-              onPressed: () => showFamilyManager(context),
+              tooltip: 'Sign out',
+              icon: const Icon(Icons.logout, color: Colors.redAccent),
+              onPressed: () async {
+                context.read<TaskCloudProvider>().teardown();
+                context.read<ItemCloudProvider>().teardown();
+                context.read<WeeklyCloudProvider>().teardown();
+                context.read<ExpenseCloudProvider>().teardown();
+                await FirebaseAuth.instance.signOut();
+                if (!context.mounted) return;
+                Navigator.of(context).popUntil((r) => r.isFirst);
+              },
             ),
           ],
         ),
@@ -50,27 +63,6 @@ class _LandingPageState extends State<LandingPage> {
           child: TabBarView(
             children: [
               // TAB 1
-              Column(
-                children: [
-                  const Expanded(child: LeaderboardPage()),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton.icon(
-                      icon: const Icon(Icons.dashboard_customize),
-                      label: const Text('Go to dashboard'),
-                      onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (_) => const HomePage()),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-
-              // TAB 2: Members (UID tabanlı)
               StreamBuilder<List<FamilyMemberEntry>>(
                 stream: famProv.watchMemberEntries(),
                 builder: (_, snap) {
@@ -100,7 +92,7 @@ class _LandingPageState extends State<LandingPage> {
                         children: [
                           Expanded(
                             child: Text(
-                              'Welcome back 👋',
+                              'Welcome back',
                               style: Theme.of(context).textTheme.headlineSmall,
                             ),
                           ),
@@ -133,7 +125,7 @@ class _LandingPageState extends State<LandingPage> {
                         const Expanded(
                           child: Center(child: Text('No members found')),
                         )
-                      else
+                      else if (visible.isNotEmpty) ...[
                         Expanded(
                           child: GridView.builder(
                             physics: const NeverScrollableScrollPhysics(),
@@ -150,7 +142,7 @@ class _LandingPageState extends State<LandingPage> {
                               return _MemberTile(
                                 label: e.label,
                                 onTap: () {
-                                  Navigator.pushReplacement(
+                                  Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) =>
@@ -162,8 +154,19 @@ class _LandingPageState extends State<LandingPage> {
                             },
                           ),
                         ),
+                        const SizedBox(height: 16),
 
-                      const SizedBox(height: 8),
+                        // 👇 Görsel buraya
+                        Center(
+                          child: Image.asset(
+                            'assets/images/family_welcome.png',
+                            height: 220, // çok büyük olmasın
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 20),
 
                       if (filtered.length > 4)
                         Align(
@@ -179,7 +182,7 @@ class _LandingPageState extends State<LandingPage> {
                                     initialList: entries,
                                     initialQuery: _query,
                                     onPickUid: (uid) {
-                                      Navigator.pushReplacement(
+                                      Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                           builder: (_) => HomePage(
@@ -197,6 +200,27 @@ class _LandingPageState extends State<LandingPage> {
                     ],
                   );
                 },
+              ),
+
+              // TAB 2: Members (UID tabanlı)
+              Column(
+                children: [
+                  const Expanded(child: LeaderboardPage()),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.dashboard_customize),
+                      label: const Text('Go to dashboard'),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const HomePage()),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

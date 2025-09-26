@@ -318,6 +318,12 @@ class FamilyProvider extends ChangeNotifier {
     return true;
   }
 
+  void clearActive() {
+    _familyId = null;
+    // varsa lokal cache/stream temizlikleri
+    notifyListeners();
+  }
+
   Future<void> _persistActive(String id, {required String ownerUid}) async {
     // ❗ aynı id ise hiçbir şey yapma
     if (_familyId == id &&
