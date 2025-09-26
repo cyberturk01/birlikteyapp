@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../providers/expense_cloud_provider.dart';
 
@@ -58,11 +59,6 @@ class ExpensesMiniSummary extends StatelessWidget {
       if (perDay.containsKey(key)) perDay[key] = (perDay[key] ?? 0) + amt;
     }
 
-    final values = days
-        .map((d) => perDay[DateTime(d.year, d.month, d.day)] ?? 0)
-        .toList();
-
-    final theme = Theme.of(context);
     final card = Card(
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -70,23 +66,22 @@ class ExpensesMiniSummary extends StatelessWidget {
         padding: padding,
         child: LayoutBuilder(
           builder: (_, c) {
-            final isTight = c.maxWidth < 360;
-            return Row(
-              children: [
-                // Numbers
-                Expanded(
-                  child: Wrap(
-                    spacing: 10,
-                    runSpacing: 6,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      _pill('Today', sumToday),
-                      _pill('Week', sumWeek),
-                      _pill('Month', sumMonth),
-                    ],
-                  ),
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520), // opsiyonel
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 6,
+                  alignment: WrapAlignment.center, // yatayda ortala
+                  runAlignment: WrapAlignment.center, // satırlar arası ortala
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _pill(context, 'Today', sumToday),
+                    _pill(context, 'Week', sumWeek),
+                    _pill(context, 'Month', sumMonth),
+                  ],
                 ),
-              ],
+              ),
             );
           },
         ),
@@ -102,7 +97,7 @@ class ExpensesMiniSummary extends StatelessWidget {
           );
   }
 
-  Widget _pill(String label, num value) {
+  Widget _pill(BuildContext context, String label, num value) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -118,7 +113,7 @@ class ExpensesMiniSummary extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w500),
             ),
             TextSpan(
-              text: _fmt(value),
+              text: _fmtMoney(context, value),
               style: const TextStyle(fontWeight: FontWeight.w800),
             ),
           ],
@@ -129,69 +124,13 @@ class ExpensesMiniSummary extends StatelessWidget {
 
   static bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
-
-  String _fmt(num v) {
-    // basit format; istersen para birimi sembolü ekleyebilirsin
-    if (v >= 1000) return '${v.toStringAsFixed(0)}';
-    if (v == v.roundToDouble()) return v.toStringAsFixed(0);
-    return v.toStringAsFixed(2);
-  }
 }
 
-class _SparklinePainter extends CustomPainter {
-  final List<double> values;
-  _SparklinePainter(this.values);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (values.isEmpty) return;
-
-    final maxV = values.reduce(max);
-    final minV = values.reduce(min);
-    final range = (maxV - minV) == 0 ? 1 : (maxV - minV);
-
-    // çizgi
-    final line = Paint()
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke
-      ..color = const Color(0xFF1565C0);
-
-    // alan (hafif)
-    final fill = Paint()
-      ..style = PaintingStyle.fill
-      ..color = const Color(0xFF1565C0).withOpacity(0.15);
-
-    final dx = size.width / (values.length - 1);
-    final path = Path();
-    final area = Path();
-
-    for (int i = 0; i < values.length; i++) {
-      final x = i * dx;
-      final norm = (values[i] - minV) / range; // 0..1
-      final y = size.height - (norm * size.height);
-      if (i == 0) {
-        path.moveTo(x, y);
-        area.moveTo(x, size.height);
-        area.lineTo(x, y);
-      } else {
-        path.lineTo(x, y);
-        area.lineTo(x, y);
-      }
-    }
-    area.lineTo(size.width, size.height);
-    area.close();
-
-    // çiz
-    canvas.drawPath(area, fill);
-    canvas.drawPath(path, line);
-  }
-
-  @override
-  bool shouldRepaint(covariant _SparklinePainter oldDelegate) {
-    if (oldDelegate.values.length != values.length) return true;
-    for (int i = 0; i < values.length; i++) {
-      if (oldDelegate.values[i] != values[i]) return true;
-    }
-    return false;
-  }
+String _fmtMoney(BuildContext context, num amount, {String currency = 'EUR'}) {
+  final format = NumberFormat.currency(
+    locale: Localizations.localeOf(context).toString(),
+    symbol: '€', // currency parametresine göre değiştirilebilir
+    decimalDigits: 0, // istersen 2 yap
+  );
+  return format.format(amount);
 }

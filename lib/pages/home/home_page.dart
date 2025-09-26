@@ -321,20 +321,16 @@ class _HomePageState extends State<HomePage> {
 
                           AnimatedSwitcher(
                             duration: const Duration(milliseconds: 200),
+                            layoutBuilder: (currentChild, previousChildren) =>
+                                Stack(
+                                  alignment: Alignment.center,
+                                  children: <Widget>[
+                                    ...previousChildren,
+                                    if (currentChild != null) currentChild,
+                                  ],
+                                ),
                             child: (_section == HomeSection.expenses)
-                                ? Column(
-                                    key: const ValueKey('exp-mini'),
-                                    children: [
-                                      ExpensesMiniSummary(
-                                        expenses: context
-                                            .watch<ExpenseCloudProvider>()
-                                            .expenses,
-                                        onTap:
-                                            null, // artık sekme zaten expenses; tıklamada iş yok
-                                        // padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8), // istersen
-                                      ),
-                                    ],
-                                  )
+                                ? const _ExpensesMiniCentered()
                                 : const SizedBox.shrink(
                                     key: ValueKey('exp-mini-off'),
                                   ),
@@ -442,6 +438,23 @@ class _HomePageState extends State<HomePage> {
           ),
         );
       },
+    );
+  }
+}
+
+class _ExpensesMiniCentered extends StatelessWidget {
+  const _ExpensesMiniCentered({super.key = const ValueKey('exp-mini')});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 540), // opsiyonel
+        child: ExpensesMiniSummary(
+          expenses: context.watch<ExpenseCloudProvider>().expenses,
+          onTap: null,
+        ),
+      ),
     );
   }
 }
