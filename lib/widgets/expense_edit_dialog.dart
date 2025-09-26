@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -29,8 +30,27 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
     text: initialAmount == null ? '' : fmtMoney(context, initialAmount),
   );
   DateTime date = initialDate ?? DateTime.now();
-  String? assignUid = initialAssignedToUid;
+  String? assignUid =
+      initialAssignedToUid ?? FirebaseAuth.instance.currentUser?.uid;
   String? category = initialCategory;
+  final recents = RecentExpenseCats.get(limit: 5);
+  if (category == null && recents.isNotEmpty) {
+    category = recents.first;
+  }
+
+  final allCategories = {
+    null: 'Uncategorized',
+    'Groceries': 'Groceries',
+    'Dining': 'Dining',
+    'Transport': 'Transport',
+    'Utilities': 'Utilities',
+    'Health': 'Health',
+    'Kids': 'Kids',
+    'Home': 'Home',
+    'Other': 'Other',
+    // recents’ten gelenler
+    for (final r in recents) r: r,
+  };
 
   Future<void> pickDate() async {
     final picked = await showDatePicker(
@@ -58,12 +78,15 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
               children: [
                 TextField(
                   controller: titleC,
+                  autofocus: true, // ⬅️ Yazmaya hazır gelsin
+                  textInputAction: TextInputAction.next,
                   decoration: const InputDecoration(
                     labelText: 'Title',
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
                 ),
+
                 const SizedBox(height: 8),
                 TextField(
                   controller: amountC,
@@ -103,6 +126,52 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
                   label: 'Assign to',
                   nullLabel: 'Unassigned',
                 ),
+                // Dropdown altında küçük bir “+ New category” (opsiyonel)
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.add),
+                    label: const Text('New category'),
+                    onPressed: () async {
+                      final newCat = await showDialog<String>(
+                        context: ctx,
+                        builder: (_) {
+                          final c = TextEditingController();
+                          return AlertDialog(
+                            title: const Text('New category'),
+                            content: TextField(
+                              controller: c,
+                              autofocus: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Name',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, null),
+                                child: const Text('Cancel'),
+                              ),
+                              FilledButton(
+                                onPressed: () =>
+                                    Navigator.pop(context, c.text.trim()),
+                                child: const Text('Add'),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                      if (newCat != null && newCat.isNotEmpty) {
+                        setLocal(() {
+                          category = newCat;
+                          RecentExpenseCats.push(newCat);
+                        });
+                      }
+                    },
+                  ),
+                ),
 
                 const SizedBox(height: 8),
                 if (recents.isNotEmpty) ...[
@@ -133,46 +202,16 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
                   const SizedBox(height: 8),
                 ],
                 DropdownButtonFormField<String?>(
-                  value: category,
+                  value: allCategories.keys.contains(category)
+                      ? category
+                      : null,
                   isExpanded: true,
-                  items: const [
-                    DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('Uncategorized'),
-                    ),
-                    DropdownMenuItem<String?>(
-                      value: 'Groceries',
-                      child: Text('Groceries'),
-                    ),
-                    DropdownMenuItem<String?>(
-                      value: 'Dining',
-                      child: Text('Dining'),
-                    ),
-                    DropdownMenuItem<String?>(
-                      value: 'Transport',
-                      child: Text('Transport'),
-                    ),
-                    DropdownMenuItem<String?>(
-                      value: 'Utilities',
-                      child: Text('Utilities'),
-                    ),
-                    DropdownMenuItem<String?>(
-                      value: 'Health',
-                      child: Text('Health'),
-                    ),
-                    DropdownMenuItem<String?>(
-                      value: 'Kids',
-                      child: Text('Kids'),
-                    ),
-                    DropdownMenuItem<String?>(
-                      value: 'Home',
-                      child: Text('Home'),
-                    ),
-                    DropdownMenuItem<String?>(
-                      value: 'Other',
-                      child: Text('Other'),
-                    ),
-                  ],
+                  items: allCategories.entries.map((e) {
+                    return DropdownMenuItem<String?>(
+                      value: e.key,
+                      child: Text(e.value),
+                    );
+                  }).toList(),
                   onChanged: (v) => setLocal(() => category = v),
                   decoration: const InputDecoration(
                     labelText: 'Category',

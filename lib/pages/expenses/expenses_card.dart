@@ -25,6 +25,14 @@ class _ExpensesCardState extends State<ExpensesCard> {
     final expenses = expProv.forMemberFiltered(widget.memberUid, _filter);
     final total = expProv.totalForMember(widget.memberUid, filter: _filter);
     final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
+    String? _catFilter;
+
+    final categoriesInRange = <String>{};
+    for (final e in expenses) {
+      if ((e.category ?? '').isNotEmpty) categoriesInRange.add(e.category!);
+    }
+    final chips = categoriesInRange.toList()..sort();
+    final capped = chips.take(6).toList();
 
     return Card(
       elevation: 6,
@@ -54,6 +62,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
                   ),
                 ),
                 const SizedBox(width: 8),
+
                 Expanded(
                   child: StreamBuilder<Map<String, String>>(
                     stream: dictStream,
@@ -115,6 +124,8 @@ class _ExpensesCardState extends State<ExpensesCard> {
                       separatorBuilder: (_, __) => const Divider(height: 1),
                       itemBuilder: (_, i) {
                         final e = expenses[i];
+                        final cat = e.category ?? 'Other';
+                        final color = _categoryColor(cat);
                         return Dismissible(
                           key: ValueKey(e.id),
                           background: const ColoredBox(
@@ -211,8 +222,12 @@ class _ExpensesCardState extends State<ExpensesCard> {
                                 initialCategory: e.category,
                               );
                             },
+                            leading: CircleAvatar(
+                              radius: 10,
+                              backgroundColor: color,
+                            ),
                             title: Text(
-                              '${e.title} ${e.category == null ? '' : '• ${e.category}'}',
+                              '${e.title} • $cat',
                               overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(_fmtDate(e.date)),
@@ -290,4 +305,17 @@ class _ExpensesCardState extends State<ExpensesCard> {
     final dd = d.day.toString().padLeft(2, '0');
     return '${d.year}-$mm-$dd';
   }
+}
+
+Color _categoryColor(String c) {
+  const palette = [
+    Color(0xFF7C4DFF),
+    Color(0xFF26A69A),
+    Color(0xFFFF7043),
+    Color(0xFF42A5F5),
+    Color(0xFFEC407A),
+    Color(0xFF66BB6A),
+  ];
+  final h = c.codeUnits.fold<int>(0, (a, b) => a + b);
+  return palette[h % palette.length];
 }
