@@ -12,7 +12,6 @@ import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/weekly_cloud_provider.dart';
 import '../../widgets/member_dropdown_uid.dart';
-import '../../widgets/section_lists.dart';
 import 'grouped_sheet.dart';
 
 enum SummaryDest { tasks, items, weekly, expenses }
@@ -62,7 +61,7 @@ class DashboardSummaryBar extends StatelessWidget {
     final now = DateTime.now();
     final todayOnly = expensesWatch.where((e) {
       final d = DateUtils.dateOnly(e.date); // e.date bir DateTime olmalı
-      return d.year == now.year && d.month == now.month;
+      return DateUtils.isSameDay(d, now);
     }).toList();
 
     final todayExpenses = todayOnly.length;
@@ -385,45 +384,415 @@ void _showAssignItemSheet(BuildContext context, Item item) {
 }
 
 Future<void> showPendingTasksDialog(BuildContext context) async {
-  // read: dialog builder içinde listen etmeden veri çekiyoruz
   final taskProv = context.read<TaskCloudProvider>();
-  final tasks = taskProv.tasks.where((t) => !t.completed).toList()
-    ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  final famDictStream = context.read<FamilyProvider>().watchMemberDirectory();
 
-  final pending = taskProv.tasks.where((t) => !t.completed).toList();
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+    ),
+    builder: (sheetCtx) {
+      final searchC = TextEditingController();
+      String? memberFilter; // null=All, ''=Unassigned, 'uid'=member
+      bool showCompleted = false;
 
-  await showDialog<void>(
+      return StatefulBuilder(
+        builder: (ctx, setLocal) {
+          // veriyi hazırla
+          final all = taskProv.tasks.toList();
+          all.sort(
+            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+          );
+          final pending = all.where((t) => !t.completed).toList();
+
+          // filtreler
+          Iterable<Task> src = showCompleted ? all : pending;
+          if (memberFilter != null) {
+            src = src.where(
+              (t) =>
+                  (memberFilter!.isEmpty &&
+                      (t.assignedToUid == null || t.assignedToUid!.isEmpty)) ||
+                  (memberFilter!.isNotEmpty && t.assignedToUid == memberFilter),
+            );
+          }
+          final q = searchC.text.trim().toLowerCase();
+          if (q.isNotEmpty) {
+            src = src.where((t) => t.name.toLowerCase().contains(q));
+          }
+          final list = src.toList();
+
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 10,
+              bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // drag handle
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).dividerColor,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                // Header
+                Row(
+                  children: [
+                    const Icon(Icons.task_alt, size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Pending tasks',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(sheetCtx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Arama
+                TextField(
+                  controller: searchC,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Search tasks…',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (_) => setLocal(() {}),
+                ),
+                const SizedBox(height: 10),
+
+                // Filtre bar: Üye filtresi + Pending/All toggle
+                StreamBuilder<Map<String, String>>(
+                  stream: famDictStream, // {uid: label}
+                  builder: (_, snap) {
+                    final dict = snap.data ?? const <String, String>{};
+                    final chips = <Widget>[
+                      FilterChip(
+                        label: const Text('All'),
+                        selected: memberFilter == null,
+                        onSelected: (_) => setLocal(() => memberFilter = null),
+                      ),
+                      FilterChip(
+                        label: const Text('Unassigned'),
+                        selected: memberFilter == '',
+                        onSelected: (_) => setLocal(() => memberFilter = ''),
+                      ),
+                      ...dict.entries.map(
+                        (e) => FilterChip(
+                          label: Text(e.value),
+                          selected: memberFilter == e.key,
+                          onSelected: (_) =>
+                              setLocal(() => memberFilter = e.key),
+                        ),
+                      ),
+                    ];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // üst satır: chips
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: chips
+                                .map(
+                                  (w) => Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: w,
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        // alt satır: pending / all toggle
+                        Center(
+                          child: SegmentedButton<bool>(
+                            segments: const [
+                              ButtonSegment(
+                                value: false,
+                                icon: Icon(Icons.timelapse),
+                                label: Text('Pending'),
+                              ),
+                              ButtonSegment(
+                                value: true,
+                                icon: Icon(Icons.all_inclusive),
+                                label: Text('All'),
+                              ),
+                            ],
+                            selected: {showCompleted},
+                            showSelectedIcon: false,
+                            onSelectionChanged: (s) =>
+                                setLocal(() => showCompleted = s.first),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 8),
+
+                // Liste
+                Expanded(
+                  child: list.isEmpty
+                      ? const Center(child: Text('No tasks'))
+                      : ListView.separated(
+                          itemCount: list.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (_, i) => _TaskRowCompact(
+                            task: list[i],
+                            onToggle: (t, v) async {
+                              await context
+                                  .read<TaskCloudProvider>()
+                                  .toggleTask(t, v);
+                            },
+                            onRename: (t) => _renameInline(context, t),
+                            onDelete: (t) =>
+                                context.read<TaskCloudProvider>().removeTask(t),
+                            onAssign: (t) => _showAssignTaskSheet(context, t),
+                          ),
+                        ),
+                ),
+
+                const SizedBox(height: 8),
+                // Alt aksiyonlar
+                Row(
+                  children: [
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.delete_sweep),
+                      label: const Text('Clear completed'),
+                      onPressed: () async {
+                        await context.read<TaskCloudProvider>().clearCompleted(
+                          forMember:
+                              (memberFilter == null || memberFilter!.isEmpty)
+                              ? null
+                              : memberFilter,
+                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Completed tasks cleared'),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    const Spacer(),
+                    FilledButton.icon(
+                      icon: const Icon(Icons.done_all),
+                      label: const Text('Mark all done'),
+                      onPressed: list.isEmpty
+                          ? null
+                          : () async {
+                              for (final t in list.where((t) => !t.completed)) {
+                                await context
+                                    .read<TaskCloudProvider>()
+                                    .toggleTask(t, true);
+                              }
+                            },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+class _TaskRowCompact extends StatelessWidget {
+  final Task task;
+  final Future<void> Function(Task task, bool value) onToggle;
+  final void Function(Task task) onRename;
+  final void Function(Task task) onDelete;
+  final void Function(Task task) onAssign;
+
+  const _TaskRowCompact({
+    required this.task,
+    required this.onToggle,
+    required this.onRename,
+    required this.onDelete,
+    required this.onAssign,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDone = task.completed;
+    // İsteğe bağlı dueAt desteği eklediysen küçük rozet:
+    final DateTime? dueAt =
+        (task as dynamic).dueAt as DateTime?; // yoksa null olur
+    final String? dueLabel = (dueAt == null)
+        ? null
+        : '${dueAt.day}.${dueAt.month}.${dueAt.year % 100}';
+
+    return ListTile(
+      dense: true,
+      visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+      leading: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: () => onToggle(task, !isDone),
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isDone
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).dividerColor,
+              width: 2,
+            ),
+            color: isDone
+                ? Theme.of(context).colorScheme.primary.withOpacity(.15)
+                : null,
+          ),
+          child: isDone ? const Icon(Icons.check, size: 16) : null,
+        ),
+      ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              task.name,
+              overflow: TextOverflow.ellipsis,
+              style: isDone
+                  ? const TextStyle(decoration: TextDecoration.lineThrough)
+                  : null,
+            ),
+          ),
+          if (dueLabel != null) ...[
+            const SizedBox(width: 8),
+            _DuePill(label: dueLabel, overdue: dueAt!.isBefore(DateTime.now())),
+          ],
+        ],
+      ),
+      onTap: () => onToggle(task, !isDone),
+      trailing: PopupMenuButton<String>(
+        onSelected: (v) {
+          switch (v) {
+            case 'rename':
+              onRename(task);
+              break;
+            case 'assign':
+              onAssign(task);
+              break;
+            case 'delete':
+              onDelete(task);
+              break;
+          }
+        },
+        itemBuilder: (_) => const [
+          PopupMenuItem(
+            value: 'rename',
+            child: ListTile(leading: Icon(Icons.edit), title: Text('Rename')),
+          ),
+          PopupMenuItem(
+            value: 'assign',
+            child: ListTile(leading: Icon(Icons.person), title: Text('Assign')),
+          ),
+          PopupMenuItem(
+            value: 'delete',
+            child: ListTile(
+              leading: Icon(Icons.delete, color: Colors.red),
+              title: Text('Delete'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DuePill extends StatelessWidget {
+  final String label;
+  final bool overdue;
+  const _DuePill({required this.label, required this.overdue});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final bg = overdue ? cs.errorContainer : cs.secondaryContainer;
+    final fg = overdue ? cs.onErrorContainer : cs.onSecondaryContainer;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.event, size: 12, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: fg,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+void _renameInline(BuildContext context, Task task) {
+  final c = TextEditingController(text: task.name);
+  showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text('   All Pending Tasks  📑 '),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 660, maxHeight: 480),
-        child: tasks.isEmpty
-            ? const Text('No pending tasks')
-            : SingleChildScrollView(
-                child: TasksSection(
-                  tasks: pending,
-                  expanded: true,
-                  previewCount: 999, // her şeyi göster
-                  onToggleTask: (t) => context
-                      .read<TaskCloudProvider>()
-                      .toggleTask(t, !t.completed),
-                  onToggleExpand: null, // “show all” linkini gizlemek için
-                  showHeader: false, // başlığı tekrarlamayalım
-                ),
-              ),
+      title: const Text('Edit task'),
+      content: TextField(
+        controller: c,
+        autofocus: true,
+        decoration: const InputDecoration(
+          isDense: true,
+          border: OutlineInputBorder(),
+          hintText: 'Task name',
+        ),
+        onSubmitted: (_) {
+          context.read<TaskCloudProvider>().renameTask(task, c.text.trim());
+          Navigator.pop(context);
+        },
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
+          child: const Text('Cancel'),
         ),
-        TextButton(
-          child: const Text('Details'),
+        FilledButton(
           onPressed: () {
+            context.read<TaskCloudProvider>().renameTask(task, c.text.trim());
             Navigator.pop(context);
-            showPendingTasksSheet(context); // alt sheet istersen
           },
+          child: const Text('Save'),
         ),
       ],
     ),
@@ -432,43 +801,358 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
 
 Future<void> showToBuyItemsDialog(BuildContext context) async {
   final itemProv = context.read<ItemCloudProvider>();
-  final items = itemProv.items.where((i) => !i.bought).toList()
-    ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-  final toBuy = itemProv.items.where((i) => !i.bought).toList();
+  final famDictStream = context.read<FamilyProvider>().watchMemberDirectory();
 
-  await showDialog<void>(
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+    ),
+    builder: (sheetCtx) {
+      final searchC = TextEditingController();
+      String? memberFilter; // null=All, ''=Unassigned, 'uid'
+      bool showBought = false; // false => sadece to-buy, true => tümü
+
+      return StatefulBuilder(
+        builder: (ctx, setLocal) {
+          // veri + sıralama
+          final all = itemProv.items.toList()
+            ..sort(
+              (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+            );
+          final toBuy = all.where((i) => !i.bought).toList();
+
+          // filtreler
+          Iterable<Item> src = showBought ? all : toBuy;
+          if (memberFilter != null) {
+            src = src.where(
+              (it) =>
+                  (memberFilter!.isEmpty &&
+                      (it.assignedToUid == null ||
+                          it.assignedToUid!.isEmpty)) ||
+                  (memberFilter!.isNotEmpty &&
+                      it.assignedToUid == memberFilter),
+            );
+          }
+          final q = searchC.text.trim().toLowerCase();
+          if (q.isNotEmpty) {
+            src = src.where((it) => it.name.toLowerCase().contains(q));
+          }
+          final list = src.toList();
+
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 10,
+              bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // drag handle
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).dividerColor,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                // Header
+                Row(
+                  children: [
+                    const Icon(Icons.shopping_cart, size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Items',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(sheetCtx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Arama
+                TextField(
+                  controller: searchC,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Search items…',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (_) => setLocal(() {}),
+                ),
+                const SizedBox(height: 10),
+
+                // Filtre bar: Üye chipleri + alt satırda To buy / All
+                StreamBuilder<Map<String, String>>(
+                  stream: famDictStream,
+                  builder: (_, snap) {
+                    final dict = snap.data ?? const <String, String>{};
+
+                    final chips = <Widget>[
+                      FilterChip(
+                        label: const Text('All'),
+                        selected: memberFilter == null,
+                        onSelected: (_) => setLocal(() => memberFilter = null),
+                      ),
+                      FilterChip(
+                        label: const Text('Unassigned'),
+                        selected: memberFilter == '',
+                        onSelected: (_) => setLocal(() => memberFilter = ''),
+                      ),
+                      ...dict.entries.map(
+                        (e) => FilterChip(
+                          label: Text(e.value),
+                          selected: memberFilter == e.key,
+                          onSelected: (_) =>
+                              setLocal(() => memberFilter = e.key),
+                        ),
+                      ),
+                    ];
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // üst satır: chips
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: chips
+                                .map(
+                                  (w) => Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: w,
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // alt satır: To buy / All
+                        Center(
+                          child: SegmentedButton<bool>(
+                            segments: const [
+                              ButtonSegment(
+                                value: false,
+                                icon: Icon(Icons.shopping_basket),
+                                label: Text('To buy'),
+                              ),
+                              ButtonSegment(
+                                value: true,
+                                icon: Icon(Icons.all_inclusive),
+                                label: Text('All'),
+                              ),
+                            ],
+                            selected: {showBought},
+                            showSelectedIcon: false,
+                            onSelectionChanged: (s) =>
+                                setLocal(() => showBought = s.first),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 8),
+
+                // Liste
+                Expanded(
+                  child: list.isEmpty
+                      ? const Center(child: Text('No items'))
+                      : ListView.separated(
+                          itemCount: list.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (_, i) => _ItemRowCompact(
+                            item: list[i],
+                            onToggle: (it, v) async {
+                              await context
+                                  .read<ItemCloudProvider>()
+                                  .toggleItem(it, v);
+                            },
+                            onRename: (it) => _renameItemInline(context, it),
+                            onDelete: (it) => context
+                                .read<ItemCloudProvider>()
+                                .removeItem(it),
+                            onAssign: (it) => _showAssignItemSheet(context, it),
+                          ),
+                        ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Alt aksiyonlar
+                Row(
+                  children: [
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.delete_sweep),
+                      label: const Text('Clear bought'),
+                      onPressed: () async {
+                        await context.read<ItemCloudProvider>().clearBought(
+                          forMember:
+                              (memberFilter == null || memberFilter!.isEmpty)
+                              ? null
+                              : memberFilter,
+                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Bought items cleared'),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    const Spacer(),
+                    FilledButton.icon(
+                      icon: const Icon(Icons.done_all),
+                      label: const Text('Mark all bought'),
+                      onPressed: list.where((it) => !it.bought).isEmpty
+                          ? null
+                          : () async {
+                              for (final it in list.where((x) => !x.bought)) {
+                                await context
+                                    .read<ItemCloudProvider>()
+                                    .toggleItem(it, true);
+                              }
+                            },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+class _ItemRowCompact extends StatelessWidget {
+  final Item item;
+  final Future<void> Function(Item it, bool value) onToggle;
+  final void Function(Item it) onRename;
+  final void Function(Item it) onDelete;
+  final void Function(Item it) onAssign;
+
+  const _ItemRowCompact({
+    required this.item,
+    required this.onToggle,
+    required this.onRename,
+    required this.onDelete,
+    required this.onAssign,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bought = item.bought;
+    return ListTile(
+      dense: true,
+      visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+      leading: Checkbox(
+        value: bought,
+        onChanged: (v) => onToggle(item, v ?? false),
+      ),
+      title: Text(
+        item.name,
+        overflow: TextOverflow.ellipsis,
+        style: bought
+            ? const TextStyle(decoration: TextDecoration.lineThrough)
+            : null,
+      ),
+      trailing: PopupMenuButton<String>(
+        onSelected: (v) {
+          switch (v) {
+            case 'rename':
+              onRename(item);
+              break;
+            case 'assign':
+              onAssign(item);
+              break;
+            case 'delete':
+              onDelete(item);
+              break;
+          }
+        },
+        itemBuilder: (_) => const [
+          PopupMenuItem(
+            value: 'rename',
+            child: ListTile(
+              dense: true,
+              leading: Icon(Icons.edit),
+              title: Text('Rename'),
+            ),
+          ),
+          PopupMenuItem(
+            value: 'assign',
+            child: ListTile(
+              dense: true,
+              leading: Icon(Icons.person_add_alt),
+              title: Text('Assign'),
+            ),
+          ),
+          PopupMenuItem(
+            value: 'delete',
+            child: ListTile(
+              dense: true,
+              leading: Icon(Icons.delete_outline, color: Colors.redAccent),
+              title: Text('Delete'),
+            ),
+          ),
+        ],
+      ),
+      onTap: () => onToggle(item, !bought),
+    );
+  }
+}
+
+void _renameItemInline(BuildContext context, Item it) {
+  final c = TextEditingController(text: it.name);
+  showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text('   All Items to Buy  🛍️   '),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 660, maxHeight: 480),
-        child: items.isEmpty
-            ? const Text('No items to buy')
-            : SingleChildScrollView(
-                child: ItemsSection(
-                  items: toBuy,
-                  expanded: true,
-                  previewCount: 999,
-                  onToggleItem: (it) => context
-                      .read<ItemCloudProvider>()
-                      .toggleItem(it, !it.bought),
-                  onToggleExpand: null,
-                  showHeader: false,
-                ),
-              ),
+      title: const Text('Edit item'),
+      content: TextField(
+        controller: c,
+        autofocus: true,
+        decoration: const InputDecoration(
+          border: OutlineInputBorder(),
+          isDense: true,
+          hintText: 'Item name',
+        ),
+        onSubmitted: (_) {
+          context.read<ItemCloudProvider>().renameItem(it, c.text.trim());
+          Navigator.pop(context);
+        },
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
+          child: const Text('Cancel'),
         ),
-        TextButton(
+        FilledButton(
           onPressed: () {
+            context.read<ItemCloudProvider>().renameItem(it, c.text.trim());
             Navigator.pop(context);
-            // mevcut quick add kullan
-            showToBuyItemsSheet(context); // alt sheet tercih edersen
           },
-          child: const Text('Details'),
+          child: const Text('Save'),
         ),
       ],
     ),
@@ -493,6 +1177,7 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
     return Card(
       elevation: 2,
       clipBehavior: Clip.antiAlias,

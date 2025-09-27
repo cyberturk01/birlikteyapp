@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../constants/app_strings.dart';
 import '../../models/task.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/ui_provider.dart';
@@ -14,6 +13,8 @@ class TasksSubsection extends StatelessWidget {
   final int previewCount;
   final VoidCallback onToggleExpand;
   final void Function(Task) onToggleTask;
+  final void Function(Task task)? onEditTask;
+  final bool showMeta;
 
   const TasksSubsection({
     super.key,
@@ -22,6 +23,8 @@ class TasksSubsection extends StatelessWidget {
     required this.previewCount,
     required this.onToggleExpand,
     required this.onToggleTask,
+    this.onEditTask,
+    this.showMeta = true,
   });
 
   @override
@@ -34,6 +37,9 @@ class TasksSubsection extends StatelessWidget {
         : tasksFiltered.take(previewCount).toList();
     final hiddenCount = showAll ? 0 : (total - previewCount);
 
+    if (visible.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -46,6 +52,10 @@ class TasksSubsection extends StatelessWidget {
         else
           ...visible.map((task) {
             final isDone = task.completed;
+            final now = DateTime.now();
+            final hasDue = task.dueAt != null;
+            final hasRem = task.reminderAt != null;
+            final isOverdue = hasDue && !isDone && task.dueAt!.isBefore(now);
             return Dismissible(
               direction: DismissDirection.horizontal,
               key: ValueKey(
@@ -99,6 +109,9 @@ class TasksSubsection extends StatelessWidget {
                   vertical: -2,
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                onLongPress: onEditTask == null
+                    ? null
+                    : () => onEditTask!(task),
                 leading: Checkbox(
                   value: isDone,
                   onChanged: (v) async {
@@ -127,13 +140,68 @@ class TasksSubsection extends StatelessWidget {
                       ? const TextStyle(decoration: TextDecoration.lineThrough)
                       : null,
                 ),
-                onTap: () => _handleToggleTask(context, task),
-                trailing: IconButton(
-                  tooltip: S.delete,
-                  icon: const Icon(Icons.delete, color: Colors.redAccent),
-                  onPressed: () =>
-                      context.read<TaskCloudProvider>().removeTask(task),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (hasDue) _DueDot(date: task.dueAt!, overdue: isOverdue),
+
+                    //TODO düzelt burayi
+                    if (hasRem)
+                      _DueDot(date: task.reminderAt!, overdue: isOverdue),
+                    const SizedBox(width: 8),
+
+                    // mevcut menü
+                    PopupMenuButton<String>(
+                      tooltip: 'More',
+                      onSelected: (v) async {
+                        if (v == 'edit' && onEditTask != null) {
+                          onEditTask!(task);
+                        } else if (v == 'delete') {
+                          final removed = task;
+                          context.read<TaskCloudProvider>().removeTask(task);
+                          ScaffoldMessenger.of(context)
+                            ..clearSnackBars()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: const Text('Task deleted'),
+                                action: SnackBarAction(
+                                  label: 'Undo',
+                                  onPressed: () {
+                                    context.read<TaskCloudProvider>().addTask(
+                                      removed,
+                                    );
+                                  },
+                                ),
+                              ),
+                            );
+                        }
+                      },
+                      itemBuilder: (ctx) => const [
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: ListTile(
+                            dense: true,
+                            leading: Icon(Icons.edit),
+                            title: Text('Edit'),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: ListTile(
+                            dense: true,
+                            leading: Icon(
+                              Icons.delete_outline,
+                              color: Colors.redAccent,
+                            ),
+                            title: Text('Delete'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
+
+                onTap: () => _handleToggleTask(context, task),
               ),
             );
           }),
@@ -148,6 +216,56 @@ class TasksSubsection extends StatelessWidget {
       ],
     );
   }
+}
+
+class _DueDot extends StatelessWidget {
+  final DateTime date;
+  final bool overdue;
+  const _DueDot({required this.date, required this.overdue});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final bg = overdue ? Colors.red : scheme.surfaceVariant.withOpacity(.7);
+    final fg = overdue ? Colors.white : scheme.onSurfaceVariant;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.event, size: 12, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            _fmtDueShort(date), // 12/03 ya da 12/03 14:30 gibi kısa
+            style: TextStyle(
+              fontSize: 11,
+              color: fg,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _fmtDueShort(DateTime d) {
+  final now = DateTime.now();
+  final isToday =
+      d.year == now.year && d.month == now.month && d.day == now.day;
+  final dd = d.day.toString().padLeft(2, '0');
+  final mm = d.month.toString().padLeft(2, '0');
+  if (isToday) {
+    final hh = d.hour.toString().padLeft(2, '0');
+    final mi = d.minute.toString().padLeft(2, '0');
+    return '$dd/$mm $hh:$mi'; // bugünse saat de göster
+  }
+  return '$dd/$mm';
 }
 
 // ---- toggle handlers keep auto-switch behavior via UiProvider ----

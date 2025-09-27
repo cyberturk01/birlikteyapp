@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 import '../utils/recent_categories.dart';
 import '_base_cloud.dart';
@@ -51,7 +53,9 @@ class ExpenseDoc {
 class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
+  final Map<String, double> _monthlyBudgets = {}; // kategori -> bütçe
 
+  double? getMonthlyBudgetFor(String category) => _monthlyBudgets[category];
   ExpenseCloudProvider(this._auth, this._db);
 
   String? _familyId;
@@ -75,6 +79,55 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
     final fid = _familyId;
     if (fid == null) return null;
     return _db.collection('families/$fid/expenses');
+  }
+
+  Future<void> setMonthlyBudget(String category, double? amount) async {
+    if (amount == null) {
+      _monthlyBudgets.remove(category);
+    } else {
+      _monthlyBudgets[category] = amount;
+    }
+    notifyListeners();
+    // TODO: Firestore’a yaz
+    // await db.collection('families').doc(familyId).set({
+    //   'settings': {
+    //     'budgets': _monthlyBudgets,
+    //   }
+    // }, SetOptions(merge: true));
+  }
+
+  /// Drill-down için basit filtre:
+  List<ExpenseDoc> forCategory({required String category, String? uid}) {
+    final all = expenses; // mevcut liste
+    return all.where((e) {
+      final catOk = (e.category ?? 'Other') == category;
+      final uidOk = uid == null ? true : e.assignedToUid == uid;
+      return catOk && uidOk;
+    }).toList()..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  /// Stacked bar için: son N ay kategorilere göre toplam
+  /// return: { 'YYYY-MM': { 'Groceries': 120.0, 'Dining': 80.0, ... }, ... }
+  Map<String, Map<String, double>> totalsByMonthAndCategory({
+    String? uid,
+    int lastMonths = 6,
+  }) {
+    final now = DateTime.now();
+    final monthsKeys = List.generate(lastMonths, (i) {
+      final d = DateTime(now.year, now.month - (lastMonths - 1 - i), 1);
+      return '${d.year}-${d.month.toString().padLeft(2, '0')}';
+    });
+
+    final out = {for (final k in monthsKeys) k: <String, double>{}};
+
+    for (final e in expenses) {
+      if (uid != null && e.assignedToUid != uid) continue;
+      final key = '${e.date.year}-${e.date.month.toString().padLeft(2, '0')}';
+      if (!out.containsKey(key)) continue; // sadece son N ay
+      final cat = (e.category ?? 'Other');
+      out[key]![cat] = (out[key]![cat] ?? 0) + e.amount;
+    }
+    return out;
   }
 
   void _bind() {

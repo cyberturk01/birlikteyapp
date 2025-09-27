@@ -1,3 +1,4 @@
+// models/item.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hive/hive.dart';
 
@@ -14,10 +15,23 @@ class Item extends HiveObject {
   @HiveField(2)
   String? assignedToUid;
 
+  // 🔽 YENİ
+  @HiveField(3)
+  String? category;
+
+  @HiveField(4)
+  double? price;
+
   String? remoteId;
 
-  Item(String name, {this.bought = false, this.assignedToUid, this.remoteId})
-    : name = _capitalize(name);
+  Item(
+    String name, {
+    this.bought = false,
+    this.assignedToUid,
+    this.category,
+    this.price,
+    this.remoteId,
+  }) : name = _capitalize(name);
 
   static String _capitalize(String input) {
     if (input.isEmpty) return input;
@@ -30,8 +44,9 @@ class Item extends HiveObject {
       (d['name'] as String).trim(),
       bought: (d['bought'] as bool?) ?? false,
       assignedToUid:
-          (d['assignedToUid'] as String?) ??
-          (d['assignedTo'] as String?), // GERİYE DÖNÜK
+          (d['assignedToUid'] as String?) ?? (d['assignedTo'] as String?),
+      category: (d['category'] as String?)?.trim(),
+      price: (d['price'] as num?)?.toDouble(),
     )..remoteId = doc.id;
   }
 }

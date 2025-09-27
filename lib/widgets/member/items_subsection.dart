@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../constants/app_strings.dart';
 import '../../models/item.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/ui_provider.dart';
@@ -110,11 +109,48 @@ class ItemsSubsection extends StatelessWidget {
                       ? const TextStyle(decoration: TextDecoration.lineThrough)
                       : null,
                 ),
-                trailing: IconButton(
-                  tooltip: S.delete,
-                  icon: const Icon(Icons.delete, color: Colors.redAccent),
-                  onPressed: () =>
-                      context.read<ItemCloudProvider>().removeItem(it),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if ((it.category ?? '').isNotEmpty)
+                      _CategoryPill(it.category!),
+                    if (it.price != null) ...[
+                      const SizedBox(width: 6),
+                      _PricePill(it.price!),
+                    ],
+                    const SizedBox(width: 8),
+                    PopupMenuButton<String>(
+                      tooltip: 'More',
+                      onSelected: (v) async {
+                        if (v == 'edit') {
+                          _showEditItemDialog(context, it);
+                        } else if (v == 'delete') {
+                          context.read<ItemCloudProvider>().removeItem(it);
+                        }
+                      },
+                      itemBuilder: (ctx) => const [
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: ListTile(
+                            dense: true,
+                            leading: Icon(Icons.edit),
+                            title: Text('Edit'),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: ListTile(
+                            dense: true,
+                            leading: Icon(
+                              Icons.delete_outline,
+                              color: Colors.redAccent,
+                            ),
+                            title: Text('Delete'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             );
@@ -129,6 +165,130 @@ class ItemsSubsection extends StatelessWidget {
           ),
       ],
     );
+  }
+}
+
+class _CategoryPill extends StatelessWidget {
+  final String category;
+  const _CategoryPill(this.category);
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = Theme.of(context).colorScheme.surfaceVariant.withOpacity(.8);
+    final fg = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.category, size: 12),
+          const SizedBox(width: 4),
+          Text(
+            category,
+            style: TextStyle(
+              fontSize: 11,
+              color: fg,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+void _showEditItemDialog(BuildContext context, Item it) {
+  final cCat = TextEditingController(text: it.category ?? '');
+  final cPrice = TextEditingController(text: it.price?.toString() ?? '');
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Edit item'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: cCat,
+            decoration: const InputDecoration(
+              labelText: 'Category',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: cPrice,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Price',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            final cat = cCat.text.trim();
+            final price = double.tryParse(cPrice.text.replaceAll(',', '.'));
+            final prov = context.read<ItemCloudProvider>();
+            await prov.updateCategory(it, cat.isEmpty ? null : cat);
+            await prov.updatePrice(it, price);
+            if (context.mounted) Navigator.pop(context);
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _PricePill extends StatelessWidget {
+  final double price;
+  const _PricePill(this.price);
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = Theme.of(context).colorScheme.secondaryContainer;
+    final fg = Theme.of(context).colorScheme.onSecondaryContainer;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.payments, size: 12),
+          const SizedBox(width: 4),
+          Text(
+            _fmtMoney(price),
+            style: TextStyle(
+              fontSize: 11,
+              color: fg,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _fmtMoney(double v) {
+    // Basit; istersen mevcut fmtMoney(context, v) utilini kullan
+    if (v >= 1000) return v.toStringAsFixed(0);
+    if (v == v.roundToDouble()) return v.toStringAsFixed(0);
+    return v.toStringAsFixed(2);
   }
 }
 

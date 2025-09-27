@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive/hive.dart';
@@ -545,6 +547,7 @@ class FamilyProvider extends ChangeNotifier {
           final data = doc.data() ?? {};
           final members = (data['members'] as Map<String, dynamic>? ?? {});
           final names = (data['memberNames'] as Map<String, dynamic>? ?? {});
+          final photos = (data['memberPhotos'] as Map<String, dynamic>? ?? {});
           final uids = members.keys.toList()..sort();
 
           final list = <FamilyMemberEntry>[];
@@ -559,10 +562,60 @@ class FamilyProvider extends ChangeNotifier {
                   ? nm
                   : 'Member • ${uid.substring(0, 6)}';
             }
-            list.add(FamilyMemberEntry(uid: uid, label: label, role: role));
+            final photoUrl = (photos[uid] as String?)?.trim();
+            list.add(
+              FamilyMemberEntry(
+                uid: uid,
+                label: label,
+                role: role,
+                photoUrl: photoUrl,
+              ),
+            );
           }
           return list;
         });
+  }
+
+  Future<String> setMemberPhoto({
+    required String memberUid,
+    required File file,
+  }) async {
+    final fid = _familyId;
+    if (fid == null) throw StateError('No active family');
+
+    final ref = FirebaseStorage.instance.ref(
+      'families/$fid/members/$memberUid.jpg',
+    );
+
+    // İstersen kaliteyi düşürülmüş/yeniden boyutlandırılmış dosya verebilirsin
+    await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
+
+    final url = await ref.getDownloadURL();
+
+    await FirebaseFirestore.instance.collection('families').doc(fid).set({
+      'memberPhotos': {memberUid: url},
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    notifyListeners(); // UI hızlıca güncellensin
+    return url;
+  }
+
+  /// İsteğe bağlı: foto kaldır
+  Future<void> removeMemberPhoto(String memberUid) async {
+    final fid = _familyId;
+    if (fid == null) return;
+    // Storage'tan da silmek istersen:
+    try {
+      await FirebaseStorage.instance
+          .ref('families/$fid/members/$memberUid.jpg')
+          .delete();
+    } catch (_) {}
+    await FirebaseFirestore.instance.collection('families').doc(fid).set({
+      'memberPhotos': {memberUid: FieldValue.delete()},
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    notifyListeners();
   }
 
   /// Sadece bu ailede görünen etiketi değiştirir (memberNames[uid])
@@ -696,12 +749,13 @@ enum ReassignStrategy { unassign, reassignTo, leaveAsText }
 
 class FamilyMemberEntry {
   final String uid;
-  final String
-  label; // ekranda görünen (You (..), ya da memberNames[uid] / fallback)
+  final String label;
   final String role; // 'owner' / 'editor' vs.
+  final String? photoUrl;
   const FamilyMemberEntry({
     required this.uid,
     required this.label,
     required this.role,
+    this.photoUrl,
   });
 }

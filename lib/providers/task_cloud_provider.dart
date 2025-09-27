@@ -112,6 +112,8 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
                                 as String?)
                             ?.trim(),
                     origin: data['origin'] as String?,
+                    dueAt: (data['dueAt'] as Timestamp?)?.toDate(),
+                    reminderAt: (data['reminderAt'] as Timestamp?)?.toDate(),
                   );
                   t.remoteId = d.id;
                   return t;
@@ -142,6 +144,8 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
       'completed': t.completed,
       'assignedToUid': t.assignedToUid,
       if (t.origin != null) 'origin': t.origin,
+      if (t.dueAt != null) 'dueAt': Timestamp.fromDate(t.dueAt!),
+      if (t.reminderAt != null) 'reminderAt': Timestamp.fromDate(t.reminderAt!),
       'createdAt': FieldValue.serverTimestamp(),
     });
     debugPrint('[TaskCloud] ADDED id=${doc.id}');
@@ -152,6 +156,32 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
     await col.doc(id).delete();
+  }
+
+  Future<void> updateDueDate(Task t, DateTime? due) async {
+    final col = _ensureCol();
+    final id = await _ensureId(col, t);
+    await col.doc(id).update({
+      if (due == null)
+        'dueAt': FieldValue.delete()
+      else
+        'dueAt': Timestamp.fromDate(due),
+    });
+    t.dueAt = due;
+    notifyListeners();
+  }
+
+  Future<void> updateReminder(Task t, DateTime? at) async {
+    final col = _ensureCol();
+    final id = await _ensureId(col, t);
+    await col.doc(id).update({
+      if (at == null)
+        'reminderAt': FieldValue.delete()
+      else
+        'reminderAt': Timestamp.fromDate(at),
+    });
+    t.reminderAt = at;
+    notifyListeners();
   }
 
   Future<void> clearCompleted({String? forMember}) async {

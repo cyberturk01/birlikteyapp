@@ -101,7 +101,9 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
                     assignedToUid:
                         ((data['assignedToUid'] ?? data['assignedTo'])
                                 as String?)
-                            ?.trim(), // ← fallback
+                            ?.trim(),
+                    category: (data['category'] as String?)?.trim(),
+                    price: (data['price'] as num?)?.toDouble(),
                   );
                   it.remoteId = d.id;
                   return it;
@@ -119,6 +121,7 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
         );
   }
 
+  // addItem çağrısında (eğer ileriye dönük set etmek istersen parametre ekleyebilirsin)
   Future<void> addItem(Item it) async {
     final col = _ensureCol();
     debugPrint(
@@ -128,10 +131,35 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
       'name': it.name,
       'bought': it.bought,
       'assignedToUid': it.assignedToUid ?? FieldValue.delete(),
+      if ((it.category ?? '').trim().isNotEmpty)
+        'category': it.category!.trim(),
+      if (it.price != null) 'price': it.price,
       'createdAt': FieldValue.serverTimestamp(),
     });
     debugPrint('[ItemCloud] ADDED id=${doc.id}');
     it.remoteId = doc.id;
+  }
+
+  Future<void> updateCategory(Item it, String? category) async {
+    final col = _ensureCol();
+    final id = await _ensureId(col, it);
+    await col.doc(id).update({
+      'category': (category?.trim().isEmpty ?? true)
+          ? FieldValue.delete()
+          : category!.trim(),
+    });
+    it.category = (category?.trim().isEmpty ?? true) ? null : category!.trim();
+    notifyListeners();
+  }
+
+  Future<void> updatePrice(Item it, double? price) async {
+    final col = _ensureCol();
+    final id = await _ensureId(col, it);
+    await col.doc(id).update({
+      if (price == null) 'price': FieldValue.delete() else 'price': price,
+    });
+    it.price = price;
+    notifyListeners();
   }
 
   // İsteğe bağlı: dışarıdan manuel tetiklemek için

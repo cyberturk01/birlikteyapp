@@ -152,6 +152,7 @@ class _LandingPageState extends State<LandingPage> {
                               final e = visible[i];
                               return _MemberTile(
                                 label: e.label,
+                                photoUrl: e.photoUrl,
                                 onTap: () async {
                                   await context
                                       .read<UiProvider>()
@@ -313,9 +314,14 @@ class _LandingPageState extends State<LandingPage> {
 
 class _MemberTile extends StatelessWidget {
   final String label;
+  final String? photoUrl;
   final VoidCallback onTap;
-  const _MemberTile({Key? key, required this.label, required this.onTap})
-    : super(key: key);
+  const _MemberTile({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.photoUrl,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -331,7 +337,15 @@ class _MemberTile extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircleAvatar(radius: 28, child: Text(initial)),
+              CircleAvatar(
+                radius: 28,
+                backgroundImage: (photoUrl != null && photoUrl!.isNotEmpty)
+                    ? NetworkImage(photoUrl!)
+                    : null,
+                child: (photoUrl == null || photoUrl!.isEmpty)
+                    ? Text(initial)
+                    : null,
+              ),
               const SizedBox(height: 10),
               Text(
                 label,
@@ -435,6 +449,7 @@ class _AllMembersPageUidState extends State<_AllMembersPageUid> {
                       final e = list[i];
                       return _MemberTile(
                         label: e.label,
+                        photoUrl: e.photoUrl,
                         onTap: () => widget.onPickUid(e.uid),
                       );
                     },

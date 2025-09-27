@@ -5,6 +5,7 @@ import '../../constants/app_lists.dart';
 import '../../models/item.dart';
 import '../../models/task.dart';
 import '../../models/view_section.dart';
+import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../widgets/member/items_subsection.dart';
@@ -77,6 +78,7 @@ class _MemberCardState extends State<MemberCard> {
     final isNarrow = width < 380;
     final previewTasks = (isLandscape || isShort) ? 2 : 6;
     final previewItems = (isLandscape || isShort) ? 2 : 3;
+    final entriesStream = context.read<FamilyProvider>().watchMemberEntries();
 
     return Card(
       elevation: 6,
@@ -106,10 +108,33 @@ class _MemberCardState extends State<MemberCard> {
               Row(
                 children: [
                   CircleAvatar(
-                    child: Text(
-                      widget.memberName.isNotEmpty
-                          ? widget.memberName[0].toUpperCase()
-                          : '?',
+                    child: StreamBuilder<List<FamilyMemberEntry>>(
+                      stream: entriesStream,
+                      builder: (_, snap) {
+                        final entries =
+                            snap.data ?? const <FamilyMemberEntry>[];
+                        FamilyMemberEntry? me;
+                        if (widget.memberUid == null) {
+                          // All
+                          return const Icon(Icons.group);
+                        } else {
+                          me = entries.firstWhere(
+                            (x) => x.uid == widget.memberUid,
+                            orElse: () => FamilyMemberEntry(
+                              uid: '',
+                              label: 'Member',
+                              role: 'editor',
+                            ),
+                          );
+                          final ch = me.label.isEmpty
+                              ? '?'
+                              : me.label[0].toUpperCase();
+                          final url = me.photoUrl;
+                          return (url != null && url.isNotEmpty)
+                              ? CircleAvatar(backgroundImage: NetworkImage(url))
+                              : CircleAvatar(child: Text(ch));
+                        }
+                      },
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -279,6 +304,9 @@ class _MemberCardState extends State<MemberCard> {
                                   () => _expandTasks = !_expandTasks,
                                 ),
                                 onToggleTask: _toggleTask,
+                                onEditTask: (task) =>
+                                    _openTaskEditDialog(context, task),
+                                showMeta: true,
                               )
                             : ItemsSubsection(
                                 itemsFiltered: itemsFiltered,
@@ -422,6 +450,131 @@ class _MemberCardState extends State<MemberCard> {
           },
         ),
         duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
+  Future<void> _openTaskEditDialog(BuildContext context, Task t) async {
+    final prov = context.read<TaskCloudProvider>();
+    final nameC = TextEditingController(text: t.name);
+    DateTime? due = t.dueAt;
+    DateTime? rem = t.reminderAt;
+
+    DateTime _join(DateTime d, TimeOfDay tod) =>
+        DateTime(d.year, d.month, d.day, tod.hour, tod.minute);
+
+    Future<DateTime?> _pickDT(DateTime? initial) async {
+      final base = initial ?? DateTime.now();
+      final d = await showDatePicker(
+        context: context,
+        initialDate: base,
+        firstDate: DateTime.now().subtract(const Duration(days: 365 * 5)),
+        lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+      );
+      if (d == null) return null;
+      final t = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(base),
+      );
+      if (t == null) return null;
+      return _join(d, t);
+    }
+
+    await showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          return AlertDialog(
+            title: const Text('Edit task'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameC,
+                  decoration: const InputDecoration(
+                    labelText: 'Task name',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.event),
+                        label: Text(
+                          due == null
+                              ? 'Set due date'
+                              : 'Due: ${due!.day.toString().padLeft(2, '0')}.${due!.month.toString().padLeft(2, '0')} '
+                                    '${due!.hour.toString().padLeft(2, '0')}:${due!.minute.toString().padLeft(2, '0')}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onPressed: () async {
+                          final picked = await _pickDT(due);
+                          setLocal(() => due = picked);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (due != null)
+                      IconButton(
+                        tooltip: 'Clear',
+                        icon: const Icon(Icons.close),
+                        onPressed: () => setLocal(() => due = null),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.alarm),
+                        label: Text(
+                          rem == null
+                              ? 'Set reminder'
+                              : 'Remind: ${rem!.day.toString().padLeft(2, '0')}.${rem!.month.toString().padLeft(2, '0')} '
+                                    '${rem!.hour.toString().padLeft(2, '0')}:${rem!.minute.toString().padLeft(2, '0')}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onPressed: () async {
+                          final picked = await _pickDT(rem);
+                          setLocal(() => rem = picked);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (rem != null)
+                      IconButton(
+                        tooltip: 'Clear',
+                        icon: const Icon(Icons.close),
+                        onPressed: () => setLocal(() => rem = null),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  final newName = nameC.text.trim();
+                  if (newName.isNotEmpty && newName != t.name) {
+                    await prov.renameTask(t, newName);
+                  }
+                  await prov.updateDueDate(t, due);
+                  await prov.updateReminder(t, rem);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -19,6 +19,12 @@ class Task extends HiveObject {
   @HiveField(3)
   String? origin;
 
+  @HiveField(4)
+  DateTime? dueAt;
+
+  @HiveField(5)
+  DateTime? reminderAt;
+
   static String _capitalize(String input) {
     if (input.isEmpty) return input;
     return input[0].toUpperCase() + input.substring(1);
@@ -30,6 +36,8 @@ class Task extends HiveObject {
     this.assignedToUid,
     this.remoteId,
     this.origin,
+    this.dueAt,
+    this.reminderAt,
   }) : name = _capitalize(name);
 
   factory Task.fromSnap(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -39,7 +47,10 @@ class Task extends HiveObject {
       completed: (d['completed'] as bool?) ?? false,
       assignedToUid:
           (d['assignedToUid'] as String?) ??
-          (d['assignedTo'] as String?), // GERİYE DÖNÜK
+          (d['assignedTo'] as String?), // geri uyum
+      origin: d['origin'] as String?,
+      dueAt: (d['dueAt'] as Timestamp?)?.toDate(),
+      reminderAt: (d['reminderAt'] as Timestamp?)?.toDate(),
     )..remoteId = doc.id;
   }
 }
