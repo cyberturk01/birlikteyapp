@@ -316,12 +316,7 @@ class _MemberTile extends StatelessWidget {
   final String label;
   final String? photoUrl;
   final VoidCallback onTap;
-  const _MemberTile({
-    super.key,
-    required this.label,
-    required this.onTap,
-    this.photoUrl,
-  });
+  const _MemberTile({required this.label, required this.onTap, this.photoUrl});
 
   @override
   Widget build(BuildContext context) {

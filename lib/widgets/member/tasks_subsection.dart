@@ -226,7 +226,9 @@ class _DueDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final bg = overdue ? Colors.red : scheme.surfaceVariant.withOpacity(.7);
+    final bg = overdue
+        ? Colors.red
+        : scheme.surfaceContainerHighest.withValues(alpha: 0.7);
     final fg = overdue ? Colors.white : scheme.onSurfaceVariant;
 
     return Container(

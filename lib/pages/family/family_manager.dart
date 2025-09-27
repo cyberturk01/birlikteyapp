@@ -373,7 +373,7 @@ class _InviteCodeTile extends StatelessWidget {
     return ListTile(
       tileColor: Theme.of(
         context,
-      ).colorScheme.surfaceContainerHighest.withOpacity(.4),
+      ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       leading: const Icon(Icons.qr_code_2),
       title: const Text('Invite a member'),

@@ -668,7 +668,7 @@ class _TaskRowCompact extends StatelessWidget {
               width: 2,
             ),
             color: isDone
-                ? Theme.of(context).colorScheme.primary.withOpacity(.15)
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15)
                 : null,
           ),
           child: isDone ? const Icon(Icons.check, size: 16) : null,

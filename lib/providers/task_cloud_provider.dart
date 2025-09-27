@@ -308,7 +308,7 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
           );
         }
       }
-    } catch (e, st) {
+    } catch (e) {
       debugPrint('[TaskCloud] score write failed: $e');
       setError(e);
     }

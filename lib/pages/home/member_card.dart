@@ -114,7 +114,7 @@ class _MemberCardState extends State<MemberCard> {
                         final entries =
                             snap.data ?? const <FamilyMemberEntry>[];
                         FamilyMemberEntry? me;
-                        if (widget.memberUid == null) {
+                        if (widget.memberUid.isEmpty) {
                           // All
                           return const Icon(Icons.group);
                         } else {
@@ -1210,20 +1210,6 @@ Item? _pickItemByName(List<Item> list, String name) {
   }
 }
 
-void _assignOrCreateTask(BuildContext context, String name, String memberUid) {
-  final prov = context.read<TaskCloudProvider>();
-  final trimmed = name.trim();
-  if (trimmed.isEmpty) return;
-
-  final existing = _pickTaskByName(prov.tasks, trimmed);
-  if (existing != null) {
-    context.read<TaskCloudProvider>().updateAssignment(existing, memberUid);
-  } else {
-    prov.addTask(Task(trimmed, assignedToUid: memberUid));
-  }
-  Navigator.pop(context);
-}
-
 List<String> _splitNames(String raw) {
   // virgül, satır sonu, noktalı virgül ayırıcıları
   final parts = raw
@@ -1239,18 +1225,4 @@ List<String> _splitNames(String raw) {
     if (seen.add(key)) out.add(p);
   }
   return out;
-}
-
-void _assignOrCreateItem(BuildContext context, String name, String memberUid) {
-  final prov = context.read<ItemCloudProvider>();
-  final trimmed = name.trim();
-  if (trimmed.isEmpty) return;
-
-  final existing = _pickItemByName(prov.items, trimmed);
-  if (existing != null) {
-    context.read<ItemCloudProvider>().updateAssignment(existing, memberUid);
-  } else {
-    prov.addItem(Item(trimmed, assignedToUid: memberUid));
-  }
-  Navigator.pop(context);
 }

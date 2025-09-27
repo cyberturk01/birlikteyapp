@@ -174,7 +174,9 @@ class _CategoryPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = Theme.of(context).colorScheme.surfaceVariant.withOpacity(.8);
+    final bg = Theme.of(
+      context,
+    ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.8);
     final fg = Theme.of(context).colorScheme.onSurfaceVariant;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
