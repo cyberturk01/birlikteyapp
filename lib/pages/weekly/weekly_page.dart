@@ -299,12 +299,6 @@ class _WeeklyTaskTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final weekly = context.read<WeeklyCloudProvider>();
     final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
-    String? timeText;
-    if (task.hour != null && task.minute != null) {
-      final h = task.hour!.toString().padLeft(2, '0');
-      final m = task.minute!.toString().padLeft(2, '0');
-      timeText = '$h:$m';
-    }
 
     return StreamBuilder<Map<String, String>>(
       stream: dictStream, // {uid: label}

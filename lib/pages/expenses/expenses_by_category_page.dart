@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../../providers/expense_cloud_provider.dart';
 import '../../utils/formatting.dart';
+import '../../widgets/budget_badges.dart';
+import '../../widgets/budgets_manager_sheet.dart';
 import '../../widgets/expense_edit_dialog.dart';
 import '../../widgets/member_dropdown_uid.dart';
 
@@ -152,6 +154,11 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
                               .getMonthlyBudgetFor(e.key); // null olabilir
                           final pct = total == 0 ? 0 : (e.value / total * 100);
                           final over = (budget != null) && (e.value > budget);
+                          final badge = buildBudgetBadge(
+                            context: context,
+                            spent: e.value,
+                            budget: budget,
+                          );
                           return InkWell(
                             onTap: () => _openDrillDown(
                               context,
@@ -173,6 +180,10 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
+                                      if (badge.overChip != null) ...[
+                                        const SizedBox(width: 8),
+                                        badge.overChip!,
+                                      ],
                                       IconButton(
                                         tooltip: 'Edit budget',
                                         icon: const Icon(
@@ -191,12 +202,21 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
                                     const SizedBox(height: 6),
                                     LinearProgressIndicator(
                                       value: (e.value / budget).clamp(0, 1),
+                                      backgroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.surfaceContainerHighest,
+                                      color: over
+                                          ? Theme.of(context).colorScheme.error
+                                          : Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
                                     ),
                                     const SizedBox(height: 4),
                                     Align(
                                       alignment: Alignment.centerRight,
                                       child: Text(
-                                        '${fmtMoney(context, e.value)} / ${fmtMoney(context, budget)}${over ? '  •  OVER' : ''}',
+                                        '${fmtMoney(context, e.value)} / ${fmtMoney(context, budget)}'
+                                        '${badge.overChip != null ? '' : '   •   ${badge.remainingText}'}',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: over
@@ -256,7 +276,7 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, null),
+            onPressed: () => Navigator.pop(context, 0.0),
             child: const Text('Remove'),
           ),
           TextButton(
@@ -267,10 +287,7 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
             onPressed: () {
               final raw = c.text.trim();
               if (raw.isEmpty) {
-                Navigator.pop(
-                  context,
-                  0,
-                ); // 0'ı "remove" gibi de yorumlayabilirsin
+                Navigator.pop(context, 0.0);
                 return;
               }
               final v = double.tryParse(raw.replaceAll(',', '.'));
@@ -298,14 +315,24 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
   List<PieChartSectionData> _buildPieSections(
     List<MapEntry<String, double>> entries,
   ) {
+    Color colorForCategory(String cat) {
+      final hash = cat.hashCode;
+      final r = 100 + (hash & 0x7F);
+      final g = 100 + ((hash >> 7) & 0x7F);
+      final b = 100 + ((hash >> 14) & 0x7F);
+      return Color.fromARGB(255, r, g, b);
+    }
+
     final total = entries.fold<double>(0, (s, e) => s + e.value);
     return List.generate(entries.length, (i) {
       final v = entries[i].value;
       final pct = total == 0 ? 0 : (v / total * 100);
+      final color = colorForCategory(entries[i].key);
       return PieChartSectionData(
         value: v,
         title: '${pct.toStringAsFixed(0)}%',
         radius: 64,
+        color: color,
         titleStyle: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
@@ -539,7 +566,28 @@ class ExpensesFilteredListPage extends StatelessWidget {
       uid: memberUid,
     ); // ↓ provider metodu aşağıda
     return Scaffold(
-      appBar: AppBar(title: Text('Category — $category')),
+      appBar: AppBar(
+        title: Text('Category — $category'),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'budgets') {
+                showBudgetsManagerSheet(context);
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'budgets',
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(Icons.account_balance_wallet),
+                  title: Text('Budgets…'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: list.isEmpty
           ? const Center(child: Text('No expenses'))
           : ListView.separated(

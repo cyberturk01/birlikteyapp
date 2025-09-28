@@ -12,6 +12,7 @@ import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/weekly_cloud_provider.dart';
 import '../../widgets/member_dropdown_uid.dart';
+import '../../widgets/task_edit_dialog.dart';
 import 'grouped_sheet.dart';
 
 enum SummaryDest { tasks, items, weekly, expenses }
@@ -660,7 +661,9 @@ class _TaskRowCompact extends StatelessWidget {
     Widget? duePill;
     if (dueAt != null) {
       final st = _dueStatus(dueAt);
-      final label = '${dueAt.day}.${dueAt.month}.${dueAt.year % 100}';
+      final String? label = (dueAt == null)
+          ? null
+          : '${dueAt.day}.${dueAt.month}.${dueAt.year % 100}';
       duePill = Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
@@ -673,7 +676,7 @@ class _TaskRowCompact extends StatelessWidget {
             Icon(Icons.event, size: 12, color: _dueFg(cs, st)),
             const SizedBox(width: 4),
             Text(
-              label,
+              label!,
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -732,6 +735,9 @@ class _TaskRowCompact extends StatelessWidget {
       trailing: PopupMenuButton<String>(
         onSelected: (v) {
           switch (v) {
+            case 'edit':
+              showTaskEditDialog(context, task);
+              break;
             case 'rename':
               onRename(task);
               break;
@@ -744,6 +750,13 @@ class _TaskRowCompact extends StatelessWidget {
           }
         },
         itemBuilder: (_) => const [
+          PopupMenuItem(
+            value: 'edit',
+            child: ListTile(
+              leading: Icon(Icons.tune),
+              title: Text('Edit (due/reminder)'),
+            ),
+          ),
           PopupMenuItem(
             value: 'rename',
             child: ListTile(leading: Icon(Icons.edit), title: Text('Rename')),

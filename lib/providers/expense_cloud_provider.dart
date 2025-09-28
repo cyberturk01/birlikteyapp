@@ -115,17 +115,15 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
       notifyListeners();
       return;
     }
+
     final famDoc = _db.collection('families').doc(fid);
 
     if (amount == null) {
-      // kaldır
-      await famDoc.set({
-        'settings': {
-          'budgets': {category: FieldValue.delete()},
-        },
-      }, SetOptions(merge: true));
+      final path = FieldPath(['settings', 'budgets', category]);
+      await famDoc.update({path: FieldValue.delete()});
       _monthlyBudgets.remove(category);
     } else {
+      // --- YAZMA ---
       await famDoc.set({
         'settings': {
           'budgets': {category: amount},

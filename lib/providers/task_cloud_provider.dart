@@ -142,7 +142,7 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     final doc = await col.add({
       'name': t.name,
       'completed': t.completed,
-      'assignedToUid': t.assignedToUid,
+      'assignedToUid': t.assignedToUid ?? FieldValue.delete(),
       if (t.origin != null) 'origin': t.origin,
       if (t.dueAt != null) 'dueAt': Timestamp.fromDate(t.dueAt!),
       if (t.reminderAt != null) 'reminderAt': Timestamp.fromDate(t.reminderAt!),
@@ -324,9 +324,9 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> renameTask(Task t, String newName) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
-    await col.doc(id).update({'name': newName});
+    await col.doc(id).update({'name': newName.trim()});
     // local model’i de güncelle ki UI’da anında görünsün
-    t.name = newName;
+    t.name = newName.trim();
     notifyListeners();
   }
 
