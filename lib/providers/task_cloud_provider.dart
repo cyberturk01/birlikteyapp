@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/task.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../services/scores_repo.dart';
 import '../services/task_service.dart';
 import '_base_cloud.dart';
@@ -155,6 +156,7 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> removeTask(Task t) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
+    await NotificationService.cancel(_notifIdForTask(t));
     await col.doc(id).delete();
   }
 
@@ -174,6 +176,7 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> updateReminder(Task t, DateTime? at) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
+
     await col.doc(id).update({
       if (at == null)
         'reminderAt': FieldValue.delete()
@@ -182,6 +185,18 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     });
     t.reminderAt = at;
     notifyListeners();
+
+    final nid = _notifIdForTask(t);
+    if (at != null && at.isAfter(DateTime.now()) && !t.completed) {
+      await NotificationService.scheduleOneTime(
+        id: nid,
+        title: 'Reminder',
+        body: t.name,
+        whenLocal: at,
+      );
+    } else {
+      await NotificationService.cancel(nid);
+    }
   }
 
   Future<void> clearCompleted({String? forMember}) async {
@@ -261,6 +276,11 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     return doc.id;
   }
 
+  int _notifIdForTask(Task t) {
+    // remoteId varsa onu kullan; yoksa isim hash’i
+    return (t.remoteId?.hashCode ?? t.name.hashCode) & 0x7FFFFFFF;
+  }
+
   // TaskCloudProvider.updateAssignment(...)
   Future<void> updateAssignment(Task t, String? memberUid) async {
     final col = _ensureCol();
@@ -290,6 +310,10 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     final id = await _ensureId(col, t);
 
     await col.doc(id).update({'completed': value});
+
+    if (value == true && t.reminderAt != null) {
+      await NotificationService.cancel(_notifIdForTask(t));
+    }
     t.completed = value;
     notifyListeners();
 

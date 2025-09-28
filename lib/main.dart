@@ -219,6 +219,7 @@ class _RootState extends State<_Root> {
   Future<void> _initApp() async {
     // Bildirim servisi
     await NotificationService.init();
+    await NotificationService.requestPermissions();
 
     // Hive
     await Hive.initFlutter();

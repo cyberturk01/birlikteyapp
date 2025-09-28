@@ -53,9 +53,13 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
             clearError();
             notifyListeners();
 
-            // Auto-reschedule safety (opsiyonel): yeni gelenler için id yoksa planla
+            await _cleanupOrphans();
+
             for (final w in _list) {
-              if (_notifBox.get(w.id) == null) {
+              if (_notifBox.get(w.id) == null &&
+                  w.notifEnabled == true &&
+                  w.hour != null &&
+                  w.minute != null) {
                 await _scheduleFor(w);
               }
             }
@@ -68,6 +72,17 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
   }
 
   // ===== queries =====
+  Future<void> _cleanupOrphans() async {
+    final idsInFirestore = _list.map((e) => e.id).toSet();
+    final keysInBox = _notifBox.keys.cast<String>().toList();
+    for (final k in keysInBox) {
+      if (!idsInFirestore.contains(k)) {
+        final nid = _notifBox.get(k);
+        if (nid != null) await NotificationService.cancel(nid);
+        await _notifBox.delete(k);
+      }
+    }
+  }
 
   List<WeeklyTaskCloud> tasksForDay(String day) =>
       _list.where((t) => _sameDay(t.day, day)).toList();
@@ -138,20 +153,21 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
     );
   }
 
-  /// Eski API’nizle uyumlu update
   Future<void> updateWeeklyTask(
     WeeklyTaskCloud task, {
     String? title,
     String? day,
     String? assignedToUid,
     TimeOfDay? timeOfDay,
+    bool? notifEnabled,
   }) async {
     if (_familyId == null) return;
 
     bool needsReschedule = false;
+    bool forceCancel = false;
+
     if (title != null && title.trim().isNotEmpty && title != task.title) {
       task.title = title.trim();
-      needsReschedule = true;
     }
     if (day != null && day.trim().isNotEmpty && day != task.day) {
       task.day = day.trim();
@@ -160,19 +176,41 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
     if (assignedToUid != null) {
       final v = assignedToUid.trim();
       task.assignedToUid = v.isEmpty ? null : v;
-      needsReschedule = true;
     }
     if (timeOfDay != null) {
-      task.hour = timeOfDay.hour;
-      task.minute = timeOfDay.minute;
-      needsReschedule = true;
+      if (timeOfDay.hour == -1 && timeOfDay.minute == -1) {
+        // “clear” protokolü
+        task.hour = null;
+        task.minute = null;
+        forceCancel = true; // saat silindiyse iptal
+        needsReschedule = false;
+      } else {
+        task.hour = timeOfDay.hour;
+        task.minute = timeOfDay.minute;
+        needsReschedule =
+            true; // saat değiştiyse yeniden planla (toggle açıksa)
+      }
+    }
+    if (notifEnabled != null && notifEnabled != task.notifEnabled) {
+      task.notifEnabled = notifEnabled;
+      if (!notifEnabled) {
+        forceCancel = true; // toggle kapandıysa iptal
+        needsReschedule = false;
+      } else {
+        // toggle açıldı; saat varsa yeniden planlayacağız
+        if (task.hour != null && task.minute != null) {
+          needsReschedule = true;
+        }
+      }
     }
 
     await _db
         .doc('families/$_familyId/weekly/${task.id}')
         .update(task.toMapForUpdate());
 
-    if (needsReschedule) {
+    if (forceCancel) {
+      await _cancelForId(task.id);
+    } else if (needsReschedule) {
       await _cancelForId(task.id);
       await _scheduleFor(task);
     }
@@ -225,12 +263,14 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
   // ===== notifications =====
 
   Future<void> _scheduleFor(WeeklyTaskCloud task) async {
+    if (task.notifEnabled != true) return;
+    if (task.hour == null || task.minute == null) return;
+
     final weekday = _dayStringToWeekdayInt(task.day);
     final time = await _resolveTime(task);
     final id = await NotificationService.scheduleWeekly(
       title: 'Weekly task',
-      body:
-          '${task.title}${task.assignedToUid != null ? " – ${task.assignedToUid}" : ""}',
+      body: task.title,
       weekday: weekday,
       timeOfDay: time,
     );

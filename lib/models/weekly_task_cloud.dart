@@ -10,15 +10,19 @@ class WeeklyTaskCloud {
   int? minute; // optional reminder minute
   DateTime createdAt;
 
+  // YENİ: bildirim anahtarı
+  bool notifEnabled;
+
   WeeklyTaskCloud(
     this.day,
     this.title, {
     this.assignedToUid,
     this.hour,
     this.minute,
-    String? id, // <-- ARTIK OPTIONAL
+    String? id,
     DateTime? createdAt,
-  }) : id = id ?? '_pending_', // <-- geçici id
+    this.notifEnabled = true,
+  }) : id = id ?? '_pending_',
        createdAt = createdAt ?? DateTime.now();
 
   factory WeeklyTaskCloud.fromDoc(DocumentSnapshot d) {
@@ -31,6 +35,7 @@ class WeeklyTaskCloud {
       minute: (m['minute'] as num?)?.toInt(),
       id: d.id,
       createdAt: (m['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      notifEnabled: (m['notifEnabled'] as bool?) ?? true,
     );
   }
 
@@ -42,6 +47,7 @@ class WeeklyTaskCloud {
         : assignedToUid!.trim(),
     'hour': hour,
     'minute': minute,
+    'notifEnabled': notifEnabled,
     'createdAt': FieldValue.serverTimestamp(),
   };
 
@@ -53,6 +59,7 @@ class WeeklyTaskCloud {
         : assignedToUid!.trim(),
     'hour': hour,
     'minute': minute,
+    'notifEnabled': notifEnabled,
     'updatedAt': FieldValue.serverTimestamp(),
   };
 

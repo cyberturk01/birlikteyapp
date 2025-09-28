@@ -1,12 +1,15 @@
 import 'package:birlikteyapp/constants/app_lists.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/weekly_task_cloud.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/weekly_cloud_provider.dart';
 import '../../widgets/member_dropdown_uid.dart';
+
+enum _WeeklyAction { edit, toggleNotif, setTime, clearTime, delete }
 
 class WeeklyPage extends StatefulWidget {
   const WeeklyPage({super.key});
@@ -55,6 +58,13 @@ class _WeeklyPageState extends State<WeeklyPage> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Default time',
+            icon: const Icon(Icons.schedule),
+            onPressed: () => _pickDefaultWeeklyTime(context),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
@@ -290,6 +300,29 @@ class _WeeklyPageState extends State<WeeklyPage> {
   }
 }
 
+Future<void> _pickDefaultWeeklyTime(BuildContext context) async {
+  final sp = await SharedPreferences.getInstance();
+  final h = sp.getInt('weeklyReminderHour') ?? 19;
+  final m = sp.getInt('weeklyReminderMinute') ?? 0;
+
+  final picked = await showTimePicker(
+    context: context,
+    initialTime: TimeOfDay(hour: h, minute: m),
+    builder: (ctx, child) => MediaQuery(
+      data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
+      child: child ?? const SizedBox.shrink(),
+    ),
+  );
+  if (picked == null) return;
+
+  await sp.setInt('weeklyReminderHour', picked.hour);
+  await sp.setInt('weeklyReminderMinute', picked.minute);
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Default weekly reminder time saved')),
+  );
+}
+
 /// Tek satır: başlık + kişi + saat, saat seçici & sil
 class _WeeklyTaskTile extends StatelessWidget {
   final WeeklyTaskCloud task;
@@ -317,19 +350,37 @@ class _WeeklyTaskTile extends StatelessWidget {
         final subtitle = [
           if (who.isNotEmpty) '👤 $who',
           if (timeText != null) '⏰ $timeText',
+          '🔔 ${task.notifEnabled ? "On" : "Off"}',
         ].join('   •   ');
 
         return ListTile(
           leading: const Icon(Icons.event_repeat),
           title: Text(task.title),
           subtitle: subtitle.isEmpty ? null : Text(subtitle),
-          trailing: Wrap(
-            spacing: 2,
-            children: [
-              IconButton(
-                tooltip: 'Reminder time',
-                icon: const Icon(Icons.access_time),
-                onPressed: () async {
+          onLongPress: () => _showEditWeeklyDialog(context, task), // <-- NEW
+          trailing: PopupMenuButton<_WeeklyAction>(
+            tooltip: 'More',
+            onSelected: (action) async {
+              switch (action) {
+                case _WeeklyAction.edit:
+                  await _showEditWeeklyDialog(context, task);
+                  break;
+
+                case _WeeklyAction.toggleNotif:
+                  final newVal = !task.notifEnabled;
+                  await weekly.updateWeeklyTask(task, notifEnabled: newVal);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Notifications ${newVal ? "enabled" : "disabled"}',
+                      ),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                  break;
+
+                case _WeeklyAction.setTime:
                   final initial = TimeOfDay(
                     hour: task.hour ?? 19,
                     minute: task.minute ?? 0,
@@ -351,11 +402,73 @@ class _WeeklyTaskTile extends StatelessWidget {
                       const SnackBar(content: Text('Reminder updated')),
                     );
                   }
-                },
+                  break;
+
+                case _WeeklyAction.clearTime:
+                  await weekly.updateWeeklyTask(
+                    task,
+                    timeOfDay: const TimeOfDay(hour: -1, minute: -1),
+                  );
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Reminder time cleared')),
+                  );
+                  break;
+
+                case _WeeklyAction.delete:
+                  await weekly.removeWeeklyTaskById(task.id);
+                  break;
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: _WeeklyAction.edit,
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(Icons.edit),
+                  title: Text('Edit'),
+                ),
               ),
-              IconButton(
-                icon: const Icon(Icons.delete, color: Colors.red),
-                onPressed: () => weekly.removeWeeklyTaskById(task.id),
+              PopupMenuItem(
+                value: _WeeklyAction.toggleNotif,
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(
+                    task.notifEnabled
+                        ? Icons.notifications_active
+                        : Icons.notifications_off,
+                  ),
+                  title: Text(
+                    task.notifEnabled
+                        ? 'Disable notifications'
+                        : 'Enable notifications',
+                  ),
+                ),
+              ),
+              const PopupMenuItem(
+                value: _WeeklyAction.setTime,
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(Icons.access_time),
+                  title: Text('Set time'),
+                ),
+              ),
+              const PopupMenuItem(
+                value: _WeeklyAction.clearTime,
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(Icons.close),
+                  title: Text('Clear time'),
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: _WeeklyAction.delete,
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(Icons.delete, color: Colors.red),
+                  title: Text('Delete'),
+                ),
               ),
             ],
           ),
@@ -363,4 +476,186 @@ class _WeeklyTaskTile extends StatelessWidget {
       },
     );
   }
+}
+
+Future<void> _showEditWeeklyDialog(
+  BuildContext context,
+  WeeklyTaskCloud task,
+) async {
+  final weekly = context.read<WeeklyCloudProvider>();
+  final famDictStream = context.read<FamilyProvider>().watchMemberDirectory();
+
+  final titleC = TextEditingController(text: task.title);
+  String day = task.day; // 'Monday'... 'Sunday'
+  String? assigned = task.assignedToUid;
+  bool notif = task.notifEnabled;
+  TimeOfDay? pickedTime = (task.hour != null && task.minute != null)
+      ? TimeOfDay(hour: task.hour!, minute: task.minute!)
+      : null;
+
+  String _fmtTime(TimeOfDay? t) => t == null
+      ? 'Not set'
+      : '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  final dayOptions = const [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+
+  await showDialog(
+    context: context,
+    builder: (_) => StatefulBuilder(
+      builder: (ctx, setLocal) {
+        return AlertDialog(
+          title: const Text('Edit weekly task'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleC,
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                DropdownButtonFormField<String>(
+                  value: dayOptions.contains(day) ? day : 'Monday',
+                  items: dayOptions
+                      .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                      .toList(),
+                  onChanged: (v) => setLocal(() => day = v ?? 'Monday'),
+                  decoration: const InputDecoration(
+                    labelText: 'Day',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Member selector
+                StreamBuilder<Map<String, String>>(
+                  stream: famDictStream,
+                  builder: (_, snap) {
+                    final dict = snap.data ?? const <String, String>{};
+                    final items = <DropdownMenuItem<String?>>[
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('Unassigned'),
+                      ),
+                      ...dict.entries.map(
+                        (e) => DropdownMenuItem(
+                          value: e.key,
+                          child: Text(e.value),
+                        ),
+                      ),
+                    ];
+                    final value = dict.containsKey(assigned) ? assigned : null;
+
+                    return DropdownButtonFormField<String?>(
+                      value: value,
+                      isExpanded: true,
+                      items: items,
+                      onChanged: (v) => setLocal(() => assigned = v),
+                      decoration: const InputDecoration(
+                        labelText: 'Assign to',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 12),
+
+                // Time + notif
+                Row(
+                  children: [
+                    Expanded(
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.access_time),
+                        title: const Text('Reminder time'),
+                        subtitle: Text(_fmtTime(pickedTime)),
+                        onTap: () async {
+                          final base = TimeOfDay(
+                            hour: task.hour ?? 19,
+                            minute: task.minute ?? 0,
+                          );
+                          final t = await showTimePicker(
+                            context: context,
+                            initialTime: pickedTime ?? base,
+                            builder: (ctx, child) => MediaQuery(
+                              data: MediaQuery.of(
+                                ctx,
+                              ).copyWith(alwaysUse24HourFormat: true),
+                              child: child ?? const SizedBox.shrink(),
+                            ),
+                          );
+                          if (t != null) setLocal(() => pickedTime = t);
+                        },
+                        trailing: IconButton(
+                          tooltip: 'Clear',
+                          icon: const Icon(Icons.close),
+                          onPressed: () => setLocal(() => pickedTime = null),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                SwitchListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: notif,
+                  onChanged: (v) => setLocal(() => notif = v),
+                  title: const Text('Notifications'),
+                  secondary: Icon(
+                    notif
+                        ? Icons.notifications_active
+                        : Icons.notifications_off,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                await weekly.updateWeeklyTask(
+                  task,
+                  title: titleC.text.trim(),
+                  day: day,
+                  assignedToUid: assigned,
+                  timeOfDay:
+                      pickedTime ??
+                      const TimeOfDay(hour: -1, minute: -1), // null => clear
+                  notifEnabled: notif,
+                );
+                if (!ctx.mounted) return;
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Weekly task updated')),
+                );
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }
