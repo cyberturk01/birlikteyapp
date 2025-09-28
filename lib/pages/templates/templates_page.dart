@@ -143,7 +143,7 @@ class _TemplatesPageState extends State<TemplatesPage> {
                   ),
                 ],
               ),
-              Divider(),
+              const Divider(),
               const SizedBox(height: 12),
 
               if (userTemplates.isEmpty)
@@ -174,7 +174,7 @@ class _TemplatesPageState extends State<TemplatesPage> {
                 'Ready Templates',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
-              Divider(),
+              const Divider(),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -681,74 +681,6 @@ class _TemplatesPageState extends State<TemplatesPage> {
             child: const Text('Close'),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _TemplateCard extends StatelessWidget {
-  final TemplatePack tpl;
-  final VoidCallback onApply;
-  const _TemplateCard({required this.tpl, required this.onApply});
-
-  @override
-  Widget build(BuildContext context) {
-    final tCount = tpl.tasks.length;
-    final iCount = tpl.items.length;
-
-    return Card(
-      elevation: 2,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        onTap: onApply,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                tpl.name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                tpl.description,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  if (tCount > 0)
-                    Row(
-                      children: [
-                        const Icon(Icons.task_alt, size: 16),
-                        const SizedBox(width: 4),
-                        Text('$tCount tasks'),
-                      ],
-                    ),
-                  if (tCount > 0 && iCount > 0) const SizedBox(width: 12),
-                  if (iCount > 0)
-                    Row(
-                      children: [
-                        const Icon(Icons.shopping_cart, size: 16),
-                        const SizedBox(width: 4),
-                        Text('$iCount items'),
-                      ],
-                    ),
-                  const Spacer(),
-                  FilledButton.tonal(
-                    onPressed: onApply,
-                    child: const Text('Apply'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

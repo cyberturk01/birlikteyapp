@@ -508,6 +508,13 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            'Filter by assignee',
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                        ),
                         // üst satır: chips
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
@@ -561,6 +568,10 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
                       : ListView.separated(
                           itemCount: list.length,
                           separatorBuilder: (_, __) => const Divider(height: 1),
+                          addAutomaticKeepAlives: false,
+                          addRepaintBoundaries: true,
+                          addSemanticIndexes: false,
+                          cacheExtent: 800,
                           itemBuilder: (_, i) => _TaskRowCompact(
                             task: list[i],
                             onToggle: (t, v) async {
@@ -642,17 +653,43 @@ class _TaskRowCompact extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDone = task.completed;
-    // İsteğe bağlı dueAt desteği eklediysen küçük rozet:
-    final DateTime? dueAt =
-        (task as dynamic).dueAt as DateTime?; // yoksa null olur
-    final String? dueLabel = (dueAt == null)
-        ? null
-        : '${dueAt.day}.${dueAt.month}.${dueAt.year % 100}';
+    final DateTime? dueAt = (task as dynamic).dueAt as DateTime?;
+
+    final cs = Theme.of(context).colorScheme;
+
+    Widget? duePill;
+    if (dueAt != null) {
+      final st = _dueStatus(dueAt);
+      final label = '${dueAt.day}.${dueAt.month}.${dueAt.year % 100}';
+      duePill = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: _dueBg(cs, st),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.event, size: 12, color: _dueFg(cs, st)),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: _dueFg(cs, st),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return ListTile(
       dense: true,
       visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
       contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+
       leading: InkWell(
         borderRadius: BorderRadius.circular(999),
         onTap: () => onToggle(task, !isDone),
@@ -674,6 +711,7 @@ class _TaskRowCompact extends StatelessWidget {
           child: isDone ? const Icon(Icons.check, size: 16) : null,
         ),
       ),
+
       title: Row(
         children: [
           Expanded(
@@ -685,13 +723,12 @@ class _TaskRowCompact extends StatelessWidget {
                   : null,
             ),
           ),
-          if (dueLabel != null) ...[
-            const SizedBox(width: 8),
-            _DuePill(label: dueLabel, overdue: dueAt!.isBefore(DateTime.now())),
-          ],
+          if (duePill != null) ...[const SizedBox(width: 8), duePill],
         ],
       ),
+
       onTap: () => onToggle(task, !isDone),
+
       trailing: PopupMenuButton<String>(
         onSelected: (v) {
           switch (v) {
@@ -728,38 +765,44 @@ class _TaskRowCompact extends StatelessWidget {
   }
 }
 
-class _DuePill extends StatelessWidget {
-  final String label;
-  final bool overdue;
-  const _DuePill({required this.label, required this.overdue});
+enum _DueStatus { overdue, today, soon, later }
 
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final bg = overdue ? cs.errorContainer : cs.secondaryContainer;
-    final fg = overdue ? cs.onErrorContainer : cs.onSecondaryContainer;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.event, size: 12, color: fg),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: fg,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
+_DueStatus _dueStatus(DateTime d) {
+  final now = DateTime.now();
+  final a = DateUtils.dateOnly(d);
+  final b = DateUtils.dateOnly(now);
+
+  if (a.isBefore(b)) return _DueStatus.overdue;
+  if (a == b) return _DueStatus.today;
+
+  final diff = a.difference(b).inDays;
+  if (diff <= 3) return _DueStatus.soon;
+  return _DueStatus.later;
+}
+
+Color _dueBg(ColorScheme cs, _DueStatus s) {
+  switch (s) {
+    case _DueStatus.overdue:
+      return cs.errorContainer;
+    case _DueStatus.today:
+      return cs.tertiaryContainer;
+    case _DueStatus.soon:
+      return cs.secondaryContainer;
+    case _DueStatus.later:
+      return cs.surfaceContainerHighest;
+  }
+}
+
+Color _dueFg(ColorScheme cs, _DueStatus s) {
+  switch (s) {
+    case _DueStatus.overdue:
+      return cs.onErrorContainer;
+    case _DueStatus.today:
+      return cs.onTertiaryContainer;
+    case _DueStatus.soon:
+      return cs.onSecondaryContainer;
+    case _DueStatus.later:
+      return cs.onSurfaceVariant;
   }
 }
 
@@ -928,6 +971,13 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            'Filter by assignee',
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                        ),
                         // üst satır: chips
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
@@ -944,6 +994,7 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
                           ),
                         ),
                         const SizedBox(height: 8),
+
                         // alt satır: To buy / All
                         Center(
                           child: SegmentedButton<bool>(
@@ -979,6 +1030,10 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
                       : ListView.separated(
                           itemCount: list.length,
                           separatorBuilder: (_, __) => const Divider(height: 1),
+                          addAutomaticKeepAlives: false,
+                          addRepaintBoundaries: true,
+                          addSemanticIndexes: false,
+                          cacheExtent: 800,
                           itemBuilder: (_, i) => _ItemRowCompact(
                             item: list[i],
                             onToggle: (it, v) async {

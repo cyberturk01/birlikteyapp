@@ -173,6 +173,15 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
+                                      IconButton(
+                                        tooltip: 'Edit budget',
+                                        icon: const Icon(
+                                          Icons.edit_calendar,
+                                          size: 18,
+                                        ),
+                                        onPressed: () =>
+                                            _editBudget(context, e.key),
+                                      ),
                                       Text(
                                         '${fmtMoney(context, e.value)}   •  ${pct.toStringAsFixed(1)}%',
                                       ),
@@ -187,8 +196,7 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
                                     Align(
                                       alignment: Alignment.centerRight,
                                       child: Text(
-                                        '${fmtMoney(context, e.value)} / ${fmtMoney(context, budget)}'
-                                        '${over ? '  •  OVER' : ''}',
+                                        '${fmtMoney(context, e.value)} / ${fmtMoney(context, budget)}${over ? '  •  OVER' : ''}',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: over
@@ -220,6 +228,71 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
         ),
       ),
     );
+  }
+
+  // aynı file’da yardımcı dialog:
+  void _editBudget(BuildContext context, String category) async {
+    final prov = context.read<ExpenseCloudProvider>();
+    final current = prov.getMonthlyBudgetFor(category);
+    final c = TextEditingController(
+      text: current == null
+          ? ''
+          : current.toStringAsFixed(current % 1 == 0 ? 0 : 2),
+    );
+
+    final res = await showDialog<double?>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Budget — $category'),
+        content: TextField(
+          controller: c,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(
+            labelText: 'Monthly budget',
+            hintText: 'e.g. 250',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: const Text('Remove'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final raw = c.text.trim();
+              if (raw.isEmpty) {
+                Navigator.pop(
+                  context,
+                  0,
+                ); // 0'ı "remove" gibi de yorumlayabilirsin
+                return;
+              }
+              final v = double.tryParse(raw.replaceAll(',', '.'));
+              Navigator.pop(context, v);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (res == null) return; // Cancel
+    if (res == 0) {
+      await prov.setMonthlyBudget(category, null); // Remove
+    } else {
+      await prov.setMonthlyBudget(category, res);
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Budget updated for $category')));
+    }
   }
 
   List<PieChartSectionData> _buildPieSections(
@@ -492,6 +565,10 @@ class ExpensesFilteredListPage extends StatelessWidget {
                   ),
                 );
               },
+              addAutomaticKeepAlives: false,
+              addRepaintBoundaries: true,
+              addSemanticIndexes: false,
+              cacheExtent: 800,
             ),
     );
   }

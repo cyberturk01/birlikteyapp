@@ -122,6 +122,10 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                   return ListView.separated(
                     itemCount: docs.length,
                     separatorBuilder: (_, __) => const Divider(height: 1),
+                    addAutomaticKeepAlives: false,
+                    addRepaintBoundaries: true,
+                    addSemanticIndexes: false,
+                    cacheExtent: 800,
                     itemBuilder: (_, i) {
                       final d = docs[i];
                       final uid = d.id;
@@ -170,7 +174,7 @@ class _RankBadge extends StatelessWidget {
         ? Colors.grey
         : rank == 3
         ? Colors.brown
-        : Theme.of(context).colorScheme.surfaceVariant;
+        : Theme.of(context).colorScheme.surfaceContainerHighest;
     return CircleAvatar(backgroundColor: bg, child: Text('$rank'));
   }
 }

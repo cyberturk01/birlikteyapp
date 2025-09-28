@@ -25,14 +25,11 @@ class _ExpensesCardState extends State<ExpensesCard> {
     final expenses = expProv.forMemberFiltered(widget.memberUid, _filter);
     final total = expProv.totalForMember(widget.memberUid, filter: _filter);
     final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
-    String? _catFilter;
 
     final categoriesInRange = <String>{};
     for (final e in expenses) {
       if ((e.category ?? '').isNotEmpty) categoriesInRange.add(e.category!);
     }
-    final chips = categoriesInRange.toList()..sort();
-    final capped = chips.take(6).toList();
 
     return Card(
       elevation: 6,
@@ -122,6 +119,10 @@ class _ExpensesCardState extends State<ExpensesCard> {
                   : ListView.separated(
                       itemCount: expenses.length,
                       separatorBuilder: (_, __) => const Divider(height: 1),
+                      addAutomaticKeepAlives: false,
+                      addRepaintBoundaries: true,
+                      addSemanticIndexes: false,
+                      cacheExtent: 800,
                       itemBuilder: (_, i) {
                         final e = expenses[i];
                         final cat = e.category ?? 'Other';

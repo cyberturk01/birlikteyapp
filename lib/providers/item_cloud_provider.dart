@@ -179,6 +179,32 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
     await col.doc(id).update({'bought': bought});
   }
 
+  Future<void> updateItemFields(
+    Item it, {
+    String? name,
+    double? price,
+    String? category,
+  }) async {
+    final col = _ensureCol();
+    final id = await _ensureId(col, it);
+    final data = <String, dynamic>{};
+    if (name != null) data['name'] = name.trim();
+    if (price != null) data['price'] = price;
+    if (category != null) {
+      data['category'] = category.trim().isEmpty
+          ? FieldValue.delete()
+          : category.trim();
+    }
+    if (data.isEmpty) return;
+    await col.doc(id).update(data);
+    if (name != null) it.name = name.trim();
+    if (price != null) it.price = price;
+    if (category != null) {
+      it.category = category.trim().isEmpty ? null : category.trim();
+    }
+    notifyListeners();
+  }
+
   Future<void> updateAssignment(Item it, String? memberUid) async {
     final col = _ensureCol();
     final id = await _ensureId(col, it);

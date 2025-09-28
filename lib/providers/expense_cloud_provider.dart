@@ -60,6 +60,7 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
 
   String? _familyId;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _famSub;
   List<ExpenseDoc> _expenses = [];
   List<ExpenseDoc> get expenses => _expenses;
 
@@ -73,6 +74,32 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
     if (_familyId == fid) return;
     _familyId = fid;
     _bind();
+    _bindFamilySettings();
+  }
+
+  void _bindFamilySettings() {
+    _famSub?.cancel();
+    final fid = _familyId;
+    if (fid == null || fid.isEmpty) {
+      _monthlyBudgets.clear();
+      notifyListeners();
+      return;
+    }
+    final famDoc = _db.collection('families').doc(fid);
+    _famSub = famDoc.snapshots().listen(
+      (snap) {
+        final data = snap.data();
+        final budgets =
+            (data?['settings']?['budgets'] as Map<String, dynamic>?) ?? {};
+        _monthlyBudgets
+          ..clear()
+          ..addAll(budgets.map((k, v) => MapEntry(k, (v as num).toDouble())));
+        notifyListeners();
+      },
+      onError: (e) {
+        debugPrint('[ExpenseCloud] settings stream error: $e');
+      },
+    );
   }
 
   CollectionReference<Map<String, dynamic>>? get _col {
@@ -82,18 +109,31 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
   }
 
   Future<void> setMonthlyBudget(String category, double? amount) async {
+    final fid = _familyId;
+    if (fid == null || fid.isEmpty) {
+      _monthlyBudgets.remove(category);
+      notifyListeners();
+      return;
+    }
+    final famDoc = _db.collection('families').doc(fid);
+
     if (amount == null) {
+      // kaldır
+      await famDoc.set({
+        'settings': {
+          'budgets': {category: FieldValue.delete()},
+        },
+      }, SetOptions(merge: true));
       _monthlyBudgets.remove(category);
     } else {
+      await famDoc.set({
+        'settings': {
+          'budgets': {category: amount},
+        },
+      }, SetOptions(merge: true));
       _monthlyBudgets[category] = amount;
     }
     notifyListeners();
-    // TODO: Firestore’a yaz
-    // await db.collection('families').doc(familyId).set({
-    //   'settings': {
-    //     'budgets': _monthlyBudgets,
-    //   }
-    // }, SetOptions(merge: true));
   }
 
   /// Drill-down için basit filtre:
@@ -157,6 +197,7 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
   @override
   void dispose() {
     _sub?.cancel();
+    _famSub?.cancel();
     super.dispose();
   }
 

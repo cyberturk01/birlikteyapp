@@ -87,48 +87,12 @@ class _FamilyManagerSheet extends StatelessWidget {
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (_, i) {
                     final e = entries[i];
-                    // final isOwner = e.role == 'owner';
-                    // return ListTile(
-                    //   leading: CircleAvatar(
-                    //     child: Text(
-                    //       e.label.isNotEmpty ? e.label[0].toUpperCase() : '?',
-                    //     ),
-                    //   ),
-                    //   title: Text(e.label, overflow: TextOverflow.ellipsis),
-                    //   subtitle: Text(isOwner ? 'Owner' : 'Member'),
-                    //   trailing: Row(
-                    //     mainAxisSize: MainAxisSize.min,
-                    //     children: [
-                    //       IconButton(
-                    //         tooltip: 'Edit label (this family only)',
-                    //         icon: const Icon(Icons.edit),
-                    //         onPressed: () => _showEditLabelDialog(context, e),
-                    //       ),
-                    //       IconButton(
-                    //         tooltip: S.delete,
-                    //         icon: const Icon(
-                    //           Icons.person_remove,
-                    //           color: Colors.red,
-                    //         ),
-                    //         onPressed: isOwner
-                    //             ? null
-                    //             : () async {
-                    //                 try {
-                    //                   await fam.removeMemberFromFamily(e.uid);
-                    //                 } catch (err) {
-                    //                   ScaffoldMessenger.of(
-                    //                     context,
-                    //                   ).showSnackBar(
-                    //                     SnackBar(content: Text(err.toString())),
-                    //                   );
-                    //                 }
-                    //               },
-                    //       ),
-                    //     ],
-                    //   ),
-                    // );
                     return MemberTile(entry: e);
                   },
+                  addAutomaticKeepAlives: false,
+                  addRepaintBoundaries: true,
+                  addSemanticIndexes: false,
+                  cacheExtent: 800,
                 );
               },
             ),

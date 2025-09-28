@@ -143,8 +143,8 @@ class _MemberChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bg = active
-        ? theme.colorScheme.primary.withOpacity(0.12)
-        : theme.colorScheme.surfaceVariant;
+        ? theme.colorScheme.primary.withValues(alpha: 0.12)
+        : theme.colorScheme.surfaceContainerHighest;
     final fg = active
         ? theme.colorScheme.primary
         : theme.colorScheme.onSurfaceVariant;
@@ -163,8 +163,8 @@ class _MemberChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: active
-                  ? theme.colorScheme.primary.withOpacity(0.35)
-                  : theme.dividerColor.withOpacity(0.4),
+                  ? theme.colorScheme.primary.withValues(alpha: 0.35)
+                  : theme.dividerColor.withValues(alpha: 0.4),
             ),
           ),
           alignment: Alignment.center,
@@ -183,76 +183,3 @@ class _MemberChip extends StatelessWidget {
     );
   }
 }
-
-// class MiniMembersBar extends StatelessWidget {
-//   final List<String> names; // Gösterilecek etiketler
-//   final int activeIndex; // Hangi üye aktif
-//   final ValueChanged<int> onPickIndex;
-//
-//   const MiniMembersBar({
-//     super.key,
-//     required this.names,
-//     required this.activeIndex,
-//     required this.onPickIndex,
-//   });
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     if (names.isEmpty) return const SizedBox.shrink();
-//
-//     return SizedBox(
-//       height: 50,
-//       child: ListView.separated(
-//         scrollDirection: Axis.horizontal,
-//         itemCount: names.length,
-//         separatorBuilder: (_, __) => const SizedBox(width: 12),
-//         itemBuilder: (ctx, i) {
-//           final sel = i == activeIndex;
-//           final label = names[i];
-//
-//           return GestureDetector(
-//             onTap: () => onPickIndex(i),
-//             child: AnimatedContainer(
-//               duration: const Duration(milliseconds: 150),
-//               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-//               decoration: BoxDecoration(
-//                 color: sel
-//                     ? Theme.of(context).colorScheme.primaryContainer
-//                     : Theme.of(context).colorScheme.surfaceVariant,
-//                 borderRadius: BorderRadius.circular(12),
-//                 border: Border.all(
-//                   color: sel
-//                       ? Theme.of(context).colorScheme.primary
-//                       : Theme.of(context).dividerColor.withOpacity(.4),
-//                 ),
-//               ),
-//               child: Row(
-//                 mainAxisSize: MainAxisSize.min,
-//                 children: [
-//                   CircleAvatar(
-//                     radius: 14,
-//                     child: Text(
-//                       label.isNotEmpty ? label[0].toUpperCase() : '?',
-//                     ),
-//                   ),
-//                   const SizedBox(width: 8),
-//                   ConstrainedBox(
-//                     constraints: const BoxConstraints(maxWidth: 140),
-//                     child: Text(
-//                       label,
-//                       maxLines: 1,
-//                       overflow: TextOverflow.ellipsis,
-//                       style: TextStyle(
-//                         fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-//                       ),
-//                     ),
-//                   ),
-//                 ],
-//               ),
-//             ),
-//           );
-//         },
-//       ),
-//     );
-//   }
-// }

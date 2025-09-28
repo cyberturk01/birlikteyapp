@@ -1161,55 +1161,6 @@ class _MemberCardState extends State<MemberCard> {
   // }
 }
 
-// ====== assign or create helpers ======
-Task? _pickTaskByName(List<Task> list, String name) {
-  final lower = name.trim().toLowerCase();
-  final unassigned = list.where(
-    (t) =>
-        t.name.toLowerCase() == lower &&
-        (t.assignedToUid == null || t.assignedToUid!.isEmpty) &&
-        !t.completed,
-  );
-  if (unassigned.isNotEmpty) return unassigned.first;
-
-  final anyUnassigned = list.where(
-    (t) =>
-        t.name.toLowerCase() == lower &&
-        (t.assignedToUid == null || t.assignedToUid!.isEmpty),
-  );
-  if (anyUnassigned.isNotEmpty) return anyUnassigned.first;
-
-  try {
-    return list.firstWhere((t) => t.name.toLowerCase() == lower);
-  } catch (_) {
-    return null;
-  }
-}
-
-Item? _pickItemByName(List<Item> list, String name) {
-  final lower = name.trim().toLowerCase();
-  final unassigned = list.where(
-    (i) =>
-        i.name.toLowerCase() == lower &&
-        (i.assignedToUid == null || i.assignedToUid!.isEmpty) &&
-        !i.bought,
-  );
-  if (unassigned.isNotEmpty) return unassigned.first;
-
-  final anyUnassigned = list.where(
-    (i) =>
-        i.name.toLowerCase() == lower &&
-        (i.assignedToUid == null || i.assignedToUid!.isEmpty),
-  );
-  if (anyUnassigned.isNotEmpty) return anyUnassigned.first;
-
-  try {
-    return list.firstWhere((i) => i.name.toLowerCase() == lower);
-  } catch (_) {
-    return null;
-  }
-}
-
 List<String> _splitNames(String raw) {
   // virgül, satır sonu, noktalı virgül ayırıcıları
   final parts = raw

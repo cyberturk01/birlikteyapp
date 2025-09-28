@@ -132,29 +132,6 @@ class _ManagePageState extends State<ManagePage> {
     );
   }
 
-  List<String> _buildSuggestions({
-    required List<String> frequent,
-    required List<String> defaults,
-    required List<String> existing,
-  }) {
-    final set = <String>{};
-    for (final s in frequent) {
-      final t = s.trim();
-      if (t.isNotEmpty) set.add(t);
-    }
-    for (final s in defaults) {
-      final t = s.trim();
-      if (t.isNotEmpty) set.add(t);
-    }
-    for (final s in existing) {
-      final t = s.trim();
-      if (t.isNotEmpty) set.add(t);
-    }
-    final list = set.toList()
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    return list;
-  }
-
   Future<void> _handleAdd(BuildContext context) async {
     final taskProv = context.read<TaskCloudProvider>();
     final itemProv = context.read<ItemCloudProvider>();
@@ -229,6 +206,10 @@ class _TaskListView extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           itemCount: tasks.length,
           separatorBuilder: (_, __) => const Divider(height: 1),
+          addAutomaticKeepAlives: false,
+          addRepaintBoundaries: true,
+          addSemanticIndexes: false,
+          cacheExtent: 800,
           itemBuilder: (_, i) {
             final t = tasks[i];
 
@@ -369,6 +350,10 @@ class _ItemListView extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           itemCount: items.length,
           separatorBuilder: (_, __) => const Divider(height: 1),
+          addAutomaticKeepAlives: false,
+          addRepaintBoundaries: true,
+          addSemanticIndexes: false,
+          cacheExtent: 800,
           itemBuilder: (_, i) {
             final it = items[i];
 
