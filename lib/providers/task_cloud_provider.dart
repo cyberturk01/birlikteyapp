@@ -143,7 +143,8 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     final doc = await col.add({
       'name': t.name,
       'completed': t.completed,
-      'assignedToUid': t.assignedToUid ?? FieldValue.delete(),
+      if ((t.assignedToUid?.trim().isNotEmpty ?? false))
+        'assignedToUid': t.assignedToUid!.trim(),
       if (t.origin != null) 'origin': t.origin,
       if (t.dueAt != null) 'dueAt': Timestamp.fromDate(t.dueAt!),
       if (t.reminderAt != null) 'reminderAt': Timestamp.fromDate(t.reminderAt!),
@@ -269,7 +270,8 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     final doc = await col.add({
       'name': t.name,
       'completed': t.completed,
-      'assignedToUid': t.assignedToUid, // null olabilir
+      if ((t.assignedToUid?.trim().isNotEmpty ?? false))
+        'assignedToUid': t.assignedToUid!.trim(),
       'createdAt': FieldValue.serverTimestamp(),
     });
     t.remoteId = doc.id;

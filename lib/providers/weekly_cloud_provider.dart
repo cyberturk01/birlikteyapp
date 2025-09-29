@@ -238,13 +238,34 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
     if (today.isEmpty) return;
 
     final existing = taskProv.tasks;
+
     for (final w in today) {
       final title = w.title.trim();
       final assg = w.assignedToUid?.trim();
+      final originKey = 'weekly:${w.id}';
 
-      final weeklyOrigin = 'weekly:${w.id}';
-      final hasByOrigin = existing.any((t) => t.origin == weeklyOrigin);
-      if (hasByOrigin) continue;
+      // 1) Önce origin’e göre mevcut task var mı?
+      final idx = existing.indexWhere((t) => t.origin == originKey);
+      if (idx != -1) {
+        final t = existing[idx];
+
+        // Gerekliyse alanları güncelle (name/assigned)
+        bool needsUpdate = false;
+        if (t.name != title) {
+          await taskProv.renameTask(t, title);
+          needsUpdate = true;
+        }
+        if ((t.assignedToUid ?? '') != (assg ?? '')) {
+          await taskProv.updateAssignment(t, assg);
+          needsUpdate = true;
+        }
+        if (needsUpdate) {
+          // provider zaten notify ediyor
+        }
+        continue;
+      }
+
+      // 2) Origin yoksa, eski “duplike ada göre” kontrol korunabilir:
       final dup = existing.any(
         (t) =>
             t.name.toLowerCase() == title.toLowerCase() &&
@@ -253,8 +274,7 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
       );
       if (!dup) {
         await taskProv.addTask(
-          // Capitalize zaten TaskCloudProvider içinde de var; yine de temiz gidelim:
-          Task(title, assignedToUid: assg, origin: weeklyOrigin),
+          Task(title, assignedToUid: assg, origin: originKey),
         );
       }
     }

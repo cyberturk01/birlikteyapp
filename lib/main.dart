@@ -320,7 +320,6 @@ class AuthGate extends StatelessWidget {
               return const LandingPage();
             }
 
-            // aktif aile yok → onboarding (aile kur / katıl)
             return const FamilyOnboardingPage();
           },
         );

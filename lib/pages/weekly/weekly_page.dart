@@ -641,10 +641,16 @@ Future<void> _showEditWeeklyDialog(
                   day: day,
                   assignedToUid: assigned,
                   timeOfDay:
-                      pickedTime ??
-                      const TimeOfDay(hour: -1, minute: -1), // null => clear
+                      pickedTime ?? const TimeOfDay(hour: -1, minute: -1),
                   notifEnabled: notif,
                 );
+                final todayWd = DateTime.now().weekday;
+                final changedDayWd = _weekdayStringToInt(day); // helper aşağıda
+                if (changedDayWd == todayWd) {
+                  final taskProv = ctx.read<TaskCloudProvider>();
+                  await weekly.syncTodayToTasks(taskProv);
+                }
+
                 if (!ctx.mounted) return;
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(ctx).showSnackBar(
@@ -658,4 +664,25 @@ Future<void> _showEditWeeklyDialog(
       },
     ),
   );
+}
+
+int _weekdayStringToInt(String day) {
+  switch (day.toLowerCase()) {
+    case 'monday':
+      return DateTime.monday;
+    case 'tuesday':
+      return DateTime.tuesday;
+    case 'wednesday':
+      return DateTime.wednesday;
+    case 'thursday':
+      return DateTime.thursday;
+    case 'friday':
+      return DateTime.friday;
+    case 'saturday':
+      return DateTime.saturday;
+    case 'sunday':
+      return DateTime.sunday;
+    default:
+      return DateTime.monday;
+  }
 }
