@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/task.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
+import '../services/offline_queue.dart';
+import '../services/retry.dart';
 import '../services/scores_repo.dart';
 import '../services/task_service.dart';
 import '_base_cloud.dart';
@@ -15,6 +18,7 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   AuthService _auth;
   TaskService _service;
   final ScoresRepo _scores; // <- ekle
+  final _uuid = Uuid();
 
   TaskCloudProvider(this._auth, this._service, this._scores) {
     _bindAuth();
@@ -137,10 +141,12 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
 
   Future<void> addTask(Task t) async {
     final col = _ensureCol();
+    final id = t.remoteId ?? _uuid.v4();
+    final path = '${col.path}/$id';
     debugPrint(
       '[TaskCloud] ADD name=${t.name} fam=$_familyId path=${col.path}',
     );
-    final doc = await col.add({
+    final data = {
       'name': t.name,
       'completed': t.completed,
       if ((t.assignedToUid?.trim().isNotEmpty ?? false))
@@ -149,27 +155,32 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
       if (t.dueAt != null) 'dueAt': Timestamp.fromDate(t.dueAt!),
       if (t.reminderAt != null) 'reminderAt': Timestamp.fromDate(t.reminderAt!),
       'createdAt': FieldValue.serverTimestamp(),
-    });
-    debugPrint('[TaskCloud] ADDED id=${doc.id}');
-    t.remoteId = doc.id;
+    };
+
+    debugPrint('[TaskCloud] ADDED id=$id');
+    await _qSet(path: path, data: data, merge: false);
+    t.remoteId = id;
   }
 
   Future<void> removeTask(Task t) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
     await NotificationService.cancel(_notifIdForTask(t));
-    await col.doc(id).delete();
+    await _qDelete(path: '${col.path}/$id');
   }
 
   Future<void> updateDueDate(Task t, DateTime? due) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
-    await col.doc(id).update({
-      if (due == null)
-        'dueAt': FieldValue.delete()
-      else
-        'dueAt': Timestamp.fromDate(due),
-    });
+    await _qUpdate(
+      path: '${col.path}/$id',
+      data: {
+        if (due == null)
+          'dueAt': FieldValue.delete()
+        else
+          'dueAt': Timestamp.fromDate(due),
+      },
+    );
     t.dueAt = due;
     notifyListeners();
   }
@@ -178,12 +189,15 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
 
-    await col.doc(id).update({
-      if (at == null)
-        'reminderAt': FieldValue.delete()
-      else
-        'reminderAt': Timestamp.fromDate(at),
-    });
+    await _qUpdate(
+      path: '${col.path}/$id',
+      data: {
+        if (at == null)
+          'reminderAt': FieldValue.delete()
+        else
+          'reminderAt': Timestamp.fromDate(at),
+      },
+    );
     t.reminderAt = at;
     notifyListeners();
 
@@ -208,7 +222,7 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     }
     final snap = await q.get();
     for (final d in snap.docs) {
-      await d.reference.delete();
+      await _qDelete(path: d.reference.path);
     }
   }
 
@@ -266,16 +280,20 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
       return t.remoteId!;
     }
 
-    // Bulunamadı → yeni doküman oluştur
-    final doc = await col.add({
-      'name': t.name,
-      'completed': t.completed,
-      if ((t.assignedToUid?.trim().isNotEmpty ?? false))
-        'assignedToUid': t.assignedToUid!.trim(),
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    t.remoteId = doc.id;
-    return doc.id;
+    final genId = _uuid.v4();
+    await _qSet(
+      path: '${col.path}/$genId',
+      data: {
+        'name': t.name,
+        'completed': t.completed,
+        if ((t.assignedToUid?.trim().isNotEmpty ?? false))
+          'assignedToUid': t.assignedToUid!.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+      merge: false,
+    );
+    t.remoteId = genId;
+    return genId;
   }
 
   int _notifIdForTask(Task t) {
@@ -287,11 +305,14 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> updateAssignment(Task t, String? memberUid) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
-    await col.doc(id).update({
-      'assignedToUid': (memberUid == null || memberUid.trim().isEmpty)
-          ? FieldValue.delete()
-          : memberUid.trim(),
-    });
+    await _qUpdate(
+      path: '${col.path}/$id',
+      data: {
+        'assignedToUid': (memberUid == null || memberUid.trim().isEmpty)
+            ? FieldValue.delete()
+            : memberUid.trim(),
+      },
+    );
     t.assignedToUid = (memberUid?.trim().isEmpty ?? true)
         ? null
         : memberUid!.trim();
@@ -311,7 +332,7 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
 
-    await col.doc(id).update({'completed': value});
+    await _qUpdate(path: '${col.path}/$id', data: {'completed': value});
 
     if (value == true && t.reminderAt != null) {
       await NotificationService.cancel(_notifIdForTask(t));
@@ -350,7 +371,7 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> renameTask(Task t, String newName) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
-    await col.doc(id).update({'name': newName.trim()});
+    await _qUpdate(path: '${col.path}/$id', data: {'name': newName.trim()});
     // local model’i de güncelle ki UI’da anında görünsün
     t.name = newName.trim();
     notifyListeners();
@@ -361,4 +382,53 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   }
 
   void teardown() => setFamilyId(null);
+
+  Future<void> _qSet({
+    required String path,
+    required Map<String, dynamic> data,
+    bool merge = false,
+  }) async {
+    Future<void> write() async => FirebaseFirestore.instance
+        .doc(path)
+        .set(data, SetOptions(merge: merge));
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(
+          id: _uuid.v4(),
+          path: path,
+          type: OpType.set,
+          data: data,
+          merge: merge,
+        ),
+      );
+    }
+  }
+
+  Future<void> _qUpdate({
+    required String path,
+    required Map<String, dynamic> data,
+  }) async {
+    Future<void> write() async =>
+        FirebaseFirestore.instance.doc(path).update(data);
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(id: _uuid.v4(), path: path, type: OpType.update, data: data),
+      );
+    }
+  }
+
+  Future<void> _qDelete({required String path}) async {
+    Future<void> write() async => FirebaseFirestore.instance.doc(path).delete();
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(id: _uuid.v4(), path: path, type: OpType.delete),
+      );
+    }
+  }
 }

@@ -8,8 +8,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/task.dart';
+import '../services/offline_queue.dart';
+import '../services/retry.dart';
 import '_base_cloud.dart';
 
 class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
@@ -17,6 +20,8 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
 
   String? _familyId;
   StreamSubscription<QuerySnapshot>? _sub;
+
+  final _uuid = const Uuid();
 
   final List<WeeklyTaskCloud> _list = [];
   List<WeeklyTaskCloud> get tasks => List.unmodifiable(_list);
@@ -98,13 +103,19 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
   // ===== mutations =====
   Future<WeeklyTaskCloud> addWeeklyTask(WeeklyTaskCloud task) async {
     if (_familyId == null) throw StateError('No familyId');
-    final col = _db.collection('families/$_familyId/weekly');
-    final ref = await col.add(task.toMapForCreate());
-    final doc = await ref.get();
 
-    final created = WeeklyTaskCloud.fromDoc(doc);
-    await _scheduleFor(created);
-    return created;
+    final colPath = 'families/$_familyId/weekly';
+    final id = task.id.isNotEmpty ? task.id : _uuid.v4();
+    final path = '$colPath/$id';
+
+    await _qSet(path: path, data: task.toMapForCreate(), merge: false);
+
+    task.id = id;
+    _list.add(task);
+    notifyListeners();
+
+    await _scheduleFor(task);
+    return task;
   }
 
   Future<List<WeeklyTaskCloud>> addWeeklyBulk(
@@ -129,7 +140,7 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> removeWeeklyTaskById(String id) async {
     if (_familyId == null) return;
     await _cancelForId(id);
-    await _db.doc('families/$_familyId/weekly/$id').delete();
+    await _qDelete(path: 'families/$_familyId/weekly/$id');
   }
 
   Future<void> removeWeeklyTask(WeeklyTaskCloud task) =>
@@ -203,10 +214,10 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
         }
       }
     }
-
-    await _db
-        .doc('families/$_familyId/weekly/${task.id}')
-        .update(task.toMapForUpdate());
+    await _qUpdate(
+      path: 'families/$_familyId/weekly/${task.id}',
+      data: task.toMapForUpdate(),
+    );
 
     if (forceCancel) {
       await _cancelForId(task.id);
@@ -376,4 +387,53 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
 
   // istersen açık bir teardown metodu
   void teardown() => setFamilyId(null);
+
+  Future<void> _qSet({
+    required String path,
+    required Map<String, dynamic> data,
+    bool merge = false,
+  }) async {
+    Future<void> write() async => FirebaseFirestore.instance
+        .doc(path)
+        .set(data, SetOptions(merge: merge));
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(
+          id: _uuid.v4(),
+          path: path,
+          type: OpType.set,
+          data: data,
+          merge: merge,
+        ),
+      );
+    }
+  }
+
+  Future<void> _qUpdate({
+    required String path,
+    required Map<String, dynamic> data,
+  }) async {
+    Future<void> write() async =>
+        FirebaseFirestore.instance.doc(path).update(data);
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(id: _uuid.v4(), path: path, type: OpType.update, data: data),
+      );
+    }
+  }
+
+  Future<void> _qDelete({required String path}) async {
+    Future<void> write() async => FirebaseFirestore.instance.doc(path).delete();
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(id: _uuid.v4(), path: path, type: OpType.delete),
+      );
+    }
+  }
 }

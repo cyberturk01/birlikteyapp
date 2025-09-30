@@ -16,6 +16,7 @@ import 'package:birlikteyapp/providers/ui_provider.dart';
 import 'package:birlikteyapp/providers/weekly_cloud_provider.dart';
 import 'package:birlikteyapp/services/auth_service.dart';
 import 'package:birlikteyapp/services/notification_service.dart';
+import 'package:birlikteyapp/services/offline_queue.dart';
 import 'package:birlikteyapp/services/scores_repo.dart';
 import 'package:birlikteyapp/services/task_service.dart';
 import 'package:birlikteyapp/theme/app_theme.dart';
@@ -244,8 +245,9 @@ class _RootState extends State<_Root> {
       Hive.openBox<WeeklyTask>('weeklyBox'),
       Hive.openBox<int>('weeklyNotifBox'),
       Hive.openBox<String>('recentExpenseCats'),
+      Hive.openBox('oplog'),
     ]);
-
+    await OfflineQueue.I.init();
     // İlk seed (sadece boşsa)
     final taskBox = Hive.box<Task>('taskBox');
     if (taskBox.isEmpty) {

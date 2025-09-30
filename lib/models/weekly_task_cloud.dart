@@ -2,7 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class WeeklyTaskCloud {
-  final String id; // Firestore doc id
+  late final String id; // Firestore doc id
   String day;
   String title;
   String? assignedToUid;

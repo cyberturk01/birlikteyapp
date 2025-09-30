@@ -3,9 +3,12 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/item.dart';
 import '../services/auth_service.dart';
+import '../services/offline_queue.dart';
+import '../services/retry.dart';
 import '../services/task_service.dart';
 import '_base_cloud.dart'; // Eğer gerekmiyorsa kaldırabilirsiniz
 
@@ -13,6 +16,7 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
   AuthService _auth;
   TaskService _service; // opsiyonel; simetri için duruyor
 
+  final _uuid = const Uuid();
   User? _currentUser;
   String? _familyId;
   CollectionReference<Map<String, dynamic>>? _col;
@@ -124,30 +128,39 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
   // addItem çağrısında (eğer ileriye dönük set etmek istersen parametre ekleyebilirsin)
   Future<void> addItem(Item it) async {
     final col = _ensureCol();
+    final id = it.remoteId ?? _uuid.v4();
+    final path = '${col.path}/$id';
     debugPrint(
       '[ItemCloud] ADD name=${it.name} fam=$_familyId path=${col.path}',
     );
-    final doc = await col.add({
+    final data = {
       'name': it.name,
       'bought': it.bought,
-      'assignedToUid': it.assignedToUid ?? FieldValue.delete(),
+      if ((it.assignedToUid ?? '').trim().isEmpty)
+        'assignedToUid': FieldValue.delete()
+      else
+        'assignedToUid': it.assignedToUid!.trim(),
       if ((it.category ?? '').trim().isNotEmpty)
         'category': it.category!.trim(),
       if (it.price != null) 'price': it.price,
       'createdAt': FieldValue.serverTimestamp(),
-    });
-    debugPrint('[ItemCloud] ADDED id=${doc.id}');
-    it.remoteId = doc.id;
+    };
+    debugPrint('[ItemCloud] ADDED id=${id}');
+    await _qSet(path: path, data: data, merge: false);
+    it.remoteId = id;
   }
 
   Future<void> updateCategory(Item it, String? category) async {
     final col = _ensureCol();
     final id = await _ensureId(col, it);
-    await col.doc(id).update({
-      'category': (category?.trim().isEmpty ?? true)
-          ? FieldValue.delete()
-          : category!.trim(),
-    });
+    await _qUpdate(
+      path: '${col.path}/$id',
+      data: {
+        'category': (category?.trim().isEmpty ?? true)
+            ? FieldValue.delete()
+            : category!.trim(),
+      },
+    );
     it.category = (category?.trim().isEmpty ?? true) ? null : category!.trim();
     notifyListeners();
   }
@@ -155,9 +168,12 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> updatePrice(Item it, double? price) async {
     final col = _ensureCol();
     final id = await _ensureId(col, it);
-    await col.doc(id).update({
-      if (price == null) 'price': FieldValue.delete() else 'price': price,
-    });
+    await _qUpdate(
+      path: '${col.path}/$id',
+      data: {
+        if (price == null) 'price': FieldValue.delete() else 'price': price,
+      },
+    );
     it.price = price;
     notifyListeners();
   }
@@ -176,7 +192,7 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> toggleItem(Item it, bool bought) async {
     final col = _ensureCol();
     final id = await _ensureId(col, it);
-    await col.doc(id).update({'bought': bought});
+    await _qUpdate(path: '${col.path}/$id', data: {'bought': bought});
   }
 
   Future<void> updateItemFields(
@@ -196,7 +212,7 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
           : category.trim();
     }
     if (data.isEmpty) return;
-    await col.doc(id).update(data);
+    await _qUpdate(path: '${col.path}/$id', data: data);
     if (name != null) it.name = name.trim();
     if (price != null) it.price = price;
     if (category != null) {
@@ -208,11 +224,14 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> updateAssignment(Item it, String? memberUid) async {
     final col = _ensureCol();
     final id = await _ensureId(col, it);
-    await col.doc(id).update({
-      'assignedToUid': (memberUid == null || memberUid.trim().isEmpty)
-          ? FieldValue.delete()
-          : memberUid.trim(),
-    });
+    await _qUpdate(
+      path: '${col.path}/$id',
+      data: {
+        'assignedToUid': (memberUid == null || memberUid.trim().isEmpty)
+            ? FieldValue.delete()
+            : memberUid.trim(),
+      },
+    );
     it.assignedToUid = (memberUid?.trim().isEmpty ?? true)
         ? null
         : memberUid!.trim();
@@ -222,7 +241,7 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> renameItem(Item it, String newName) async {
     final col = _ensureCol();
     final id = await _ensureId(col, it);
-    await col.doc(id).update({'name': newName.trim()});
+    await _qUpdate(path: '${col.path}/$id', data: {'name': newName.trim()});
     it.name = newName.trim();
     notifyListeners();
   }
@@ -230,7 +249,7 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> removeItem(Item it) async {
     final col = _ensureCol();
     final id = await _ensureId(col, it);
-    await col.doc(id).delete();
+    await _qDelete(path: '${col.path}/$id');
   }
 
   Future<void> clearBought({String? forMember}) async {
@@ -239,7 +258,7 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
     if (forMember != null) q = q.where('assignedToUid', isEqualTo: forMember);
     final snap = await q.get();
     for (final d in snap.docs) {
-      await d.reference.delete();
+      await _qDelete(path: d.reference.path);
     }
   }
 
@@ -304,4 +323,53 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
   }
 
   void teardown() => setFamilyId(null);
+
+  Future<void> _qSet({
+    required String path,
+    required Map<String, dynamic> data,
+    bool merge = false,
+  }) async {
+    Future<void> write() async => FirebaseFirestore.instance
+        .doc(path)
+        .set(data, SetOptions(merge: merge));
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(
+          id: _uuid.v4(),
+          path: path,
+          type: OpType.set,
+          data: data,
+          merge: merge,
+        ),
+      );
+    }
+  }
+
+  Future<void> _qUpdate({
+    required String path,
+    required Map<String, dynamic> data,
+  }) async {
+    Future<void> write() async =>
+        FirebaseFirestore.instance.doc(path).update(data);
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(id: _uuid.v4(), path: path, type: OpType.update, data: data),
+      );
+    }
+  }
+
+  Future<void> _qDelete({required String path}) async {
+    Future<void> write() async => FirebaseFirestore.instance.doc(path).delete();
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(id: _uuid.v4(), path: path, type: OpType.delete),
+      );
+    }
+  }
 }

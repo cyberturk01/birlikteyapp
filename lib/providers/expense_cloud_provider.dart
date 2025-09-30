@@ -5,7 +5,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
+import '../services/offline_queue.dart';
+import '../services/retry.dart';
 import '../utils/recent_categories.dart';
 import '_base_cloud.dart';
 
@@ -53,7 +56,8 @@ class ExpenseDoc {
 class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
-  final Map<String, double> _monthlyBudgets = {}; // kategori -> bütçe
+  final Map<String, double> _monthlyBudgets = {};
+  final _uuid = const Uuid();
 
   double? getMonthlyBudgetFor(String category) => _monthlyBudgets[category];
   ExpenseCloudProvider(this._auth, this._db);
@@ -116,22 +120,69 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
       return;
     }
 
-    final famDoc = _db.collection('families').doc(fid);
+    final docPath = _db.collection('families').doc(fid).path;
 
     if (amount == null) {
-      final path = FieldPath(['settings', 'budgets', category]);
-      await famDoc.update({path: FieldValue.delete()});
+      // string path kullan
+      final field = 'settings.budgets.$category';
+      await _qUpdateDoc(docPath: docPath, data: {field: FieldValue.delete()});
       _monthlyBudgets.remove(category);
     } else {
-      // --- YAZMA ---
-      await famDoc.set({
-        'settings': {
-          'budgets': {category: amount},
+      await _qSetDoc(
+        docPath: docPath,
+        data: {
+          'settings': {
+            'budgets': {category: amount},
+          },
         },
-      }, SetOptions(merge: true));
+        merge: true,
+      );
       _monthlyBudgets[category] = amount;
     }
     notifyListeners();
+  }
+
+  Future<void> _qSetDoc({
+    required String docPath,
+    required Map<String, dynamic> data,
+    bool merge = false,
+  }) async {
+    Future<void> write() async => FirebaseFirestore.instance
+        .doc(docPath)
+        .set(data, SetOptions(merge: merge));
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(
+          id: _uuid.v4(),
+          path: docPath,
+          type: OpType.set,
+          data: data,
+          merge: merge,
+        ),
+      );
+    }
+  }
+
+  Future<void> _qUpdateDoc({
+    required String docPath,
+    required Map<String, dynamic> data,
+  }) async {
+    Future<void> write() async =>
+        FirebaseFirestore.instance.doc(docPath).update(data);
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(
+          id: _uuid.v4(),
+          path: docPath,
+          type: OpType.update,
+          data: data,
+        ),
+      );
+    }
   }
 
   /// Drill-down için basit filtre:
@@ -210,31 +261,39 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
     if (c == null) {
       throw StateError('[ExpenseCloud] No active familyId set');
     }
+    final id = _uuid.v4();
+    final path = '${c.path}/$id';
     if ((category ?? '').trim().isNotEmpty) {
       RecentExpenseCats.push(category!.trim());
     }
-    await c.add({
+    final data = {
       'title': title.trim(),
       'amount': amount,
       'date': Timestamp.fromDate(date),
       'assignedToUid': assignedToUid,
       'category': (category?.trim().isEmpty ?? true) ? null : category!.trim(),
       'createdAt': FieldValue.serverTimestamp(),
-    });
+    };
+    await _qSet(path: path, data: data, merge: false);
   }
 
   Future<void> remove(String id) async {
     final c = _col;
     if (c == null) throw StateError('[ExpenseCloud] No active familyId set');
-    await c.doc(id).delete();
+    await _qDelete(path: '${_col!.path}/$id');
   }
 
   Future<void> updateCategory(String id, String? category) async {
     final c = _col;
     if (c == null) throw StateError('[ExpenseCloud] No active familyId set');
-    await c.doc(id).update({
-      'category': (category?.trim().isEmpty ?? true) ? null : category!.trim(),
-    });
+    await _qUpdate(
+      path: '${_col!.path}/$id',
+      data: {
+        'category': (category?.trim().isEmpty ?? true)
+            ? null
+            : category!.trim(),
+      },
+    );
   }
 
   // yardımcılar (UI filtreleri)
@@ -343,4 +402,53 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
   }
 
   void teardown() => setFamilyId(null);
+
+  Future<void> _qSet({
+    required String path,
+    required Map<String, dynamic> data,
+    bool merge = false,
+  }) async {
+    Future<void> write() async => FirebaseFirestore.instance
+        .doc(path)
+        .set(data, SetOptions(merge: merge));
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(
+          id: _uuid.v4(),
+          path: path,
+          type: OpType.set,
+          data: data,
+          merge: merge,
+        ),
+      );
+    }
+  }
+
+  Future<void> _qUpdate({
+    required String path,
+    required Map<String, dynamic> data,
+  }) async {
+    Future<void> write() async =>
+        FirebaseFirestore.instance.doc(path).update(data);
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(id: _uuid.v4(), path: path, type: OpType.update, data: data),
+      );
+    }
+  }
+
+  Future<void> _qDelete({required String path}) async {
+    Future<void> write() async => FirebaseFirestore.instance.doc(path).delete();
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(id: _uuid.v4(), path: path, type: OpType.delete),
+      );
+    }
+  }
 }
