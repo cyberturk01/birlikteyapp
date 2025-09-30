@@ -11,6 +11,7 @@ import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/weekly_cloud_provider.dart';
+import '../../widgets/due_pill.dart';
 import '../../widgets/member_dropdown_uid.dart';
 import '../../widgets/task_edit_dialog.dart';
 import 'grouped_sheet.dart';
@@ -726,7 +727,13 @@ class _TaskRowCompact extends StatelessWidget {
                   : null,
             ),
           ),
-          if (duePill != null) ...[const SizedBox(width: 8), duePill],
+          if ((task as dynamic).dueAt != null) ...[
+            const SizedBox(width: 8),
+            DuePill(
+              dueAt: (task as dynamic).dueAt as DateTime?,
+              reminderAt: (task as dynamic).reminderAt as DateTime?,
+            ),
+          ],
         ],
       ),
 
