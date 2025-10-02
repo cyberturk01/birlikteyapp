@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../providers/family_provider.dart';
 import '../../widgets/family_name_suggest_field.dart';
 
@@ -109,14 +110,19 @@ class _FamilyOnboardingPageState extends State<FamilyOnboardingPage>
   }
 
   Future<void> _create() async {
+    final t = AppLocalizations.of(context)!;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final name = _nameCtrl.text.trim();
-      if (name.isEmpty) throw 'Aile adı boş olamaz';
-      if (!_available) throw 'Bu isim şu an kullanılamıyor';
+      if (name.isEmpty) {
+        throw t.errorFamilyNameEmpty;
+      }
+      if (!_available) {
+        throw t.errorNameUnavailable;
+      }
 
       final fam = context.read<FamilyProvider>();
       await fam.createFamily(name);
@@ -138,16 +144,21 @@ class _FamilyOnboardingPageState extends State<FamilyOnboardingPage>
   }
 
   Future<void> _join() async {
+    final t = AppLocalizations.of(context)!;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final code = _codeCtrl.text.trim().toUpperCase();
-      if (code.isEmpty) throw 'Davet kodu boş olamaz';
+      if (code.isEmpty) {
+        throw t.errorInviteEmpty;
+      }
 
       final ok = await context.read<FamilyProvider>().joinWithCode(code);
-      if (!ok) throw 'Geçersiz davet kodu';
+      if (!ok) {
+        throw t.errorInviteInvalid;
+      }
       // AuthGate akışı devam ettirecek
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -161,17 +172,17 @@ class _FamilyOnboardingPageState extends State<FamilyOnboardingPage>
     final theme = Theme.of(context);
     final canCreate =
         _nameCtrl.text.trim().isNotEmpty && _available && !_loading;
-
+    final t = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Set up your family'),
         bottom: TabBar(
           controller: _tab,
-          tabs: const [
-            Tab(text: 'Create family'),
-            Tab(text: 'Join with code'),
+          tabs: [
+            Tab(text: t.createFamilyTab),
+            Tab(text: t.joinWithCodeTab),
           ],
         ),
+        title: Text(t.setupFamily),
       ),
       body: AbsorbPointer(
         absorbing: _loading,
@@ -200,7 +211,7 @@ class _FamilyOnboardingPageState extends State<FamilyOnboardingPage>
                                   const Icon(Icons.family_restroom, size: 28),
                                   const SizedBox(width: 8),
                                   Text(
-                                    'Choose a family name',
+                                    t.chooseFamilyName,
                                     style: theme.textTheme.titleLarge,
                                   ),
                                 ],
@@ -213,8 +224,8 @@ class _FamilyOnboardingPageState extends State<FamilyOnboardingPage>
                                   _onNameChanged();
                                 },
                                 decoration: InputDecoration(
-                                  labelText: 'Family name',
-                                  hintText: 'e.g., Yigit Family',
+                                  labelText: t.familyNameLabel,
+                                  hintText: t.familyNameHint,
                                   prefixIcon: const Icon(Icons.edit),
                                   suffixIcon: _checking
                                       ? const Padding(
@@ -252,7 +263,7 @@ class _FamilyOnboardingPageState extends State<FamilyOnboardingPage>
                                       ? const SizedBox.shrink()
                                       : _available
                                       ? Text(
-                                          'Great! This name is available.',
+                                          t.nameCheckingOk,
                                           key: const ValueKey('ok'),
                                           style: TextStyle(
                                             color: Colors.green[700],
@@ -264,7 +275,7 @@ class _FamilyOnboardingPageState extends State<FamilyOnboardingPage>
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'This name is taken. Try one of these:',
+                                              t.nameCheckingTaken,
                                               style: TextStyle(
                                                 color: theme.colorScheme.error,
                                               ),
@@ -307,7 +318,7 @@ class _FamilyOnboardingPageState extends State<FamilyOnboardingPage>
                                             strokeWidth: 2,
                                           ),
                                         )
-                                      : const Text('Create family'),
+                                      : Text(t.createFamilyCta),
                                 ),
                               ),
                             ],
@@ -338,7 +349,7 @@ class _FamilyOnboardingPageState extends State<FamilyOnboardingPage>
                                   const Icon(Icons.group_add, size: 28),
                                   const SizedBox(width: 8),
                                   Text(
-                                    'Join an existing family',
+                                    t.joinExistingFamily,
                                     style: theme.textTheme.titleLarge,
                                   ),
                                 ],
@@ -353,11 +364,11 @@ class _FamilyOnboardingPageState extends State<FamilyOnboardingPage>
                                   UpperCaseTextFormatter(),
                                 ],
                                 decoration: InputDecoration(
-                                  labelText: 'Invite code',
-                                  hintText: 'e.g., ABCD23',
+                                  labelText: t.inviteCode,
+                                  hintText: t.inviteCodeHint,
                                   prefixIcon: const Icon(Icons.key),
                                   suffixIcon: IconButton(
-                                    tooltip: 'Paste',
+                                    tooltip: t.paste,
                                     icon: const Icon(Icons.paste),
                                     onPressed: () async {
                                       final clip = await Clipboard.getData(
@@ -391,7 +402,7 @@ class _FamilyOnboardingPageState extends State<FamilyOnboardingPage>
                                             strokeWidth: 2,
                                           ),
                                         )
-                                      : const Text('Join family'),
+                                      : Text(t.joinFamilyCta),
                                 ),
                               ),
                             ],
@@ -445,8 +456,9 @@ class _InviteDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     return AlertDialog(
-      title: const Text('Invite your family'),
+      title: Text(t.inviteYourFamily),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -461,13 +473,13 @@ class _InviteDialog extends StatelessWidget {
           // QR (opsiyonel)
           QrImageView(data: code, size: 160),
           const SizedBox(height: 12),
-          const Text('Share this code with your family to join your home.'),
+          Text(t.inviteShareHelp),
         ],
       ),
       actions: [
         TextButton.icon(
           icon: const Icon(Icons.copy),
-          label: const Text('Copy'),
+          label: Text(t.copy),
           onPressed: () async {
             await Clipboard.setData(ClipboardData(text: code));
             if (context.mounted) Navigator.pop(context);
@@ -475,15 +487,15 @@ class _InviteDialog extends StatelessWidget {
         ),
         TextButton.icon(
           icon: const Icon(Icons.share),
-          label: const Text('Share'),
+          label: Text(t.share),
           onPressed: () async {
-            await Share.share('Join our family on Togetherly: $code');
+            await Share.share(t.inviteShareText(code));
             if (context.mounted) Navigator.pop(context);
           },
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Done'),
+          child: Text(t.done),
         ),
       ],
     );

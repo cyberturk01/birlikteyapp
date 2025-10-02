@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:birlikteyapp/models/weekly_task_cloud.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../models/item.dart';
 import '../../models/task.dart';
 import '../../providers/expense_cloud_provider.dart';
@@ -50,7 +52,7 @@ class DashboardSummaryBar extends StatelessWidget {
     final items = context.watch<ItemCloudProvider>().items;
 
     // BUGÜN'e ait weekly sayısı
-    final String todayName = _weekdayName(DateTime.now());
+    final String todayName = DateFormat('EEEE').format(DateTime.now());
     final weeklyProv = Provider.of<WeeklyCloudProvider?>(context, listen: true);
     final List<WeeklyTaskCloud> todaysWeekly =
         weeklyProv?.tasksForDay(todayName) ?? const [];
@@ -71,15 +73,16 @@ class DashboardSummaryBar extends StatelessWidget {
       '[Summary] expenses(all)=${expensesWatch.length}, today=$todayExpenses',
     );
 
+    final t = AppLocalizations.of(context)!;
     return LayoutBuilder(
       builder: (context, c) {
         final isWide = c.maxWidth >= 720;
         final cards = <Widget>[
           _SummaryCard(
             icon: Icons.task_alt,
-            title: 'Tasks',
+            title: t.tasks,
             value: '$pendingTasks',
-            subtitle: 'Pending today',
+            subtitle: t.pendingToday,
             onTap: () {
               onTap(SummaryDest.tasks);
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -89,9 +92,9 @@ class DashboardSummaryBar extends StatelessWidget {
           ),
           _SummaryCard(
             icon: Icons.shopping_cart,
-            title: 'Market',
+            title: t.market,
             value: '$toBuyItems',
-            subtitle: 'To buy',
+            subtitle: t.toBuy,
             onTap: () {
               onTap(SummaryDest.items);
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -102,14 +105,14 @@ class DashboardSummaryBar extends StatelessWidget {
           // Expenses kutusu (opsiyonel). Provider yoksa sayacı 0 gösterelim.
           _SummaryCard(
             icon: Icons.payments,
-            title: 'Expenses',
+            title: t.expenses,
             value: '$todayExpenses',
-            subtitle: 'Total records',
+            subtitle: t.totalRecords,
             onTap: () => onTap(SummaryDest.expenses),
           ),
           _SummaryCard(
             icon: Icons.calendar_today,
-            title: 'Weekly',
+            title: t.weekly,
             value: '${todaysWeekly.length}',
             subtitle: todayName,
             onTap: () => onTap(SummaryDest.weekly),
@@ -144,11 +147,12 @@ class DashboardSummaryBar extends StatelessWidget {
 }
 
 Future<void> showPendingTasksSheet(BuildContext context) async {
+  final t = AppLocalizations.of(context)!;
   await showGroupedByMemberSheet<Task>(
     context: context,
-    titleAll: 'Pending tasks',
-    titleMine: 'My tasks',
-    titleUnassigned: 'Unassigned',
+    titleAll: t.pendingTasks,
+    titleMine: t.myTasks,
+    titleUnassigned: t.unassigned,
     sourceSelector: (ctx) =>
         ctx.watch<TaskCloudProvider>().tasks.where((t) => !t.completed),
     getName: (t) => t.name,
@@ -162,11 +166,12 @@ Future<void> showPendingTasksSheet(BuildContext context) async {
 }
 
 Future<void> showToBuyItemsSheet(BuildContext context) async {
+  final t = AppLocalizations.of(context)!;
   await showGroupedByMemberSheet<Item>(
     context: context,
-    titleAll: 'To buy',
-    titleMine: 'My list',
-    titleUnassigned: 'Unassigned',
+    titleAll: t.toBuy,
+    titleMine: t.myTasks,
+    titleUnassigned: t.unassigned,
     sourceSelector: (ctx) =>
         ctx.watch<ItemCloudProvider>().items.where((i) => !i.bought),
     getName: (it) => it.name,
@@ -180,17 +185,18 @@ Future<void> showToBuyItemsSheet(BuildContext context) async {
 }
 
 void _showRenameTaskDialog(BuildContext context, Task task) {
+  final t = AppLocalizations.of(context)!;
   final ctrl = TextEditingController(text: task.name);
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text('Edit task'),
+      title: Text(t.editTask),
       content: TextField(
         controller: ctrl,
         autofocus: true,
-        decoration: const InputDecoration(
-          border: OutlineInputBorder(),
-          hintText: 'Task name',
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
+          hintText: t.taskName,
           isDense: true,
         ),
         onSubmitted: (_) {
@@ -201,7 +207,7 @@ void _showRenameTaskDialog(BuildContext context, Task task) {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(t.cancel),
         ),
         FilledButton(
           onPressed: () {
@@ -211,7 +217,7 @@ void _showRenameTaskDialog(BuildContext context, Task task) {
             );
             Navigator.pop(context);
           },
-          child: const Text('Save'),
+          child: Text(t.save),
         ),
       ],
     ),
@@ -219,17 +225,18 @@ void _showRenameTaskDialog(BuildContext context, Task task) {
 }
 
 void _showRenameItemDialog(BuildContext context, Item item) {
+  final t = AppLocalizations.of(context)!;
   final ctrl = TextEditingController(text: item.name);
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text('Edit item'),
+      title: Text(t.editItem),
       content: TextField(
         controller: ctrl,
         autofocus: true,
-        decoration: const InputDecoration(
-          border: OutlineInputBorder(),
-          hintText: 'Item name',
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
+          hintText: t.itemName,
           isDense: true,
         ),
         onSubmitted: (_) {
@@ -240,7 +247,7 @@ void _showRenameItemDialog(BuildContext context, Item item) {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(t.cancel),
         ),
         FilledButton(
           onPressed: () {
@@ -250,7 +257,7 @@ void _showRenameItemDialog(BuildContext context, Item item) {
             );
             Navigator.pop(context);
           },
-          child: const Text('Save'),
+          child: Text(t.save),
         ),
       ],
     ),
@@ -258,6 +265,7 @@ void _showRenameItemDialog(BuildContext context, Item item) {
 }
 
 void _showAssignTaskSheet(BuildContext context, Task task) {
+  final t = AppLocalizations.of(context)!;
   String? selectedUid = task.assignedToUid;
 
   final taskCloud = context.read<TaskCloudProvider>();
@@ -269,16 +277,16 @@ void _showAssignTaskSheet(BuildContext context, Task task) {
         builder: (ctx, setLocal) => Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Assign task',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            Text(
+              t.assignTask,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             MemberDropdownUid(
               value: selectedUid,
               onChanged: (v) => setLocal(() => selectedUid = v),
-              label: 'Assign to',
-              nullLabel: 'No one',
+              label: t.assignTo,
+              nullLabel: t.noOne,
             ),
             const SizedBox(height: 12),
             SizedBox(
@@ -294,7 +302,7 @@ void _showAssignTaskSheet(BuildContext context, Task task) {
                   taskCloud.refreshNow();
                   if (context.mounted) Navigator.pop(context);
                 },
-                child: const Text('Save'),
+                child: Text(t.save),
               ),
             ),
           ],
@@ -305,6 +313,7 @@ void _showAssignTaskSheet(BuildContext context, Task task) {
 }
 
 void _showAssignItemSheet(BuildContext context, Item item) {
+  final t = AppLocalizations.of(context)!;
   String? selectedUid = item.assignedToUid;
   showModalBottomSheet(
     context: context,
@@ -313,9 +322,9 @@ void _showAssignItemSheet(BuildContext context, Item item) {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'Assign item',
-            style: TextStyle(fontWeight: FontWeight.bold),
+          Text(
+            t.assignItem,
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
 
@@ -328,11 +337,10 @@ void _showAssignItemSheet(BuildContext context, Item item) {
                 builder: (ctx, snap) {
                   final dict = snap.data ?? const <String, String>{};
 
-                  // Dropdown item'ları: value = uid, görünen = label
                   final items = <DropdownMenuItem<String?>>[
-                    const DropdownMenuItem<String?>(
+                    DropdownMenuItem<String?>(
                       value: null,
-                      child: Text('No one'),
+                      child: Text(t.noOne),
                     ),
                     ...dict.entries.map(
                       (e) => DropdownMenuItem<String?>(
@@ -352,10 +360,10 @@ void _showAssignItemSheet(BuildContext context, Item item) {
                     isExpanded: true,
                     items: items,
                     onChanged: (v) => setLocal(() => selectedUid = v),
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
                       isDense: true,
-                      labelText: 'Assign to',
+                      labelText: t.assignTo,
                     ),
                   );
                 },
@@ -376,7 +384,7 @@ void _showAssignItemSheet(BuildContext context, Item item) {
                 );
                 Navigator.pop(context);
               },
-              child: const Text('Save'),
+              child: Text(t.save),
             ),
           ),
         ],
@@ -386,10 +394,11 @@ void _showAssignItemSheet(BuildContext context, Item item) {
 }
 
 Future<void> showPendingTasksDialog(BuildContext context) async {
+  final t = AppLocalizations.of(context)!;
   final taskProv = context.read<TaskCloudProvider>();
   final famDictStream = context.read<FamilyProvider>().watchMemberDirectory();
 
-  showModalBottomSheet(
+  await showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -404,7 +413,6 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
 
       return StatefulBuilder(
         builder: (ctx, setLocal) {
-          // veriyi hazırla
           final all = taskProv.tasks.toList();
           all.sort(
             (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
@@ -452,10 +460,10 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
                   children: [
                     const Icon(Icons.task_alt, size: 20),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Pending tasks',
-                        style: TextStyle(
+                        t.pendingTasks,
+                        style: const TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 18,
                         ),
@@ -472,29 +480,28 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
                 // Arama
                 TextField(
                   controller: searchC,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search),
-                    hintText: 'Search tasks…',
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search),
+                    hintText: t.searchTasks,
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                   onChanged: (_) => setLocal(() {}),
                 ),
                 const SizedBox(height: 10),
 
-                // Filtre bar: Üye filtresi + Pending/All toggle
                 StreamBuilder<Map<String, String>>(
                   stream: famDictStream, // {uid: label}
                   builder: (_, snap) {
                     final dict = snap.data ?? const <String, String>{};
                     final chips = <Widget>[
                       FilterChip(
-                        label: const Text('All'),
+                        label: Text(t.allLabel),
                         selected: memberFilter == null,
                         onSelected: (_) => setLocal(() => memberFilter = null),
                       ),
                       FilterChip(
-                        label: const Text('Unassigned'),
+                        label: Text(t.unassigned),
                         selected: memberFilter == '',
                         onSelected: (_) => setLocal(() => memberFilter = ''),
                       ),
@@ -513,7 +520,7 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
                         Padding(
                           padding: const EdgeInsets.only(bottom: 4),
                           child: Text(
-                            'Filter by assignee',
+                            t.filterByAssignee,
                             style: Theme.of(context).textTheme.labelMedium,
                           ),
                         ),
@@ -538,16 +545,16 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
                         // alt satır: pending / all toggle
                         Center(
                           child: SegmentedButton<bool>(
-                            segments: const [
+                            segments: [
                               ButtonSegment(
                                 value: false,
-                                icon: Icon(Icons.timelapse),
-                                label: Text('Pending'),
+                                icon: const Icon(Icons.timelapse),
+                                label: Text(t.pendingLabel),
                               ),
                               ButtonSegment(
                                 value: true,
-                                icon: Icon(Icons.all_inclusive),
-                                label: Text('All'),
+                                icon: const Icon(Icons.all_inclusive),
+                                label: Text(t.allLabel),
                               ),
                             ],
                             selected: {showCompleted},
@@ -566,7 +573,7 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
                 // Liste
                 Expanded(
                   child: list.isEmpty
-                      ? const Center(child: Text('No tasks'))
+                      ? Center(child: Text(t.noTasks))
                       : ListView.separated(
                           itemCount: list.length,
                           separatorBuilder: (_, __) => const Divider(height: 1),
@@ -595,7 +602,7 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
                   children: [
                     OutlinedButton.icon(
                       icon: const Icon(Icons.delete_sweep),
-                      label: const Text('Clear completed'),
+                      label: Text(t.clearCompleted),
                       onPressed: () async {
                         await context.read<TaskCloudProvider>().clearCompleted(
                           forMember:
@@ -605,9 +612,7 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
                         );
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Completed tasks cleared'),
-                            ),
+                            SnackBar(content: Text(t.completedTasksCleared)),
                           );
                         }
                       },
@@ -615,7 +620,7 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
                     const Spacer(),
                     FilledButton.icon(
                       icon: const Icon(Icons.done_all),
-                      label: const Text('Mark all done'),
+                      label: Text(t.markAllDone),
                       onPressed: list.isEmpty
                           ? null
                           : () async {
@@ -656,7 +661,7 @@ class _TaskRowCompact extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDone = task.completed;
     final DateTime? dueAt = (task as dynamic).dueAt as DateTime?;
-
+    final t = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
 
     Widget? duePill;
@@ -756,27 +761,33 @@ class _TaskRowCompact extends StatelessWidget {
               break;
           }
         },
-        itemBuilder: (_) => const [
+        itemBuilder: (_) => [
           PopupMenuItem(
             value: 'edit',
             child: ListTile(
-              leading: Icon(Icons.tune),
-              title: Text('Edit (due/reminder)'),
+              leading: const Icon(Icons.tune),
+              title: Text(t.editDueReminder),
             ),
           ),
           PopupMenuItem(
             value: 'rename',
-            child: ListTile(leading: Icon(Icons.edit), title: Text('Rename')),
+            child: ListTile(
+              leading: const Icon(Icons.edit),
+              title: Text(t.rename),
+            ),
           ),
           PopupMenuItem(
             value: 'assign',
-            child: ListTile(leading: Icon(Icons.person), title: Text('Assign')),
+            child: ListTile(
+              leading: const Icon(Icons.person),
+              title: Text(t.assign),
+            ),
           ),
           PopupMenuItem(
             value: 'delete',
             child: ListTile(
-              leading: Icon(Icons.delete, color: Colors.red),
-              title: Text('Delete'),
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: Text(t.delete),
             ),
           ),
         ],
@@ -827,18 +838,19 @@ Color _dueFg(ColorScheme cs, _DueStatus s) {
 }
 
 void _renameInline(BuildContext context, Task task) {
+  final t = AppLocalizations.of(context)!;
   final c = TextEditingController(text: task.name);
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text('Edit task'),
+      title: Text(t.editTask),
       content: TextField(
         controller: c,
         autofocus: true,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           isDense: true,
-          border: OutlineInputBorder(),
-          hintText: 'Task name',
+          border: const OutlineInputBorder(),
+          hintText: t.taskName,
         ),
         onSubmitted: (_) {
           context.read<TaskCloudProvider>().renameTask(task, c.text.trim());
@@ -848,14 +860,14 @@ void _renameInline(BuildContext context, Task task) {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(t.cancel),
         ),
         FilledButton(
           onPressed: () {
             context.read<TaskCloudProvider>().renameTask(task, c.text.trim());
             Navigator.pop(context);
           },
-          child: const Text('Save'),
+          child: Text(t.save),
         ),
       ],
     ),
@@ -865,8 +877,9 @@ void _renameInline(BuildContext context, Task task) {
 Future<void> showToBuyItemsDialog(BuildContext context) async {
   final itemProv = context.read<ItemCloudProvider>();
   final famDictStream = context.read<FamilyProvider>().watchMemberDirectory();
+  final t = AppLocalizations.of(context)!;
 
-  showModalBottomSheet(
+  await showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -876,12 +889,11 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
     ),
     builder: (sheetCtx) {
       final searchC = TextEditingController();
-      String? memberFilter; // null=All, ''=Unassigned, 'uid'
-      bool showBought = false; // false => sadece to-buy, true => tümü
+      String? memberFilter;
+      bool showBought = false;
 
       return StatefulBuilder(
         builder: (ctx, setLocal) {
-          // veri + sıralama
           final all = itemProv.items.toList()
             ..sort(
               (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
@@ -931,10 +943,10 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
                   children: [
                     const Icon(Icons.shopping_cart, size: 20),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Items',
-                        style: TextStyle(
+                        t.items,
+                        style: const TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 18,
                         ),
@@ -951,11 +963,11 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
                 // Arama
                 TextField(
                   controller: searchC,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search),
-                    hintText: 'Search items…',
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search),
+                    hintText: t.searchItems,
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                   onChanged: (_) => setLocal(() {}),
                 ),
@@ -969,12 +981,12 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
 
                     final chips = <Widget>[
                       FilterChip(
-                        label: const Text('All'),
+                        label: Text(t.allLabel),
                         selected: memberFilter == null,
                         onSelected: (_) => setLocal(() => memberFilter = null),
                       ),
                       FilterChip(
-                        label: const Text('Unassigned'),
+                        label: Text(t.unassigned),
                         selected: memberFilter == '',
                         onSelected: (_) => setLocal(() => memberFilter = ''),
                       ),
@@ -994,7 +1006,7 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
                         Padding(
                           padding: const EdgeInsets.only(bottom: 4),
                           child: Text(
-                            'Filter by assignee',
+                            t.filterByAssignee,
                             style: Theme.of(context).textTheme.labelMedium,
                           ),
                         ),
@@ -1018,16 +1030,16 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
                         // alt satır: To buy / All
                         Center(
                           child: SegmentedButton<bool>(
-                            segments: const [
+                            segments: [
                               ButtonSegment(
                                 value: false,
-                                icon: Icon(Icons.shopping_basket),
-                                label: Text('To buy'),
+                                icon: const Icon(Icons.shopping_basket),
+                                label: Text(t.toBuy),
                               ),
                               ButtonSegment(
                                 value: true,
-                                icon: Icon(Icons.all_inclusive),
-                                label: Text('All'),
+                                icon: const Icon(Icons.all_inclusive),
+                                label: Text(t.allLabel),
                               ),
                             ],
                             selected: {showBought},
@@ -1046,7 +1058,7 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
                 // Liste
                 Expanded(
                   child: list.isEmpty
-                      ? const Center(child: Text('No items'))
+                      ? Center(child: Text(t.noItems))
                       : ListView.separated(
                           itemCount: list.length,
                           separatorBuilder: (_, __) => const Divider(height: 1),
@@ -1077,7 +1089,7 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
                   children: [
                     OutlinedButton.icon(
                       icon: const Icon(Icons.delete_sweep),
-                      label: const Text('Clear bought'),
+                      label: Text(t.clearBought),
                       onPressed: () async {
                         await context.read<ItemCloudProvider>().clearBought(
                           forMember:
@@ -1087,9 +1099,7 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
                         );
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Bought items cleared'),
-                            ),
+                            SnackBar(content: Text(t.boughtItemsCleared)),
                           );
                         }
                       },
@@ -1097,7 +1107,7 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
                     const Spacer(),
                     FilledButton.icon(
                       icon: const Icon(Icons.done_all),
-                      label: const Text('Mark all bought'),
+                      label: Text(t.markAllBought),
                       onPressed: list.where((it) => !it.bought).isEmpty
                           ? null
                           : () async {
@@ -1136,6 +1146,8 @@ class _ItemRowCompact extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
+
     final bought = item.bought;
     return ListTile(
       dense: true,
@@ -1166,29 +1178,32 @@ class _ItemRowCompact extends StatelessWidget {
               break;
           }
         },
-        itemBuilder: (_) => const [
+        itemBuilder: (_) => [
           PopupMenuItem(
             value: 'rename',
             child: ListTile(
               dense: true,
-              leading: Icon(Icons.edit),
-              title: Text('Rename'),
+              leading: const Icon(Icons.edit),
+              title: Text(t.rename),
             ),
           ),
           PopupMenuItem(
             value: 'assign',
             child: ListTile(
               dense: true,
-              leading: Icon(Icons.person_add_alt),
-              title: Text('Assign'),
+              leading: const Icon(Icons.person_add_alt),
+              title: Text(t.assign),
             ),
           ),
           PopupMenuItem(
             value: 'delete',
             child: ListTile(
               dense: true,
-              leading: Icon(Icons.delete_outline, color: Colors.redAccent),
-              title: Text('Delete'),
+              leading: const Icon(
+                Icons.delete_outline,
+                color: Colors.redAccent,
+              ),
+              title: Text(t.delete),
             ),
           ),
         ],
@@ -1200,17 +1215,18 @@ class _ItemRowCompact extends StatelessWidget {
 
 void _renameItemInline(BuildContext context, Item it) {
   final c = TextEditingController(text: it.name);
+  final t = AppLocalizations.of(context)!;
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text('Edit item'),
+      title: Text(t.editItem),
       content: TextField(
         controller: c,
         autofocus: true,
-        decoration: const InputDecoration(
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
           isDense: true,
-          hintText: 'Item name',
+          hintText: t.itemName,
         ),
         onSubmitted: (_) {
           context.read<ItemCloudProvider>().renameItem(it, c.text.trim());
@@ -1220,14 +1236,14 @@ void _renameItemInline(BuildContext context, Item it) {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(t.cancel),
         ),
         FilledButton(
           onPressed: () {
             context.read<ItemCloudProvider>().renameItem(it, c.text.trim());
             Navigator.pop(context);
           },
-          child: const Text('Save'),
+          child: Text(t.save),
         ),
       ],
     ),

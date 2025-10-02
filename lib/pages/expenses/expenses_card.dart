@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
 import '../../utils/formatting.dart';
@@ -22,6 +24,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
   Widget build(BuildContext context) {
     final expProv = context.watch<ExpenseCloudProvider>();
 
+    final t = AppLocalizations.of(context)!;
     final expenses = expProv.forMemberFiltered(widget.memberUid, _filter);
     final total = expProv.totalForMember(widget.memberUid, filter: _filter);
     final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
@@ -49,8 +52,8 @@ class _ExpensesCardState extends State<ExpensesCard> {
                     builder: (_, snap) {
                       final dict = snap.data ?? const {};
                       final label = widget.memberUid == null
-                          ? 'All'
-                          : (dict[widget.memberUid] ?? 'Member');
+                          ? t.allLabel
+                          : (dict[widget.memberUid] ?? t.memberFallback);
                       final ch = label.trim().isEmpty
                           ? '?'
                           : label.trim()[0].toUpperCase();
@@ -66,10 +69,10 @@ class _ExpensesCardState extends State<ExpensesCard> {
                     builder: (_, snap) {
                       final dict = snap.data ?? const {};
                       final label = widget.memberUid == null
-                          ? 'All members'
-                          : (dict[widget.memberUid] ?? 'Member');
+                          ? t.allMembers
+                          : (dict[widget.memberUid] ?? t.memberFallback);
                       return Text(
-                        '$label ${_filterLabel(_filter)}',
+                        '$label  ${_filterLabel(context, _filter)}',
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold),
                         overflow: TextOverflow.ellipsis,
@@ -88,21 +91,21 @@ class _ExpensesCardState extends State<ExpensesCard> {
 
             // Tarih filtresi
             SegmentedButton<ExpenseDateFilter>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: ExpenseDateFilter.thisMonth,
-                  label: Text('This month'),
-                  icon: Icon(Icons.today),
+                  label: Text(t.thisMonth),
+                  icon: const Icon(Icons.today),
                 ),
                 ButtonSegment(
                   value: ExpenseDateFilter.lastMonth,
-                  label: Text('Last month'),
-                  icon: Icon(Icons.calendar_today_outlined),
+                  label: Text(t.lastMonth),
+                  icon: const Icon(Icons.calendar_today_outlined),
                 ),
                 ButtonSegment(
                   value: ExpenseDateFilter.all,
-                  label: Text('All'),
-                  icon: Icon(Icons.all_inclusive),
+                  label: Text(t.allLabel),
+                  icon: const Icon(Icons.all_inclusive),
                 ),
               ],
               selected: {_filter},
@@ -115,7 +118,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
             // Liste
             Expanded(
               child: expenses.isEmpty
-                  ? const Center(child: Text('No expenses'))
+                  ? Center(child: Text(t.noExpenses))
                   : ListView.separated(
                       itemCount: expenses.length,
                       separatorBuilder: (_, __) => const Divider(height: 1),
@@ -125,7 +128,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
                       cacheExtent: 800,
                       itemBuilder: (_, i) {
                         final e = expenses[i];
-                        final cat = e.category ?? 'Other';
+                        final cat = e.category ?? t.otherCategory;
                         final color = _categoryColor(cat);
                         return Dismissible(
                           key: ValueKey(e.id),
@@ -153,20 +156,18 @@ class _ExpensesCardState extends State<ExpensesCard> {
                             final ok = await showDialog<bool>(
                               context: context,
                               builder: (_) => AlertDialog(
-                                title: const Text('Delete expense?'),
-                                content: Text(
-                                  '“${e.title}” will be removed. You can undo right after.',
-                                ),
+                                title: Text(t.deleteExpenseTitle),
+                                content: Text(t.deleteExpenseBody(e.title)),
                                 actions: [
                                   TextButton(
                                     onPressed: () =>
                                         Navigator.pop(context, false),
-                                    child: const Text('Cancel'),
+                                    child: Text(t.cancel),
                                   ),
                                   FilledButton(
                                     onPressed: () =>
                                         Navigator.pop(context, true),
-                                    child: const Text('Delete'),
+                                    child: Text(t.delete),
                                   ),
                                 ],
                               ),
@@ -174,16 +175,16 @@ class _ExpensesCardState extends State<ExpensesCard> {
                             if (ok != true) return false;
 
                             try {
-                              final removed = e; // undo için sakla
+                              final removed = e;
                               await context.read<ExpenseCloudProvider>().remove(
                                 removed.id,
                               );
                               if (!context.mounted) return true;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: const Text('Expense deleted'),
+                                  content: Text(t.expenseDeleted),
                                   action: SnackBarAction(
-                                    label: 'Undo',
+                                    label: t.undo,
                                     onPressed: () {
                                       final p = context
                                           .read<ExpenseCloudProvider>();
@@ -202,7 +203,9 @@ class _ExpensesCardState extends State<ExpensesCard> {
                             } catch (err) {
                               if (!context.mounted) return false;
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Delete failed: $err')),
+                                SnackBar(
+                                  content: Text(t.deleteFailed(err.toString())),
+                                ),
                               );
                               return false;
                             }
@@ -244,7 +247,7 @@ class _ExpensesCardState extends State<ExpensesCard> {
               children: [
                 FilledButton.tonalIcon(
                   icon: const Icon(Icons.add),
-                  label: const Text('Add expense'),
+                  label: Text(t.addExpense),
                   onPressed: () async {
                     await showExpenseEditDialog(
                       context: context,
@@ -258,13 +261,13 @@ class _ExpensesCardState extends State<ExpensesCard> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => ExpensesInsightsPage(
-                          initialMember: widget.memberUid, // aktif üyeyle aç
+                          initialMember: widget.memberUid,
                         ),
                       ),
                     );
                   },
                   icon: const Icon(Icons.bar_chart),
-                  label: const Text('Insights'),
+                  label: Text(t.insights),
                 ),
               ],
             ),
@@ -272,33 +275,6 @@ class _ExpensesCardState extends State<ExpensesCard> {
         ),
       ),
     );
-  }
-
-  String _filterLabel(ExpenseDateFilter f) {
-    final now = DateTime.now();
-    final monthNames = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-
-    if (f == ExpenseDateFilter.thisMonth) {
-      return ' (${monthNames[now.month - 1]} ${now.year})';
-    }
-    if (f == ExpenseDateFilter.lastMonth) {
-      final prev = DateTime(now.year, now.month - 1, 1);
-      return ' (${monthNames[prev.month - 1]} ${prev.year})';
-    }
-    return '';
   }
 
   static String _fmtDate(DateTime d) {
@@ -319,4 +295,16 @@ Color _categoryColor(String c) {
   ];
   final h = c.codeUnits.fold<int>(0, (a, b) => a + b);
   return palette[h % palette.length];
+}
+
+String _filterLabel(BuildContext context, ExpenseDateFilter f) {
+  final now = DateTime.now();
+  if (f == ExpenseDateFilter.thisMonth) {
+    return ' (${DateFormat.yMMMM(Localizations.localeOf(context).toString()).format(now)})';
+  }
+  if (f == ExpenseDateFilter.lastMonth) {
+    final prev = DateTime(now.year, now.month - 1, 1);
+    return ' (${DateFormat.yMMMM(Localizations.localeOf(context).toString()).format(prev)})';
+  }
+  return '';
 }

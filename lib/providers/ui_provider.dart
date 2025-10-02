@@ -16,6 +16,8 @@ class UiProvider extends ChangeNotifier {
   ItemViewFilter _itemFilter = ItemViewFilter.toBuy;
   String? _activeMember;
   String? get activeMember => _activeMember;
+  Locale? _locale;
+  Locale? get locale => _locale;
 
   // ====== tema modu ======
   ThemeMode _themeMode = ThemeMode.system;
@@ -61,7 +63,17 @@ class UiProvider extends ChangeNotifier {
     if (bs != null && bs >= 0 && bs < BrandSeed.values.length) {
       _brand = BrandSeed.values[bs];
     }
+    final code = sp.getString('ui_locale_code');
+    if (code != null && code.isNotEmpty) {
+      _locale = Locale(code);
+    }
+    notifyListeners();
+  }
 
+  Future<void> setLocale(Locale loc) async {
+    _locale = loc;
+    final sp = await SharedPreferences.getInstance();
+    await sp.setString('ui_locale_code', loc.languageCode);
     notifyListeners();
   }
 

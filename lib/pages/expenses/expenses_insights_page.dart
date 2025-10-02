@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
 import '../../utils/formatting.dart';
@@ -34,9 +35,10 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
     return Scaffold(
-      appBar: AppBar(title: const Text('Expenses — Insights')),
+      appBar: AppBar(title: Text('${t.expenses} — ${t.insights}')),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -51,26 +53,26 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                 child: MemberDropdownUid(
                   value: _memberUid,
                   onChanged: (v) => setState(() => _memberUid = v),
-                  label: 'Member',
-                  nullLabel: 'All members',
+                  label: t.memberLabel,
+                  nullLabel: t.allMembers,
                 ),
               ), // Tarih filtresi ve aksiyonlar aşağı taşındı (StreamBuilder’a gerek yok)
               SegmentedButton<ExpenseDateFilter>(
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: ExpenseDateFilter.thisMonth,
-                    label: Text('This month'),
-                    icon: Icon(Icons.today),
+                    label: Text(t.thisMonth),
+                    icon: const Icon(Icons.today),
                   ),
                   ButtonSegment(
                     value: ExpenseDateFilter.lastMonth,
-                    label: Text('Last month'),
-                    icon: Icon(Icons.calendar_today_outlined),
+                    label: Text(t.lastMonth),
+                    icon: const Icon(Icons.calendar_today_outlined),
                   ),
                   ButtonSegment(
                     value: ExpenseDateFilter.all,
-                    label: Text('All'),
-                    icon: Icon(Icons.all_inclusive),
+                    label: Text(t.allLabel),
+                    icon: const Icon(Icons.all_inclusive),
                   ),
                 ],
                 selected: {_filter},
@@ -92,17 +94,17 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                       );
                     },
                     icon: const Icon(Icons.pie_chart_outline),
-                    label: const Text('By category'),
+                    label: Text(t.byCategory),
                   ),
                   TextButton.icon(
                     onPressed: () => _pickRangeAndExport(context, _memberUid),
                     icon: const Icon(Icons.download_for_offline_outlined),
-                    label: const Text('Export'),
+                    label: Text(t.export),
                   ),
                   TextButton.icon(
                     onPressed: () => _pickRangeAndShare(context, _memberUid),
                     icon: const Icon(Icons.ios_share_outlined),
-                    label: const Text('Share'),
+                    label: Text(t.share),
                   ),
                 ],
               ),
@@ -125,20 +127,18 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                     child: Column(
                       children: [
                         ListTile(
-                          title: const Text('Transactions'),
-                          subtitle: Text(
-                            '${expenses.length} record${expenses.length == 1 ? '' : 's'}',
-                          ),
+                          title: Text(t.transactions),
+                          subtitle: Text(t.recordsCount(expenses.length)),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                tooltip: 'Export CSV',
+                                tooltip: t.exportCsvTooltip,
                                 icon: const Icon(Icons.download),
                                 onPressed: () => _exportCsv(context, expenses),
                               ),
                               IconButton(
-                                tooltip: 'Share',
+                                tooltip: t.shareTooltip,
                                 icon: const Icon(Icons.share),
                                 onPressed: () => _shareCsv(context, expenses),
                               ),
@@ -147,15 +147,15 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
                         ),
                         const Divider(height: 1),
                         if (expenses.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Text('No expenses for selected range.'),
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(t.noExpensesForRange),
                           )
                         else
                           ...expenses.map((e) {
                             final memberLabel = e.assignedToUid == null
-                                ? 'Unassigned'
-                                : (dict[e.assignedToUid] ?? 'Member');
+                                ? t.unassigned
+                                : (dict[e.assignedToUid] ?? t.memberFallback);
                             return ListTile(
                               dense: true,
                               title: Text(
@@ -241,7 +241,7 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
   ) async {
     final picked = await _pickRange(context);
     if (picked == null) return;
-
+    final t = AppLocalizations.of(context)!;
     try {
       final dict = await context
           .read<FamilyProvider>()
@@ -250,7 +250,7 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
       final list = _filterByRange(context, memberUid: memberUid, range: picked);
 
       final rows = <List<dynamic>>[
-        ['date', 'title', 'amount', 'member', 'category'],
+        [t.csvDate, t.csvTitle, t.csvAmount, t.csvMember, t.csvCategory],
         ...list.map(
           (e) => [
             _fmtDate(e.date),
@@ -275,13 +275,13 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved CSV: ${file.path.split('/').last}')),
+        SnackBar(content: Text(t.savedCsvWithName(file.path.split('/').last))),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      ).showSnackBar(SnackBar(content: Text(t.exportFailed(e.toString()))));
     }
   }
 
@@ -291,7 +291,7 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
   ) async {
     final picked = await _pickRange(context);
     if (picked == null) return;
-
+    final t = AppLocalizations.of(context)!;
     try {
       final dict = await context
           .read<FamilyProvider>()
@@ -300,7 +300,7 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
       final list = _filterByRange(context, memberUid: memberUid, range: picked);
 
       final rows = <List<dynamic>>[
-        ['date', 'title', 'amount', 'member', 'category'],
+        [t.csvDate, t.csvTitle, t.csvAmount, t.csvMember, t.csvCategory],
         ...list.map(
           (e) => [
             _fmtDate(e.date),
@@ -322,14 +322,12 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
       );
       await file.writeAsString(csv);
 
-      await Share.shareXFiles([
-        XFile(file.path),
-      ], text: 'Togetherly — Expenses CSV');
+      await Share.shareXFiles([XFile(file.path)], text: t.expensesCsvShareText);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
+      ).showSnackBar(SnackBar(content: Text(t.shareFailed(e.toString()))));
     }
   }
 
@@ -338,12 +336,13 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
     List<ExpenseDoc> expenses,
   ) async {
     try {
+      final t = AppLocalizations.of(context)!;
       final dict = await context
           .read<FamilyProvider>()
           .watchMemberDirectory()
           .first;
       final rows = <List<dynamic>>[
-        ['date', 'title', 'amount', 'member', 'category'],
+        [t.csvDate, t.csvTitle, t.csvAmount, t.csvMember, t.csvCategory],
         ...expenses.map(
           (e) => [
             _fmtDate(e.date),
@@ -363,13 +362,14 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
       await file.writeAsString(csv);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved CSV: ${file.path.split('/').last}')),
+        SnackBar(content: Text(t.savedCsvWithName(file.path.split('/').last))),
       );
     } catch (e) {
       if (!mounted) return;
+      final t = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      ).showSnackBar(SnackBar(content: Text(t.exportFailed(e.toString()))));
     }
   }
 
@@ -382,8 +382,9 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
           .read<FamilyProvider>()
           .watchMemberDirectory()
           .first;
+      final t = AppLocalizations.of(context)!;
       final rows = <List<dynamic>>[
-        ['date', 'title', 'amount', 'member'],
+        [t.csvDate, t.csvTitle, t.csvAmount, t.csvMember],
         ...expenses.map(
           (e) => [
             _fmtDate(e.date),
@@ -402,14 +403,13 @@ class _ExpensesInsightsPageState extends State<ExpensesInsightsPage> {
         '${dir.path}/expenses_share_${famId}_${_stampNow()}.csv',
       );
       await file.writeAsString(csv);
-      await Share.shareXFiles([
-        XFile(file.path),
-      ], text: 'Togetherly — Expenses CSV');
+      await Share.shareXFiles([XFile(file.path)], text: t.expensesCsvShareText);
     } catch (e) {
       if (!mounted) return;
+      final t = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
+      ).showSnackBar(SnackBar(content: Text(t.shareFailed(e.toString()))));
     }
   }
 }
@@ -422,18 +422,21 @@ String _fmtDate(DateTime d) {
 }
 
 void _showChangeCategorySheet(BuildContext context, ExpenseDoc e) {
-  const categories = <String>[
-    'Groceries',
-    'Dining',
-    'Clothing',
-    'Transport',
-    'Utilities',
-    'Health',
-    'Kids',
-    'Home',
-    'Other',
+  final t = AppLocalizations.of(context)!;
+
+  final categories = [
+    t.categoryGroceries,
+    t.categoryDining,
+    t.categoryClothing,
+    t.categoryTransport,
+    t.categoryUtilities,
+    t.categoryHealth,
+    t.categoryKids,
+    t.categoryHome,
+    t.categoryOther,
   ];
-  String? current = e.category;
+
+  final String? current = e.category;
 
   showModalBottomSheet(
     context: context,
@@ -458,10 +461,10 @@ void _showChangeCategorySheet(BuildContext context, ExpenseDoc e) {
             ),
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Change category',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    t.changeCategory,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
                 IconButton(
@@ -476,7 +479,7 @@ void _showChangeCategorySheet(BuildContext context, ExpenseDoc e) {
               runSpacing: 8,
               children: [
                 ActionChip(
-                  label: const Text('Uncategorized'),
+                  label: Text(t.uncategorized),
                   onPressed: () {
                     context.read<ExpenseCloudProvider>().updateCategory(
                       e.id,
@@ -503,9 +506,9 @@ void _showChangeCategorySheet(BuildContext context, ExpenseDoc e) {
             // Özel kategori
             TextField(
               controller: ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Custom category',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: t.customCategory,
+                border: const OutlineInputBorder(),
                 isDense: true,
               ),
               onSubmitted: (val) {
@@ -528,7 +531,7 @@ void _showChangeCategorySheet(BuildContext context, ExpenseDoc e) {
                   );
                   Navigator.pop(context);
                 },
-                child: const Text('Save'),
+                child: Text(t.save),
               ),
             ),
           ],
@@ -542,23 +545,24 @@ class _MonthlyBarChart extends StatelessWidget {
   final List<double> data; // 12 eleman
   const _MonthlyBarChart({required this.data});
 
-  static const _labels = [
-    'J',
-    'F',
-    'M',
-    'A',
-    'M',
-    'J',
-    'J',
-    'A',
-    'S',
-    'O',
-    'N',
-    'D',
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
+    final List<dynamic> _labels = [
+      t.monthShortJan,
+      t.monthShortFeb,
+      t.monthShortMar,
+      t.monthShortApr,
+      t.monthShortMay,
+      t.monthShortJun,
+      t.monthShortJul,
+      t.monthShortAug,
+      t.monthShortSep,
+      t.monthShortOct,
+      t.monthShortNov,
+      t.monthShortDec,
+    ];
+
     final maxY =
         ((data.isEmpty ? 0.0 : data.reduce((a, b) => a > b ? a : b)) * 1.25) +
         1;

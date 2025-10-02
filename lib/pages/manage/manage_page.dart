@@ -480,7 +480,7 @@ Future<void> _showRenameDialog({
 }) async {
   final ctrl = TextEditingController(text: initial);
 
-  showDialog(
+  await showDialog(
     context: context,
     builder: (_) => AlertDialog(
       title: const Text('Edit name'),

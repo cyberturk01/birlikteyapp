@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../providers/expense_cloud_provider.dart';
 import '../../utils/formatting.dart';
 import '../../widgets/budget_badges.dart';
@@ -29,6 +30,7 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     final expProv = context.watch<ExpenseCloudProvider>();
     final map = expProv.totalsByCategory(uid: _member, filter: _filter);
     final entries = map.entries.toList()
@@ -39,11 +41,11 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Expenses — By Category'),
-          bottom: const TabBar(
+          title: Text(t.expensesByCategoryTitle),
+          bottom: TabBar(
             tabs: [
-              Tab(icon: Icon(Icons.pie_chart), text: 'Breakdown'),
-              Tab(icon: Icon(Icons.stacked_bar_chart), text: 'Trend'),
+              Tab(icon: const Icon(Icons.pie_chart), text: t.breakdown),
+              Tab(icon: const Icon(Icons.stacked_bar_chart), text: t.trend),
             ],
           ),
         ),
@@ -63,26 +65,26 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
                       child: MemberDropdownUid(
                         value: _member,
                         onChanged: (v) => setState(() => _member = v),
-                        label: 'Member',
-                        nullLabel: 'All members',
+                        label: t.memberFallback,
+                        nullLabel: t.allMembers,
                       ),
                     ),
                     SegmentedButton<ExpenseDateFilter>(
-                      segments: const [
+                      segments: [
                         ButtonSegment(
                           value: ExpenseDateFilter.thisMonth,
-                          label: Text('This month'),
-                          icon: Icon(Icons.today),
+                          label: Text(t.thisMonth),
+                          icon: const Icon(Icons.today),
                         ),
                         ButtonSegment(
                           value: ExpenseDateFilter.lastMonth,
-                          label: Text('Last month'),
-                          icon: Icon(Icons.calendar_today_outlined),
+                          label: Text(t.lastMonth),
+                          icon: const Icon(Icons.calendar_today_outlined),
                         ),
                         ButtonSegment(
                           value: ExpenseDateFilter.all,
-                          label: Text('All'),
-                          icon: Icon(Icons.all_inclusive),
+                          label: Text(t.allLabel),
+                          icon: const Icon(Icons.all_inclusive),
                         ),
                       ],
                       selected: {_filter},
@@ -95,10 +97,10 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
                 const SizedBox(height: 12),
 
                 if (entries.isEmpty)
-                  const Card(
+                  Card(
                     child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Text('No expenses for selected range.'),
+                      padding: const EdgeInsets.all(16),
+                      child: Text(t.noExpensesForRange),
                     ),
                   )
                 else ...[
@@ -134,13 +136,12 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Legend + totals + bütçe barı
                   Card(
                     elevation: 2,
                     child: Column(
                       children: [
                         ListTile(
-                          title: const Text('Totals by category'),
+                          title: Text(t.totalsByCategory),
                           trailing: Text(
                             fmtMoney(context, total),
                             style: Theme.of(context).textTheme.titleMedium
@@ -185,7 +186,7 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
                                         badge.overChip!,
                                       ],
                                       IconButton(
-                                        tooltip: 'Edit budget',
+                                        tooltip: t.editBudgetTooltip,
                                         icon: const Icon(
                                           Icons.edit_calendar,
                                           size: 18,
@@ -259,29 +260,29 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
           ? ''
           : current.toStringAsFixed(current % 1 == 0 ? 0 : 2),
     );
-
+    final t = AppLocalizations.of(context)!;
     final res = await showDialog<double?>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('Budget — $category'),
+        title: Text(t.budgetDialogTitle(category)),
         content: TextField(
           controller: c,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Monthly budget',
-            hintText: 'e.g. 250',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: t.monthlyBudgetLabel,
+            hintText: t.monthlyBudgetHint,
+            border: const OutlineInputBorder(),
             isDense: true,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, 0.0),
-            child: const Text('Remove'),
+            child: Text(t.remove),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(t.cancel),
           ),
           FilledButton(
             onPressed: () {
@@ -293,7 +294,7 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
               final v = double.tryParse(raw.replaceAll(',', '.'));
               Navigator.pop(context, v);
             },
-            child: const Text('Save'),
+            child: Text(t.save),
           ),
         ],
       ),
@@ -308,7 +309,7 @@ class _ExpensesByCategoryPageState extends State<ExpensesByCategoryPage> {
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Budget updated for $category')));
+      ).showSnackBar(SnackBar(content: Text(t.budgetUpdatedFor(category))));
     }
   }
 
@@ -363,6 +364,7 @@ class _MonthlyStackedTrend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     final expProv = context.watch<ExpenseCloudProvider>();
     final data = expProv.totalsByMonthAndCategory(
       uid: memberUid,
@@ -370,7 +372,7 @@ class _MonthlyStackedTrend extends StatelessWidget {
     );
 
     if (data.isEmpty) {
-      return const Center(child: Text('No data for last months.'));
+      return Center(child: Text(t.noDataLastMonths));
     }
 
     // eksenler ve seriler
@@ -424,7 +426,7 @@ class _MonthlyStackedTrend extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(left: 4, bottom: 8),
                 child: Text(
-                  'Last 6 months by category',
+                  t.last6MonthsByCategory,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
@@ -561,13 +563,14 @@ class ExpensesFilteredListPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.watch<ExpenseCloudProvider>();
+    final t = AppLocalizations.of(context)!;
     final list = p.forCategory(
       category: category,
       uid: memberUid,
     ); // ↓ provider metodu aşağıda
     return Scaffold(
       appBar: AppBar(
-        title: Text('Category — $category'),
+        title: Text(t.categoryTitle(category)),
         actions: [
           PopupMenuButton<String>(
             onSelected: (v) {
@@ -575,13 +578,13 @@ class ExpensesFilteredListPage extends StatelessWidget {
                 showBudgetsManagerSheet(context);
               }
             },
-            itemBuilder: (_) => const [
+            itemBuilder: (_) => [
               PopupMenuItem(
                 value: 'budgets',
                 child: ListTile(
                   dense: true,
-                  leading: Icon(Icons.account_balance_wallet),
-                  title: Text('Budgets…'),
+                  leading: const Icon(Icons.account_balance_wallet),
+                  title: Text(t.budgetsMenu),
                 ),
               ),
             ],
@@ -589,7 +592,7 @@ class ExpensesFilteredListPage extends StatelessWidget {
         ],
       ),
       body: list.isEmpty
-          ? const Center(child: Text('No expenses'))
+          ? Center(child: Text(t.noExpenses))
           : ListView.separated(
               padding: const EdgeInsets.all(12),
               itemCount: list.length,

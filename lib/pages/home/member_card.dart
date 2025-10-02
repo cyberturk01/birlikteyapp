@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../constants/app_lists.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/item.dart';
 import '../../models/task.dart';
 import '../../models/view_section.dart';
@@ -79,7 +81,7 @@ class _MemberCardState extends State<MemberCard> {
     final previewTasks = (isLandscape || isShort) ? 2 : 6;
     final previewItems = (isLandscape || isShort) ? 2 : 3;
     final entriesStream = context.read<FamilyProvider>().watchMemberEntries();
-
+    final t = AppLocalizations.of(context)!;
     return Card(
       elevation: 6,
       clipBehavior: Clip.antiAlias,
@@ -122,7 +124,7 @@ class _MemberCardState extends State<MemberCard> {
                             (x) => x.uid == widget.memberUid,
                             orElse: () => FamilyMemberEntry(
                               uid: '',
-                              label: 'Member',
+                              label: t.memberFallback,
                               role: 'editor',
                             ),
                           );
@@ -172,7 +174,7 @@ class _MemberCardState extends State<MemberCard> {
                                 onPressed: () {
                                   widget.onJumpSection?.call(HomeSection.tasks);
                                 },
-                                child: const Text('Tasks'),
+                                child: Text(t.tasks),
                               ),
                               TextButton(
                                 style: TextButton.styleFrom(
@@ -188,7 +190,7 @@ class _MemberCardState extends State<MemberCard> {
                                   // widget.onOpenItemsPopup?.call();
                                   widget.onJumpSection?.call(HomeSection.items);
                                 },
-                                child: const Text('Market'),
+                                child: Text(t.market),
                               ),
                             ],
                           ),
@@ -233,7 +235,11 @@ class _MemberCardState extends State<MemberCard> {
                               value: _TaskStatus.pending,
                               icon: const Icon(Icons.radio_button_unchecked),
                               label: Text(
-                                'Pending (${widget.tasks.where((t) => !t.completed).length})',
+                                t.pendingCount(
+                                  widget.tasks
+                                      .where((t) => !t.completed)
+                                      .length,
+                                ),
                                 style: const TextStyle(fontSize: 12),
                               ),
                             ),
@@ -241,7 +247,9 @@ class _MemberCardState extends State<MemberCard> {
                               value: _TaskStatus.completed,
                               icon: const Icon(Icons.check_circle),
                               label: Text(
-                                'Completed (${widget.tasks.where((t) => t.completed).length})',
+                                t.completedCount(
+                                  widget.tasks.where((t) => t.completed).length,
+                                ),
                                 style: const TextStyle(fontSize: 12),
                               ),
                             ),
@@ -258,14 +266,18 @@ class _MemberCardState extends State<MemberCard> {
                               value: _ItemStatus.toBuy,
                               icon: const Icon(Icons.shopping_basket),
                               label: Text(
-                                'To buy (${widget.items.where((i) => !i.bought).length})',
+                                t.toBuyCount(
+                                  widget.items.where((i) => !i.bought).length,
+                                ),
                               ),
                             ),
                             ButtonSegment(
                               value: _ItemStatus.bought,
                               icon: const Icon(Icons.check_circle),
                               label: Text(
-                                'Bought (${widget.items.where((i) => i.bought).length})',
+                                t.boughtCount(
+                                  widget.items.where((i) => i.bought).length,
+                                ),
                               ),
                             ),
                           ],
@@ -326,7 +338,7 @@ class _MemberCardState extends State<MemberCard> {
                             alignment: Alignment.centerRight,
                             child: TextButton.icon(
                               icon: const Icon(Icons.delete_sweep),
-                              label: const Text('Clear completed'),
+                              label: Text(t.clearCompleted),
                               onPressed: () => _clearCompletedForMember(
                                 context,
                                 widget.memberUid,
@@ -340,7 +352,7 @@ class _MemberCardState extends State<MemberCard> {
                             alignment: Alignment.centerRight,
                             child: TextButton.icon(
                               icon: const Icon(Icons.delete_sweep),
-                              label: const Text('Clear bought'),
+                              label: Text(t.clearBought),
                               onPressed: () => _clearBoughtForMember(
                                 context,
                                 widget.memberUid,
@@ -366,9 +378,9 @@ class _MemberCardState extends State<MemberCard> {
                         onPressed: () =>
                             _openQuickAddTaskSheet(context, widget.memberUid),
                         icon: const Icon(Icons.add_task),
-                        label: const Text(
-                          'Add task',
-                          style: TextStyle(fontSize: 12),
+                        label: Text(
+                          t.addTaskBtn,
+                          style: const TextStyle(fontSize: 12),
                         ),
                       ),
                     )
@@ -379,9 +391,9 @@ class _MemberCardState extends State<MemberCard> {
                         onPressed: () =>
                             _openQuickAddItemSheet(context, widget.memberUid),
                         icon: const Icon(Icons.add_shopping_cart),
-                        label: const Text(
-                          'Add item',
-                          style: TextStyle(fontSize: 12),
+                        label: Text(
+                          t.addItemBtn,
+                          style: const TextStyle(fontSize: 12),
                         ),
                       ),
                     ),
@@ -396,7 +408,7 @@ class _MemberCardState extends State<MemberCard> {
 
   void _clearCompletedForMember(BuildContext context, String memberUid) {
     final prov = context.read<TaskCloudProvider>();
-
+    final t = AppLocalizations.of(context)!;
     final removed = prov.tasks
         .where((t) => (t.assignedToUid ?? '') == memberUid && t.completed)
         .map(
@@ -412,9 +424,9 @@ class _MemberCardState extends State<MemberCard> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Cleared – Undo'),
+        content: Text(t.clearedUndo),
         action: SnackBarAction(
-          label: 'Undo',
+          label: t.undo,
           onPressed: () {
             for (final t in removed) {
               context.read<TaskCloudProvider>().addTask(t);
@@ -428,6 +440,7 @@ class _MemberCardState extends State<MemberCard> {
 
   void _clearBoughtForMember(BuildContext context, String memberUid) {
     final prov = context.read<ItemCloudProvider>();
+    final t = AppLocalizations.of(context)!;
 
     final removed = prov.items
         .where((i) => (i.assignedToUid ?? '') == memberUid && i.bought)
@@ -440,9 +453,9 @@ class _MemberCardState extends State<MemberCard> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Cleared – Undo'),
+        content: Text(t.clearedUndo),
         action: SnackBarAction(
-          label: 'Undo',
+          label: t.undo,
           onPressed: () {
             for (final it in removed) {
               context.read<ItemCloudProvider>().addItem(it);
@@ -457,6 +470,8 @@ class _MemberCardState extends State<MemberCard> {
   Future<void> _openTaskEditDialog(BuildContext context, Task t) async {
     final prov = context.read<TaskCloudProvider>();
     final nameC = TextEditingController(text: t.name);
+    final tr = AppLocalizations.of(context)!;
+
     DateTime? due = t.dueAt;
     DateTime? rem = t.reminderAt;
 
@@ -485,15 +500,15 @@ class _MemberCardState extends State<MemberCard> {
       builder: (_) => StatefulBuilder(
         builder: (ctx, setLocal) {
           return AlertDialog(
-            title: const Text('Edit task'),
+            title: Text(tr.editTask),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: nameC,
-                  decoration: const InputDecoration(
-                    labelText: 'Task name',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: tr.taskName,
+                    border: const OutlineInputBorder(),
                     isDense: true,
                   ),
                 ),
@@ -505,9 +520,8 @@ class _MemberCardState extends State<MemberCard> {
                         icon: const Icon(Icons.event),
                         label: Text(
                           due == null
-                              ? 'Set due date'
-                              : 'Due: ${due!.day.toString().padLeft(2, '0')}.${due!.month.toString().padLeft(2, '0')} '
-                                    '${due!.hour.toString().padLeft(2, '0')}:${due!.minute.toString().padLeft(2, '0')}',
+                              ? tr.setDueDate
+                              : tr.duePrefix(formatDt(context, due!)),
                           overflow: TextOverflow.ellipsis,
                         ),
                         onPressed: () async {
@@ -519,7 +533,7 @@ class _MemberCardState extends State<MemberCard> {
                     const SizedBox(width: 8),
                     if (due != null)
                       IconButton(
-                        tooltip: 'Clear',
+                        tooltip: tr.clear,
                         icon: const Icon(Icons.close),
                         onPressed: () => setLocal(() => due = null),
                       ),
@@ -533,9 +547,8 @@ class _MemberCardState extends State<MemberCard> {
                         icon: const Icon(Icons.alarm),
                         label: Text(
                           rem == null
-                              ? 'Set reminder'
-                              : 'Remind: ${rem!.day.toString().padLeft(2, '0')}.${rem!.month.toString().padLeft(2, '0')} '
-                                    '${rem!.hour.toString().padLeft(2, '0')}:${rem!.minute.toString().padLeft(2, '0')}',
+                              ? tr.setReminder
+                              : tr.remindPrefix(formatDt(context, rem!)),
                           overflow: TextOverflow.ellipsis,
                         ),
                         onPressed: () async {
@@ -547,7 +560,7 @@ class _MemberCardState extends State<MemberCard> {
                     const SizedBox(width: 8),
                     if (rem != null)
                       IconButton(
-                        tooltip: 'Clear',
+                        tooltip: tr.clear,
                         icon: const Icon(Icons.close),
                         onPressed: () => setLocal(() => rem = null),
                       ),
@@ -558,7 +571,7 @@ class _MemberCardState extends State<MemberCard> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
+                child: Text(tr.cancel),
               ),
               FilledButton(
                 onPressed: () async {
@@ -570,7 +583,7 @@ class _MemberCardState extends State<MemberCard> {
                   await prov.updateReminder(t, rem);
                   if (ctx.mounted) Navigator.pop(ctx);
                 },
-                child: const Text('Save'),
+                child: Text(tr.save),
               ),
             ],
           );
@@ -582,7 +595,7 @@ class _MemberCardState extends State<MemberCard> {
   void _openQuickAddTaskSheet(BuildContext context, String memberUid) {
     final memberLabel = widget.memberName;
     final taskProv = context.read<TaskCloudProvider>();
-
+    final t = AppLocalizations.of(context)!;
     const defaultTasks = AppLists.defaultTasks;
     final frequent = taskProv.suggestedTasks;
     final existing = taskProv.tasks.map((t) => t.name).toList();
@@ -622,7 +635,7 @@ class _MemberCardState extends State<MemberCard> {
                 if (Navigator.canPop(sheetCtx)) Navigator.pop(sheetCtx);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Added ${selected.length} task(s)')),
+                    SnackBar(content: Text(t.addedTasks(selected.length))),
                   );
                 }
               }
@@ -637,7 +650,7 @@ class _MemberCardState extends State<MemberCard> {
                 if (Navigator.canPop(sheetCtx)) Navigator.pop(sheetCtx);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Added ${names.length} task(s)')),
+                    SnackBar(content: Text(t.addedTasks(names.length))),
                   );
                 }
               }
@@ -661,7 +674,7 @@ class _MemberCardState extends State<MemberCard> {
                     children: [
                       Expanded(
                         child: Text(
-                          "Add task for $memberLabel",
+                          t.addTaskFor(memberLabel),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -677,11 +690,11 @@ class _MemberCardState extends State<MemberCard> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: c,
-                    decoration: const InputDecoration(
-                      hintText: "Enter tasks (comma or new line)…",
-                      helperText: "Example: Laundry, Dishes, Take out trash",
-                      prefixIcon: Icon(Icons.task_alt),
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      hintText: t.enterTasksHint,
+                      helperText: t.tasksHelperExample,
+                      prefixIcon: const Icon(Icons.task_alt),
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                     onSubmitted: (_) => addTyped(),
@@ -691,7 +704,7 @@ class _MemberCardState extends State<MemberCard> {
                   const SizedBox(height: 10),
                   if (suggestions.isNotEmpty) ...[
                     Text(
-                      "Suggestions",
+                      t.suggestionsTitle,
                       style: Theme.of(context).textTheme.labelLarge,
                     ),
                     const SizedBox(height: 6),
@@ -727,7 +740,7 @@ class _MemberCardState extends State<MemberCard> {
                     children: [
                       OutlinedButton.icon(
                         icon: const Icon(Icons.playlist_add),
-                        label: const Text("Add typed list"),
+                        label: Text(t.addTypedList),
                         onPressed: addTyped,
                       ),
                       const SizedBox(width: 8),
@@ -735,8 +748,8 @@ class _MemberCardState extends State<MemberCard> {
                         icon: const Icon(Icons.library_add_check),
                         label: Text(
                           selected.isEmpty
-                              ? "Add selected"
-                              : "Add selected (${selected.length})",
+                              ? t.addSelected
+                              : t.addSelectedCount(selected.length),
                         ),
                         onPressed: selected.isEmpty ? null : addSelected,
                       ),
@@ -754,7 +767,7 @@ class _MemberCardState extends State<MemberCard> {
   void _openQuickAddItemSheet(BuildContext context, String memberUid) {
     final memberLabel = widget.memberName;
     final itemProv = context.read<ItemCloudProvider>();
-
+    final t = AppLocalizations.of(context)!;
     const defaultItems = AppLists.defaultItems;
     final frequent = itemProv.frequentItems;
     final existing = itemProv.items.map((i) => i.name).toList();
@@ -794,7 +807,7 @@ class _MemberCardState extends State<MemberCard> {
                 if (Navigator.canPop(sheetCtx)) Navigator.pop(sheetCtx);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Added ${selected.length} item(s)')),
+                    SnackBar(content: Text(t.addedItems(selected.length))),
                   );
                 }
               }
@@ -809,7 +822,7 @@ class _MemberCardState extends State<MemberCard> {
                 if (Navigator.canPop(sheetCtx)) Navigator.pop(sheetCtx);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Added ${names.length} item(s)')),
+                    SnackBar(content: Text(t.addedItems(names.length))),
                   );
                 }
               }
@@ -833,7 +846,7 @@ class _MemberCardState extends State<MemberCard> {
                     children: [
                       Expanded(
                         child: Text(
-                          "Add item for $memberLabel",
+                          t.addItemFor(memberLabel),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -849,11 +862,11 @@ class _MemberCardState extends State<MemberCard> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: c,
-                    decoration: const InputDecoration(
-                      hintText: "Enter items (comma or new line)…",
-                      helperText: "Example: Milk, Bread, Eggs",
-                      prefixIcon: Icon(Icons.shopping_bag),
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      hintText: t.enterItemsHint,
+                      helperText: t.itemsHelperExample,
+                      prefixIcon: const Icon(Icons.shopping_bag),
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                     onSubmitted: (_) => addTyped(),
@@ -863,7 +876,7 @@ class _MemberCardState extends State<MemberCard> {
                   const SizedBox(height: 10),
                   if (suggestions.isNotEmpty) ...[
                     Text(
-                      "Suggestions",
+                      t.suggestionsTitle,
                       style: Theme.of(context).textTheme.labelLarge,
                     ),
                     const SizedBox(height: 6),
@@ -899,7 +912,7 @@ class _MemberCardState extends State<MemberCard> {
                     children: [
                       OutlinedButton.icon(
                         icon: const Icon(Icons.playlist_add),
-                        label: const Text("Add typed list"),
+                        label: Text(t.addTypedList),
                         onPressed: addTyped,
                       ),
                       const SizedBox(width: 8),
@@ -907,8 +920,8 @@ class _MemberCardState extends State<MemberCard> {
                         icon: const Icon(Icons.library_add_check),
                         label: Text(
                           selected.isEmpty
-                              ? "Add selected"
-                              : "Add selected (${selected.length})",
+                              ? t.addSelected
+                              : t.addSelectedCount(selected.length),
                         ),
                         onPressed: selected.isEmpty ? null : addSelected,
                       ),
@@ -922,243 +935,13 @@ class _MemberCardState extends State<MemberCard> {
       },
     );
   }
+}
 
-  // void _openQuickAddTaskSheet(BuildContext context, String memberUid) {
-  //   final memberLabel = widget.memberName; // sadece başlıkta göstermek için
-  //   final taskProv = context.read<TaskCloudProvider>();
-  //
-  //   const defaultTasks = AppLists.defaultTasks;
-  //   final frequent = taskProv.suggestedTasks;
-  //   final existing = taskProv.tasks.map((t) => t.name).toList();
-  //   final suggestions = {
-  //     ...frequent,
-  //     ...defaultTasks,
-  //     ...existing,
-  //   }.where((s) => s.trim().isNotEmpty).toList();
-  //
-  //   final c = TextEditingController();
-  //
-  //   showModalBottomSheet(
-  //     context: context,
-  //     isScrollControlled: true,
-  //     shape: const RoundedRectangleBorder(
-  //       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-  //     ),
-  //     builder: (_) {
-  //       return Padding(
-  //         padding: EdgeInsets.only(
-  //           left: 16,
-  //           right: 16,
-  //           top: 12,
-  //           bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
-  //         ),
-  //         child: StatefulBuilder(
-  //           builder: (ctx, setLocal) {
-  //             return Column(
-  //               mainAxisSize: MainAxisSize.min,
-  //               crossAxisAlignment: CrossAxisAlignment.start,
-  //               children: [
-  //                 // handle + başlık
-  //                 Center(
-  //                   child: Container(
-  //                     width: 36,
-  //                     height: 4,
-  //                     margin: const EdgeInsets.only(bottom: 10),
-  //                     decoration: BoxDecoration(
-  //                       color: Theme.of(context).dividerColor,
-  //                       borderRadius: BorderRadius.circular(99),
-  //                     ),
-  //                   ),
-  //                 ),
-  //                 Row(
-  //                   children: [
-  //                     Expanded(
-  //                       child: Text(
-  //                         "Add task for $memberLabel",
-  //                         style: const TextStyle(
-  //                           fontWeight: FontWeight.bold,
-  //                           fontSize: 16,
-  //                         ),
-  //                       ),
-  //                     ),
-  //                     IconButton(
-  //                       icon: const Icon(Icons.close),
-  //                       onPressed: () => Navigator.pop(context),
-  //                     ),
-  //                   ],
-  //                 ),
-  //                 const SizedBox(height: 8),
-  //                 TextField(
-  //                   controller: c,
-  //                   decoration: const InputDecoration(
-  //                     hintText: "Enter task…",
-  //                     prefixIcon: Icon(Icons.task_alt),
-  //                     border: OutlineInputBorder(),
-  //                     isDense: true,
-  //                   ),
-  //                   onSubmitted: (_) =>
-  //                       _assignOrCreateTask(context, c.text, memberUid),
-  //                 ),
-  //                 const SizedBox(height: 12),
-  //                 if (suggestions.isNotEmpty) ...[
-  //                   Text(
-  //                     "Suggestions",
-  //                     style: Theme.of(context).textTheme.labelLarge,
-  //                   ),
-  //                   const SizedBox(height: 6),
-  //                   ConstrainedBox(
-  //                     constraints: const BoxConstraints(maxHeight: 150),
-  //                     child: SingleChildScrollView(
-  //                       child: Wrap(
-  //                         spacing: 6,
-  //                         runSpacing: 6,
-  //                         children: suggestions.map((name) {
-  //                           return ActionChip(
-  //                             label: Text(name),
-  //                             onPressed: () =>
-  //                                 _assignOrCreateTask(context, name, memberUid),
-  //                           );
-  //                         }).toList(),
-  //                       ),
-  //                     ),
-  //                   ),
-  //                   const SizedBox(height: 12),
-  //                 ],
-  //                 Align(
-  //                   alignment: Alignment.centerRight,
-  //                   child: FilledButton.icon(
-  //                     icon: const Icon(Icons.add),
-  //                     label: const Text("Add"),
-  //                     onPressed: () =>
-  //                         _assignOrCreateTask(context, c.text, memberUid),
-  //                   ),
-  //                 ),
-  //               ],
-  //             );
-  //           },
-  //         ),
-  //       );
-  //     },
-  //   );
-  // }
-
-  // void _openQuickAddItemSheet(BuildContext context, String memberUid) {
-  //   final memberLabel = widget.memberName; // sadece başlık için
-  //   final itemProv = context.read<ItemCloudProvider>();
-  //
-  //   const defaultItems = AppLists.defaultItems;
-  //   final frequent = itemProv.frequentItems;
-  //   final existing = itemProv.items.map((i) => i.name).toList();
-  //   final suggestions = {
-  //     ...frequent,
-  //     ...defaultItems,
-  //     ...existing,
-  //   }.where((s) => s.trim().isNotEmpty).toList();
-  //
-  //   final c = TextEditingController();
-  //
-  //   showModalBottomSheet(
-  //     context: context,
-  //     isScrollControlled: true,
-  //     shape: const RoundedRectangleBorder(
-  //       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-  //     ),
-  //     builder: (_) {
-  //       return Padding(
-  //         padding: EdgeInsets.only(
-  //           left: 16,
-  //           right: 16,
-  //           top: 12,
-  //           bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
-  //         ),
-  //         child: StatefulBuilder(
-  //           builder: (ctx, setLocal) {
-  //             return Column(
-  //               mainAxisSize: MainAxisSize.min,
-  //               crossAxisAlignment: CrossAxisAlignment.start,
-  //               children: [
-  //                 Center(
-  //                   child: Container(
-  //                     width: 36,
-  //                     height: 4,
-  //                     margin: const EdgeInsets.only(bottom: 10),
-  //                     decoration: BoxDecoration(
-  //                       color: Theme.of(context).dividerColor,
-  //                       borderRadius: BorderRadius.circular(99),
-  //                     ),
-  //                   ),
-  //                 ),
-  //                 Row(
-  //                   children: [
-  //                     Expanded(
-  //                       child: Text(
-  //                         "Add item for $memberLabel",
-  //                         style: const TextStyle(
-  //                           fontWeight: FontWeight.bold,
-  //                           fontSize: 16,
-  //                         ),
-  //                       ),
-  //                     ),
-  //                     IconButton(
-  //                       icon: const Icon(Icons.close),
-  //                       onPressed: () => Navigator.pop(context),
-  //                     ),
-  //                   ],
-  //                 ),
-  //                 const SizedBox(height: 8),
-  //                 TextField(
-  //                   controller: c,
-  //                   decoration: const InputDecoration(
-  //                     hintText: "Enter item…",
-  //                     prefixIcon: Icon(Icons.shopping_bag),
-  //                     border: OutlineInputBorder(),
-  //                     isDense: true,
-  //                   ),
-  //                   onSubmitted: (_) =>
-  //                       _assignOrCreateItem(context, c.text, memberUid),
-  //                 ),
-  //                 const SizedBox(height: 12),
-  //                 if (suggestions.isNotEmpty) ...[
-  //                   Text(
-  //                     "Suggestions",
-  //                     style: Theme.of(context).textTheme.labelLarge,
-  //                   ),
-  //                   const SizedBox(height: 6),
-  //                   ConstrainedBox(
-  //                     constraints: const BoxConstraints(maxHeight: 150),
-  //                     child: SingleChildScrollView(
-  //                       child: Wrap(
-  //                         spacing: 6,
-  //                         runSpacing: 6,
-  //                         children: suggestions.map((name) {
-  //                           return ActionChip(
-  //                             label: Text(name),
-  //                             onPressed: () =>
-  //                                 _assignOrCreateItem(context, name, memberUid),
-  //                           );
-  //                         }).toList(),
-  //                       ),
-  //                     ),
-  //                   ),
-  //                   const SizedBox(height: 12),
-  //                 ],
-  //                 Align(
-  //                   alignment: Alignment.centerRight,
-  //                   child: FilledButton.icon(
-  //                     icon: const Icon(Icons.add),
-  //                     label: const Text("Add"),
-  //                     onPressed: () =>
-  //                         _assignOrCreateItem(context, c.text, memberUid),
-  //                   ),
-  //                 ),
-  //               ],
-  //             );
-  //           },
-  //         ),
-  //       );
-  //     },
-  //   );
-  // }
+String formatDt(BuildContext context, DateTime dt) {
+  final locale = Localizations.localeOf(context).toLanguageTag(); // ör: "tr-TR"
+  // İstediğin desene göre düzenleyebilirsin:
+  final df = DateFormat('dd.MM, HH:mm', locale);
+  return df.format(dt);
 }
 
 List<String> _splitNames(String raw) {

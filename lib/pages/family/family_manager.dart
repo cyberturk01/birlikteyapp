@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../providers/family_provider.dart';
 
 class _FamilyManagerSheet extends StatelessWidget {
@@ -14,6 +15,7 @@ class _FamilyManagerSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     final fam = context.read<FamilyProvider>();
 
     return Padding(
@@ -38,10 +40,13 @@ class _FamilyManagerSheet extends StatelessWidget {
           ),
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Manage family',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  t.menuManageFamily,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
               IconButton(
@@ -55,12 +60,17 @@ class _FamilyManagerSheet extends StatelessWidget {
           // Davet kodu kartı
           _InviteCodeTile(
             onTapCopy: () async {
+              final t = AppLocalizations.of(context)!;
               final code = await fam.getInviteCode();
               if (code == null) return;
               await Clipboard.setData(ClipboardData(text: code));
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Invite code copied: $code')),
+                  SnackBar(
+                    content: Text(
+                      AppLocalizations.of(context)!.inviteCodeCopied(code),
+                    ),
+                  ),
                 );
               }
             },
@@ -109,6 +119,7 @@ class MemberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     final meUid = FirebaseAuth.instance.currentUser?.uid;
     final isOwner = entry.role == 'owner';
     final isSelf = entry.uid == meUid;
@@ -123,7 +134,7 @@ class MemberTile extends StatelessWidget {
             : Text(entry.label.isEmpty ? '?' : entry.label[0].toUpperCase()),
       ),
       title: Text(entry.label, overflow: TextOverflow.ellipsis),
-      subtitle: Text(isOwner ? 'Owner' : 'Member'),
+      subtitle: Text(isOwner ? t.ownerLabel : t.memberLabel),
       trailing: PopupMenuButton<String>(
         onSelected: (v) async {
           if (v == 'editLabel') {
@@ -140,7 +151,7 @@ class MemberTile extends StatelessWidget {
             );
             if (x == null) return;
 
-            showDialog(
+            await showDialog(
               context: context,
               barrierDismissible: false,
               builder: (_) => const Center(child: CircularProgressIndicator()),
@@ -153,7 +164,7 @@ class MemberTile extends StatelessWidget {
             } catch (e) {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Photo update failed: $e')),
+                  SnackBar(content: Text(t.photoUpdateFailed('$e'))),
                 );
               }
             } finally {
@@ -169,7 +180,7 @@ class MemberTile extends StatelessWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(
                   context,
-                ).showSnackBar(SnackBar(content: Text('Remove failed: $e')));
+                ).showSnackBar(SnackBar(content: Text(t.removeFailed('$e'))));
               }
             }
             return;
@@ -179,18 +190,16 @@ class MemberTile extends StatelessWidget {
             final ok = await showDialog<bool>(
               context: context,
               builder: (_) => AlertDialog(
-                title: const Text('Remove member?'),
-                content: Text(
-                  '“${entry.label}” will be removed from this family.',
-                ),
+                title: Text(t.removeMemberTitle),
+                content: Text(t.removeMemberBody(entry.label)),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancel'),
+                    child: Text(t.cancel),
                   ),
                   FilledButton(
                     onPressed: () => Navigator.pop(context, true),
-                    child: const Text('Remove'),
+                    child: Text(t.remove),
                   ),
                 ],
               ),
@@ -204,39 +213,39 @@ class MemberTile extends StatelessWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(
                   context,
-                ).showSnackBar(const SnackBar(content: Text('Member removed')));
+                ).showSnackBar(SnackBar(content: Text(t.memberRemoved)));
               }
             } catch (e) {
               if (context.mounted) {
                 ScaffoldMessenger.of(
                   context,
-                ).showSnackBar(SnackBar(content: Text('Remove failed: $e')));
+                ).showSnackBar(SnackBar(content: Text(t.removeFailed('$e'))));
               }
             }
             return;
           }
         },
         itemBuilder: (ctx) => [
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'editLabel',
             child: ListTile(
-              leading: Icon(Icons.edit),
-              title: Text('Edit User'),
+              leading: const Icon(Icons.edit),
+              title: Text(AppLocalizations.of(context)!.editMember),
             ),
           ),
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'photo',
             child: ListTile(
-              leading: Icon(Icons.photo),
-              title: Text('Change photo'),
+              leading: const Icon(Icons.photo),
+              title: Text(AppLocalizations.of(context)!.changePhoto),
             ),
           ),
           if (hasPhoto)
-            const PopupMenuItem(
+            PopupMenuItem(
               value: 'removePhoto',
               child: ListTile(
-                leading: Icon(Icons.delete_outline),
-                title: Text('Remove photo'),
+                leading: const Icon(Icons.delete_outline),
+                title: Text(AppLocalizations.of(context)!.removePhoto),
               ),
             ),
           const PopupMenuDivider(),
@@ -249,7 +258,7 @@ class MemberTile extends StatelessWidget {
                 color: (!isOwner && !isSelf) ? Colors.red : Colors.grey,
               ),
               title: Text(
-                'Remove user',
+                AppLocalizations.of(context)!.removeUser,
                 style: TextStyle(
                   color: (!isOwner && !isSelf) ? Colors.red : Colors.grey,
                 ),
@@ -265,6 +274,7 @@ class MemberTile extends StatelessWidget {
 void showInviteSheet(BuildContext context) async {
   final fam = context.read<FamilyProvider>();
   String? code = await fam.ensureInviteCode();
+  final t = AppLocalizations.of(context)!;
   bool isActive = true;
   try {
     final snap = await FirebaseFirestore.instance
@@ -274,7 +284,7 @@ void showInviteSheet(BuildContext context) async {
     isActive = (snap.data()?['active'] as bool?) ?? true;
   } catch (_) {}
 
-  showModalBottomSheet(
+  await showModalBottomSheet(
     context: context,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -297,7 +307,7 @@ void showInviteSheet(BuildContext context) async {
                   ),
                 ),
                 ListTile(
-                  title: const Text('Invite code'),
+                  title: Text(t.inviteCode),
                   subtitle: Text(code ?? '—'),
                   trailing: Switch(
                     value: isActive,
@@ -313,7 +323,7 @@ void showInviteSheet(BuildContext context) async {
                     Expanded(
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.copy),
-                        label: const Text('Copy & Share'),
+                        label: Text(t.copyAndShare),
                         onPressed: () async => fam.shareInvite(context),
                       ),
                     ),
@@ -334,17 +344,18 @@ class _InviteCodeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     return ListTile(
       tileColor: Theme.of(
         context,
       ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       leading: const Icon(Icons.qr_code_2),
-      title: const Text('Invite a member'),
-      subtitle: const Text('Share your family’s invite code'),
+      title: Text(t.inviteMember),
+      subtitle: Text(t.shareInviteCode),
       trailing: FilledButton.icon(
         icon: const Icon(Icons.copy),
-        label: const Text('Copy code'),
+        label: Text(t.copyCode),
         onPressed: onTapCopy,
       ),
     );
@@ -355,6 +366,7 @@ class _EmptyMembersHint extends StatelessWidget {
   const _EmptyMembersHint();
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -364,14 +376,11 @@ class _EmptyMembersHint extends StatelessWidget {
             const Icon(Icons.groups_2, size: 48),
             const SizedBox(height: 10),
             Text(
-              'No family members yet',
+              t.noFamilyMembersYet,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Use the invite code above to add members.',
-              textAlign: TextAlign.center,
-            ),
+            Text(t.useInviteCodeHint, textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -385,16 +394,16 @@ void _showEditLabelDialog(BuildContext context, FamilyMemberEntry e) async {
   if (!context.mounted) return;
 
   final c = TextEditingController(text: initial);
-
-  showDialog(
+  final t = AppLocalizations.of(context)!;
+  await showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text('Edit member label'),
+      title: Text(t.editMemberLabel),
       content: TextField(
         controller: c,
-        decoration: const InputDecoration(
-          labelText: 'Label',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: t.label,
+          border: const OutlineInputBorder(),
           isDense: true,
         ),
         autofocus: true,
@@ -402,7 +411,7 @@ void _showEditLabelDialog(BuildContext context, FamilyMemberEntry e) async {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(t.cancel),
         ),
         FilledButton(
           onPressed: () async {
@@ -411,7 +420,7 @@ void _showEditLabelDialog(BuildContext context, FamilyMemberEntry e) async {
             await fam.updateMemberLabel(e.uid, newLabel);
             if (context.mounted) Navigator.pop(context);
           },
-          child: const Text('Save'),
+          child: Text(t.save),
         ),
       ],
     ),

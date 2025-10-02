@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../main.dart';
 import '../../models/view_section.dart';
 import '../../providers/expense_cloud_provider.dart';
@@ -69,6 +70,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     final famProv = context.watch<FamilyProvider>();
     final familyId = famProv.familyId;
     debugPrint('[HomePage] familyId=$familyId');
@@ -181,12 +183,12 @@ class _HomePageState extends State<HomePage> {
             title: Row(
               children: [
                 IconButton(
-                  tooltip: 'Togetherly',
+                  tooltip: t.appTitle,
                   icon: const Icon(Icons.family_restroom),
                   onPressed: () => Navigator.pop(context),
                 ),
                 const SizedBox(width: 2),
-                const Text('Togetherly'),
+                Text(t.appTitle),
               ],
             ),
             actions: [
@@ -194,16 +196,16 @@ class _HomePageState extends State<HomePage> {
                 onSelected: (value) async {
                   switch (value) {
                     case 'manage':
-                      showFamilyManager(context);
+                      await showFamilyManager(context);
                       break;
                     case 'addCenter':
-                      Navigator.push(
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const ManagePage()),
                       );
                       break;
                     case 'config':
-                      Navigator.push(
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => const ConfigurationPage(),
@@ -220,7 +222,7 @@ class _HomePageState extends State<HomePage> {
                       await FirebaseAuth.instance.signOut();
                       if (!context.mounted) return;
 
-                      Navigator.of(context).pushAndRemoveUntil(
+                      await Navigator.of(context).pushAndRemoveUntil(
                         MaterialPageRoute(builder: (_) => const AuthGate()),
                         (route) => false,
                       );
@@ -228,33 +230,36 @@ class _HomePageState extends State<HomePage> {
                   }
                 },
                 itemBuilder: (ctx) => [
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'manage',
                     child: ListTile(
-                      leading: Icon(Icons.group),
-                      title: Text('Manage family'),
+                      leading: const Icon(Icons.group),
+                      title: Text(t.menuManageFamily),
                     ),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'addCenter',
                     child: ListTile(
-                      leading: Icon(Icons.add_circle_outline),
-                      title: Text('Add Center'),
+                      leading: const Icon(Icons.add_circle_outline),
+                      title: Text(t.menuAddCenter),
                     ),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'config',
                     child: ListTile(
-                      leading: Icon(Icons.tune),
-                      title: Text('Configuration'),
+                      leading: const Icon(Icons.tune),
+                      title: Text(t.configTitle),
                     ),
                   ),
                   const PopupMenuDivider(),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'signout',
                     child: ListTile(
-                      leading: Icon(Icons.logout, color: Colors.redAccent),
-                      title: Text('Sign out'),
+                      leading: const Icon(
+                        Icons.logout,
+                        color: Colors.redAccent,
+                      ),
+                      title: Text(t.signOut),
                     ),
                   ),
                 ],
@@ -274,7 +279,7 @@ class _HomePageState extends State<HomePage> {
                   leading: const Icon(Icons.warning, color: Colors.red),
                   actions: [
                     TextButton(
-                      child: const Text('DISMISS'),
+                      child: Text(t.dismiss),
                       onPressed: () {
                         context.read<TaskCloudProvider>().clearError();
                         context.read<ItemCloudProvider>().clearError();

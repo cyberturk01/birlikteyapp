@@ -31,6 +31,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 
 import 'auth/login_page.dart';
+import 'l10n/app_localizations.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -194,7 +195,9 @@ class _RootState extends State<_Root> {
           ],
           child: Consumer<UiProvider>(
             builder: (_, ui, __) => MaterialApp(
+              locale: ui.locale,
               localizationsDelegates: const [
+                AppLocalizations.delegate,
                 GlobalMaterialLocalizations.delegate,
                 GlobalWidgetsLocalizations.delegate,
                 GlobalCupertinoLocalizations.delegate,

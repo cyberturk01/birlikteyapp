@@ -6,6 +6,7 @@ import 'package:birlikteyapp/widgets/manage/section_title.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../providers/ui_provider.dart';
 import '../../services/notification_service.dart';
 import '../../theme/brand_seed.dart';
@@ -18,18 +19,19 @@ class ConfigurationPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ui = context.watch<UiProvider>();
+    final t = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Configuration',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            Text(
+              t.configTitle, // "Configuration"
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             Text(
-              'Customize theme, reminders, and family filters.',
+              t.configSubtitle, // "Customize theme, reminders, and family filters."
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -41,29 +43,33 @@ class ConfigurationPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          SectionTitle('Family Invitation Code'),
+          // === Family Invite ===
+          SectionTitle(t.familyInviteCode),
           const SizedBox(height: 8),
           const InviteCodeCard(),
           const SizedBox(height: 8),
           const Divider(height: 24),
-          SectionTitle('Appearance'),
+
+          // === Appearance ===
+          SectionTitle(t.appearance),
           const SizedBox(height: 6),
+          // Tema modu
           SegmentedButton<ThemeMode>(
-            segments: const [
+            segments: [
               ButtonSegment(
                 value: ThemeMode.system,
-                label: Text('System'),
-                icon: Icon(Icons.phone_android),
+                label: Text(t.themeSystem), // "System"
+                icon: const Icon(Icons.phone_android),
               ),
               ButtonSegment(
                 value: ThemeMode.light,
-                label: Text('Light'),
-                icon: Icon(Icons.light_mode),
+                label: Text(t.themeLight), // "Light"
+                icon: const Icon(Icons.light_mode),
               ),
               ButtonSegment(
                 value: ThemeMode.dark,
-                label: Text('Dark'),
-                icon: Icon(Icons.dark_mode),
+                label: Text(t.themeDark), // "Dark"
+                icon: const Icon(Icons.dark_mode),
               ),
             ],
             selected: {ui.themeMode},
@@ -71,21 +77,43 @@ class ConfigurationPage extends StatelessWidget {
                 context.read<UiProvider>().setThemeMode(s.first),
             showSelectedIcon: false,
           ),
+
+          const SizedBox(height: 8),
+          const Divider(height: 24),
+          // Dil seçici
+          DropdownButtonFormField<Locale>(
+            value: ui.locale ?? Localizations.localeOf(context),
+            isExpanded: true,
+            items: const [
+              DropdownMenuItem(value: Locale('en'), child: Text('English')),
+              DropdownMenuItem(value: Locale('tr'), child: Text('Türkçe')),
+              DropdownMenuItem(value: Locale('de'), child: Text('Deutsch')),
+            ],
+            onChanged: (loc) {
+              if (loc != null) {
+                context.read<UiProvider>().setLocale(loc);
+              }
+            },
+            decoration: InputDecoration(
+              labelText: t.language, // "Language"
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
           const SizedBox(height: 8),
           const Divider(height: 24),
 
-          // === Theme ===
-          SectionTitle('App color'),
+          // === App color ===
           const SizedBox(height: 8),
           DropdownButtonFormField<BrandSeed>(
-            value: context.watch<UiProvider>().brand,
+            value: ui.brand,
             isExpanded: true,
             items: BrandSeed.values.map((b) {
               return DropdownMenuItem(
                 value: b,
                 child: Row(
                   children: [
-                    b.swatch(size: 20), // küçük renk kutusu
+                    b.swatch(size: 20),
                     const SizedBox(width: 8),
                     Text(b.label),
                   ],
@@ -97,19 +125,24 @@ class ConfigurationPage extends StatelessWidget {
                 context.read<UiProvider>().setBrand(b);
               }
             },
-            decoration: const InputDecoration(
-              labelText: "App color",
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t.appColor,
+              border: const OutlineInputBorder(),
               isDense: true,
             ),
           ),
 
-          const SizedBox(height: 16),
-          SectionTitle('Templates'),
+          const SizedBox(height: 8),
+          const Divider(height: 24),
+          const SizedBox(height: 6),
+          // === Templates ===
+          SectionTitle(t.templates),
           ListTile(
             leading: const Icon(Icons.dashboard_customize),
-            title: const Text('Templates'),
-            subtitle: const Text('One-tap task & market packs'),
+            title: Text(t.templates), // "Templates"
+            subtitle: Text(
+              t.templatesSubtitle,
+            ), // "One-tap task & market packs"
             trailing: const Icon(Icons.open_in_new),
             onTap: () {
               Navigator.push(
@@ -120,8 +153,9 @@ class ConfigurationPage extends StatelessWidget {
           ),
           const Divider(),
           const SizedBox(height: 8),
-          // === Debug / Notifications ===
-          SectionTitle('Notifications'),
+
+          // === Notifications ===
+          SectionTitle(t.notifications),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
@@ -131,21 +165,26 @@ class ConfigurationPage extends StatelessWidget {
                 onPressed: () async {
                   await NotificationService.requestPermissions();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Permission requested (if needed)'),
+                    SnackBar(
+                      content: Text(
+                        t.permissionRequested,
+                      ), // "Permission requested (if needed)"
                     ),
                   );
                 },
-                child: const Text('Request permission'),
+                child: Text(t.requestPermission),
               ),
               Tooltip(
-                message: 'Open system setting to allow precise alarms',
+                message: t
+                    .preciseAlarmsTooltip, // "Open system setting to allow precise alarms"
                 child: FilledButton.tonal(
                   onPressed: () async {
                     if (!Platform.isAndroid) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('This setting is Android-only'),
+                        SnackBar(
+                          content: Text(
+                            t.androidOnly,
+                          ), // "This setting is Android-only"
                         ),
                       );
                       return;
@@ -157,38 +196,16 @@ class ConfigurationPage extends StatelessWidget {
                       await intent.launch();
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Could not open settings: $e')),
+                        SnackBar(
+                          content: Text('${t.couldNotOpenSettings}: $e'),
+                        ),
                       );
                     }
                   },
-                  child: const Text('Enable exact alarms'),
+                  child: Text(t.enableExactAlarms),
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Dot extends StatelessWidget {
-  final Color color;
-  const _Dot({required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 18,
-      height: 18,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.35),
-            blurRadius: 6,
-            spreadRadius: 1,
           ),
         ],
       ),

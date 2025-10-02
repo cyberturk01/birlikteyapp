@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../providers/family_provider.dart';
 
 enum _GroupFilter { all, mine, unassigned }
@@ -21,6 +22,7 @@ Future<void> showGroupedByMemberSheet<T>({
   FutureOr<void> Function(BuildContext, T)? onEdit,
   FutureOr<void> Function(BuildContext, T)? onAssign,
 }) async {
+  final t = AppLocalizations.of(context)!;
   await showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -111,7 +113,7 @@ Future<void> showGroupedByMemberSheet<T>({
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          header.isEmpty ? 'Unassigned' : header,
+                          header.isEmpty ? t.unassigned : header,
                           style: Theme.of(ctx).textTheme.labelLarge?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
@@ -138,20 +140,20 @@ Future<void> showGroupedByMemberSheet<T>({
                         children: [
                           if (onAssign != null)
                             IconButton(
-                              tooltip: 'Assign',
+                              tooltip: t.assign,
                               icon: const Icon(Icons.person_add_alt, size: 20),
                               onPressed: () =>
                                   _refreshAfter(() => onAssign(ctx, e)),
                             ),
                           if (onEdit != null)
                             IconButton(
-                              tooltip: 'Edit',
+                              tooltip: t.edit,
                               icon: const Icon(Icons.edit, size: 20),
                               onPressed: () =>
                                   _refreshAfter(() => onEdit(ctx, e)),
                             ),
                           IconButton(
-                            tooltip: 'Delete',
+                            tooltip: t.delete,
                             icon: const Icon(
                               Icons.delete,
                               color: Colors.redAccent,
@@ -209,21 +211,21 @@ Future<void> showGroupedByMemberSheet<T>({
 
                         Center(
                           child: SegmentedButton<_GroupFilter>(
-                            segments: const [
+                            segments: [
                               ButtonSegment(
                                 value: _GroupFilter.all,
-                                icon: Icon(Icons.all_inclusive),
-                                label: Text('All'),
+                                icon: const Icon(Icons.all_inclusive),
+                                label: Text(t.allLabel),
                               ),
                               ButtonSegment(
                                 value: _GroupFilter.mine,
-                                icon: Icon(Icons.person),
-                                label: Text('Mine'),
+                                icon: const Icon(Icons.person),
+                                label: Text(t.mine),
                               ),
                               ButtonSegment(
                                 value: _GroupFilter.unassigned,
-                                icon: Icon(Icons.person_off_outlined),
-                                label: Text('Unassigned'),
+                                icon: const Icon(Icons.person_off_outlined),
+                                label: Text(t.unassigned),
                               ),
                             ],
                             selected: {filter},
@@ -236,9 +238,9 @@ Future<void> showGroupedByMemberSheet<T>({
                         const SizedBox(height: 8),
 
                         if (list.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 18),
-                            child: Text('No data'),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            child: Text(t.noData),
                           )
                         else
                           Flexible(

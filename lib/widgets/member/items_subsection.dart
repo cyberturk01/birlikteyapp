@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../models/item.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/ui_provider.dart';
@@ -32,16 +34,16 @@ class ItemsSubsection extends StatelessWidget {
         ? itemsFiltered
         : itemsFiltered.take(previewCount).toList();
     final hiddenCount = showAll ? 0 : (total - previewCount);
-
+    final tr = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Market',
+          tr.market,
           style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         if (itemsFiltered.isEmpty)
-          const MutedText('No items')
+          MutedText(tr.noItems)
         else
           ...visible.map((it) {
             final bought = it.bought;
@@ -69,11 +71,11 @@ class ItemsSubsection extends StatelessWidget {
                     bought: removed.bought,
                     assignedToUid: removed.assignedToUid,
                   );
-                  context.read<ItemCloudProvider>().removeItem(removed);
+                  await context.read<ItemCloudProvider>().removeItem(removed);
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Item deleted'),
+                      content: Text(tr.itemDeleted),
                       action: SnackBarAction(
                         label: 'Undo',
                         onPressed: () =>
@@ -128,24 +130,24 @@ class ItemsSubsection extends StatelessWidget {
                           context.read<ItemCloudProvider>().removeItem(it);
                         }
                       },
-                      itemBuilder: (ctx) => const [
+                      itemBuilder: (ctx) => [
                         PopupMenuItem(
                           value: 'edit',
                           child: ListTile(
                             dense: true,
-                            leading: Icon(Icons.edit),
-                            title: Text('Edit'),
+                            leading: const Icon(Icons.edit),
+                            title: Text(tr.edit),
                           ),
                         ),
                         PopupMenuItem(
                           value: 'delete',
                           child: ListTile(
                             dense: true,
-                            leading: Icon(
+                            leading: const Icon(
                               Icons.delete_outline,
                               color: Colors.redAccent,
                             ),
-                            title: Text('Delete'),
+                            title: Text(tr.delete),
                           ),
                         ),
                       ],
@@ -160,7 +162,7 @@ class ItemsSubsection extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: onToggleExpand,
-              child: Text(showAll ? 'Show less' : 'Show all (+$hiddenCount)'),
+              child: Text(showAll ? tr.showLess : tr.showAllCount(hiddenCount)),
             ),
           ),
       ],
@@ -205,19 +207,22 @@ class _CategoryPill extends StatelessWidget {
 
 void _showEditItemDialog(BuildContext context, Item it) {
   final cCat = TextEditingController(text: it.category ?? '');
-  final cPrice = TextEditingController(text: it.price?.toString() ?? '');
+  final cPrice = TextEditingController(
+    text: it.price == null ? '' : _formatMoneyForInput(context, it.price!),
+  );
+  final t = AppLocalizations.of(context)!;
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text('Edit item'),
+      title: Text(t.editItem),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
             controller: cCat,
-            decoration: const InputDecoration(
-              labelText: 'Category',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t.category,
+              border: const OutlineInputBorder(),
               isDense: true,
             ),
           ),
@@ -225,9 +230,9 @@ void _showEditItemDialog(BuildContext context, Item it) {
           TextField(
             controller: cPrice,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Price',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t.price,
+              border: const OutlineInputBorder(),
               isDense: true,
             ),
           ),
@@ -236,7 +241,7 @@ void _showEditItemDialog(BuildContext context, Item it) {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(t.cancel),
         ),
         FilledButton(
           onPressed: () async {
@@ -247,7 +252,7 @@ void _showEditItemDialog(BuildContext context, Item it) {
             await prov.updatePrice(it, price);
             if (context.mounted) Navigator.pop(context);
           },
-          child: const Text('Save'),
+          child: Text(t.save),
         ),
       ],
     ),
@@ -274,7 +279,7 @@ class _PricePill extends StatelessWidget {
           const Icon(Icons.payments, size: 12),
           const SizedBox(width: 4),
           Text(
-            _fmtMoney(price),
+            _formatMoneyDisplay(context, price),
             style: TextStyle(
               fontSize: 11,
               color: fg,
@@ -287,11 +292,24 @@ class _PricePill extends StatelessWidget {
   }
 
   String _fmtMoney(double v) {
-    // Basit; istersen mevcut fmtMoney(context, v) utilini kullan
     if (v >= 1000) return v.toStringAsFixed(0);
     if (v == v.roundToDouble()) return v.toStringAsFixed(0);
     return v.toStringAsFixed(2);
   }
+}
+
+String _formatMoneyDisplay(BuildContext context, double v) {
+  final locale = Localizations.localeOf(context).toLanguageTag();
+  // Varsayılan yerel para birimi simgesi; istersen currencyCode geçirilebilir
+  return NumberFormat.simpleCurrency(locale: locale).format(v);
+}
+
+String _formatMoneyForInput(BuildContext context, double v) {
+  final locale = Localizations.localeOf(context).toLanguageTag();
+  final dec = NumberFormat.decimalPattern(locale);
+  // Tam sayı ise ondalık ekleme
+  if (v == v.roundToDouble()) return dec.format(v);
+  return dec.format(v);
 }
 
 Future<void> _handleToggleItem(
@@ -301,6 +319,7 @@ Future<void> _handleToggleItem(
 }) async {
   final ui = context.read<UiProvider>();
   final willComplete = !it.bought;
+  final t = AppLocalizations.of(context)!;
 
   await context.read<ItemCloudProvider>().toggleItem(it, willComplete);
 
@@ -310,9 +329,9 @@ Future<void> _handleToggleItem(
       final m = ScaffoldMessenger.of(context);
       m.clearSnackBars();
       m.showSnackBar(
-        const SnackBar(
-          content: Text('🎉 Item Bought!'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(t.itemBoughtToast),
+          duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
         ),
       );

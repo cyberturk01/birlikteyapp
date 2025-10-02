@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../models/task.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/ui_provider.dart';
@@ -29,7 +30,8 @@ class TasksSubsection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
+    final th = Theme.of(context);
+    final t = AppLocalizations.of(context)!;
     final total = tasksFiltered.length;
     final showAll = expanded || total <= previewCount;
     final visible = showAll
@@ -44,11 +46,11 @@ class TasksSubsection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Tasks',
-          style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+          t.tasks,
+          style: th.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         if (tasksFiltered.isEmpty)
-          const MutedText('No tasks')
+          MutedText(t.noTasks)
         else
           ...visible.map((task) {
             final isDone = task.completed;
@@ -83,17 +85,16 @@ class TasksSubsection extends StatelessWidget {
                   return false; // tile listeden düşmesin
                 } else {
                   final removed = task;
-                  context.read<TaskCloudProvider>().removeTask(task);
+                  await context.read<TaskCloudProvider>().removeTask(task);
 
                   // Undo SnackBar
                   ScaffoldMessenger.of(context).clearSnackBars();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Task deleted'),
+                      content: Text(t.taskDeleted),
                       action: SnackBarAction(
-                        label: 'Undo',
+                        label: t.undo,
                         onPressed: () {
-                          // Not: yeniden eklenir (yeni key alır); sıra üstte olur
                           context.read<TaskCloudProvider>().addTask(removed);
                         },
                       ),
@@ -123,9 +124,9 @@ class TasksSubsection extends StatelessWidget {
                     );
                     if (willComplete && context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('🎉 +10 points'),
-                          duration: Duration(seconds: 2),
+                        SnackBar(
+                          content: Text(t.taskCompletedToast),
+                          duration: const Duration(seconds: 2),
                           behavior: SnackBarBehavior.floating,
                         ),
                       );
@@ -152,7 +153,7 @@ class TasksSubsection extends StatelessWidget {
 
                     // mevcut menü
                     PopupMenuButton<String>(
-                      tooltip: 'More',
+                      tooltip: t.more,
                       onSelected: (v) async {
                         if (v == 'edit' && onEditTask != null) {
                           onEditTask!(task);
@@ -163,9 +164,9 @@ class TasksSubsection extends StatelessWidget {
                             ..clearSnackBars()
                             ..showSnackBar(
                               SnackBar(
-                                content: const Text('Task deleted'),
+                                content: Text(t.taskDeleted),
                                 action: SnackBarAction(
-                                  label: 'Undo',
+                                  label: t.undo,
                                   onPressed: () {
                                     context.read<TaskCloudProvider>().addTask(
                                       removed,
@@ -176,24 +177,24 @@ class TasksSubsection extends StatelessWidget {
                             );
                         }
                       },
-                      itemBuilder: (ctx) => const [
+                      itemBuilder: (ctx) => [
                         PopupMenuItem(
                           value: 'edit',
                           child: ListTile(
                             dense: true,
-                            leading: Icon(Icons.edit),
-                            title: Text('Edit'),
+                            leading: const Icon(Icons.edit),
+                            title: Text(t.edit),
                           ),
                         ),
                         PopupMenuItem(
                           value: 'delete',
                           child: ListTile(
                             dense: true,
-                            leading: Icon(
+                            leading: const Icon(
                               Icons.delete_outline,
                               color: Colors.redAccent,
                             ),
-                            title: Text('Delete'),
+                            title: Text(t.delete),
                           ),
                         ),
                       ],
@@ -210,7 +211,7 @@ class TasksSubsection extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: onToggleExpand,
-              child: Text(showAll ? 'Show less' : 'Show all (+$hiddenCount)'),
+              child: Text(showAll ? t.showLess : t.showAllCount(hiddenCount)),
             ),
           ),
       ],
@@ -265,7 +266,7 @@ String _fmtDueShort(DateTime d) {
   if (isToday) {
     final hh = d.hour.toString().padLeft(2, '0');
     final mi = d.minute.toString().padLeft(2, '0');
-    return '$dd/$mm $hh:$mi'; // bugünse saat de göster
+    return '$dd/$mm $hh:$mi';
   }
   return '$dd/$mm';
 }
@@ -273,13 +274,14 @@ String _fmtDueShort(DateTime d) {
 // ---- toggle handlers keep auto-switch behavior via UiProvider ----
 Future<void> _handleToggleTask(
   BuildContext context,
-  Task t, {
+  Task tk, {
   bool withCelebrate = false,
 }) async {
   final ui = context.read<UiProvider>();
-  final willComplete = !t.completed;
+  final willComplete = !tk.completed;
+  final t = AppLocalizations.of(context)!;
 
-  await context.read<TaskCloudProvider>().toggleTask(t, willComplete);
+  await context.read<TaskCloudProvider>().toggleTask(tk, willComplete);
 
   if (withCelebrate && willComplete) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -287,9 +289,9 @@ Future<void> _handleToggleTask(
       final m = ScaffoldMessenger.of(context);
       m.clearSnackBars();
       m.showSnackBar(
-        const SnackBar(
-          content: Text('🎉 Task completed!'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(t.taskCompletedToast),
+          duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -299,9 +301,9 @@ Future<void> _handleToggleTask(
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('➕ +10 points'),
-          duration: Duration(seconds: 1),
+        SnackBar(
+          content: Text(t.pointsAwarded(10)),
+          duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
         ),
       );

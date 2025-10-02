@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
@@ -36,16 +37,22 @@ class _LandingPageState extends State<LandingPage> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Togetherly — Welcome'),
-          bottom: const TabBar(
+          title: Text('Togetherly — ${AppLocalizations.of(context)!.welcome}'),
+          bottom: TabBar(
             tabs: [
-              Tab(text: 'Members', icon: Icon(Icons.group)),
-              Tab(text: 'Leaderboard', icon: Icon(Icons.emoji_events)),
+              Tab(
+                text: AppLocalizations.of(context)!.members,
+                icon: const Icon(Icons.group),
+              ),
+              Tab(
+                text: AppLocalizations.of(context)!.leaderboard,
+                icon: const Icon(Icons.emoji_events),
+              ),
             ],
           ),
           actions: [
             IconButton(
-              tooltip: 'Sign out',
+              tooltip: AppLocalizations.of(context)!.signOut,
               icon: const Icon(Icons.logout, color: Colors.redAccent),
               onPressed: () async {
                 context.read<TaskCloudProvider>().teardown();
@@ -103,28 +110,30 @@ class _LandingPageState extends State<LandingPage> {
                         children: [
                           Expanded(
                             child: Text(
-                              'Welcome back',
+                              AppLocalizations.of(context)!.welcomeBack,
                               style: Theme.of(context).textTheme.headlineSmall,
                             ),
                           ),
                           IconButton(
-                            tooltip: 'Add member',
+                            tooltip: AppLocalizations.of(context)!.addMember,
                             icon: const Icon(Icons.person_add_alt_1),
                             onPressed: () => showFamilyManager(context),
                           ),
                         ],
                       ),
                       const SizedBox(height: 6),
-                      const Text('Pick a member to continue'),
+                      Text(AppLocalizations.of(context)!.pickMember),
                       const SizedBox(height: 12),
 
                       if (entries.length > 4) ...[
                         TextField(
                           controller: _searchCtrl,
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.search),
-                            hintText: 'Search member…',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            prefixIcon: const Icon(Icons.search),
+                            hintText: AppLocalizations.of(
+                              context,
+                            )!.searchMember,
+                            border: const OutlineInputBorder(),
                             isDense: true,
                           ),
                           onChanged: (v) => setState(() => _query = v),
@@ -133,8 +142,12 @@ class _LandingPageState extends State<LandingPage> {
                       ],
 
                       if (visible.isEmpty)
-                        const Expanded(
-                          child: Center(child: Text('No members found')),
+                        Expanded(
+                          child: Center(
+                            child: Text(
+                              AppLocalizations.of(context)!.noMembersFound,
+                            ),
+                          ),
                         )
                       else if (visible.isNotEmpty) ...[
                         Expanded(
@@ -158,7 +171,7 @@ class _LandingPageState extends State<LandingPage> {
                                       .read<UiProvider>()
                                       .setActiveMemberUid(e.uid);
                                   if (!context.mounted) return;
-                                  Navigator.push(
+                                  await Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => HomePage(
@@ -190,7 +203,9 @@ class _LandingPageState extends State<LandingPage> {
                           alignment: Alignment.centerRight,
                           child: TextButton.icon(
                             icon: const Icon(Icons.groups),
-                            label: Text('See all members (${filtered.length})'),
+                            label: Text(
+                              '${AppLocalizations.of(context)!.seeAllMembers} ${filtered.length}',
+                            ),
                             onPressed: () {
                               Navigator.push(
                                 context,
@@ -203,7 +218,7 @@ class _LandingPageState extends State<LandingPage> {
                                           .read<UiProvider>()
                                           .setActiveMemberUid(uid);
                                       if (!context.mounted) return;
-                                      Navigator.push(
+                                      await Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                           builder: (_) => HomePage(
@@ -232,7 +247,7 @@ class _LandingPageState extends State<LandingPage> {
                     alignment: Alignment.centerRight,
                     child: FilledButton.icon(
                       icon: const Icon(Icons.dashboard_customize),
-                      label: const Text('Go to dashboard'),
+                      label: Text(AppLocalizations.of(context)!.goToDashboard),
                       onPressed: () {
                         Navigator.push(
                           context,
@@ -251,10 +266,6 @@ class _LandingPageState extends State<LandingPage> {
   }
 
   Widget _buildEmpty(BuildContext context) {
-    /* (seninkiyle aynı) */
-    // ... (hiç değiştirmedim)
-    // showFamilyManager(context) butonlu kart
-    // return ...
     final theme = Theme.of(context);
     return Center(
       child: ConstrainedBox(
@@ -272,13 +283,13 @@ class _LandingPageState extends State<LandingPage> {
                 const Icon(Icons.family_restroom, size: 42),
                 const SizedBox(height: 12),
                 Text(
-                  'Let’s set up your family',
+                  AppLocalizations.of(context)!.setupFamily,
                   style: theme.textTheme.titleLarge,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Add your first family member to start sharing tasks and shopping lists together.',
+                  AppLocalizations.of(context)!.setupFamilyDesc,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: Colors.grey[700],
                   ),
@@ -289,7 +300,7 @@ class _LandingPageState extends State<LandingPage> {
                   width: double.infinity,
                   child: FilledButton.icon(
                     icon: const Icon(Icons.person_add_alt_1),
-                    label: const Text('Add first member'),
+                    label: Text(AppLocalizations.of(context)!.addFirstMember),
                     onPressed: () async {
                       await showFamilyManager(context);
                       if (!mounted) return;
@@ -299,7 +310,7 @@ class _LandingPageState extends State<LandingPage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'You can add more members anytime from the top-right.',
+                  AppLocalizations.of(context)!.setupFamilyHint,
                   style: theme.textTheme.bodySmall,
                   textAlign: TextAlign.center,
                 ),
@@ -403,7 +414,7 @@ class _AllMembersPageUidState extends State<_AllMembersPageUid> {
         .toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('All members')),
+      appBar: AppBar(title: Text(AppLocalizations.of(context)!.allMembers)),
       body: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
