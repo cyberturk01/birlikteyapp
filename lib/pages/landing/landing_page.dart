@@ -14,7 +14,7 @@ import '../family/family_manager.dart';
 import '../home/home_page.dart';
 
 class LandingPage extends StatefulWidget {
-  const LandingPage({Key? key}) : super(key: key);
+  const LandingPage({super.key});
   @override
   State<LandingPage> createState() => _LandingPageState();
 }
@@ -51,6 +51,11 @@ class _LandingPageState extends State<LandingPage> {
             ],
           ),
           actions: [
+            IconButton(
+              tooltip: AppLocalizations.of(context)!.language, // "Language"
+              icon: const Icon(Icons.language),
+              onPressed: () => _showLanguagePicker(context),
+            ),
             IconButton(
               tooltip: AppLocalizations.of(context)!.signOut,
               icon: const Icon(Icons.logout, color: Colors.redAccent),
@@ -376,11 +381,10 @@ class _AllMembersPageUid extends StatefulWidget {
   final ValueChanged<String> onPickUid;
 
   const _AllMembersPageUid({
-    Key? key,
     required this.initialList,
     required this.initialQuery,
     required this.onPickUid,
-  }) : super(key: key);
+  });
 
   @override
   State<_AllMembersPageUid> createState() => _AllMembersPageUidState();
@@ -422,9 +426,9 @@ class _AllMembersPageUidState extends State<_AllMembersPageUid> {
             TextField(
               controller: _searchCtrl,
               decoration: InputDecoration(
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search),
                 hintText: AppLocalizations.of(context)!.searchMember,
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
                 isDense: true,
               ),
               onChanged: (v) => setState(() => _query = v),
@@ -434,14 +438,15 @@ class _AllMembersPageUidState extends State<_AllMembersPageUid> {
               child: LayoutBuilder(
                 builder: (context, c) {
                   int cross = 2;
-                  if (c.maxWidth >= 1200)
+                  if (c.maxWidth >= 1200) {
                     cross = 6;
-                  else if (c.maxWidth >= 900)
+                  } else if (c.maxWidth >= 900) {
                     cross = 5;
-                  else if (c.maxWidth >= 700)
+                  } else if (c.maxWidth >= 700) {
                     cross = 4;
-                  else if (c.maxWidth >= 520)
+                  } else if (c.maxWidth >= 520) {
                     cross = 3;
+                  }
 
                   return GridView.builder(
                     itemCount: list.length,
@@ -468,4 +473,65 @@ class _AllMembersPageUidState extends State<_AllMembersPageUid> {
       ),
     );
   }
+}
+
+void _showLanguagePicker(BuildContext context) {
+  final ui = context.read<UiProvider>();
+  final t = AppLocalizations.of(context)!;
+  final current = ui.locale ?? Localizations.localeOf(context);
+
+  showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) {
+      Widget tile(Locale loc, String name) {
+        final selected = current.languageCode == loc.languageCode;
+        return ListTile(
+          leading: const Icon(Icons.language),
+          title: Text(name),
+          trailing: selected ? const Icon(Icons.check) : null,
+          onTap: () {
+            ui.setLocale(loc);
+            Navigator.pop(context);
+          },
+        );
+      }
+
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).dividerColor,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  t.language, // "Language"
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              tile(const Locale('en'), 'English'),
+              tile(const Locale('tr'), 'Türkçe'),
+              tile(const Locale('de'), 'Deutsch'),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
