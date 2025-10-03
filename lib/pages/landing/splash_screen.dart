@@ -31,12 +31,12 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     if (members.isNotEmpty) {
-      Navigator.pushReplacement(
+      await Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
       );
     } else {
-      Navigator.pushReplacement(
+      await Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LandingPage()),
       );

@@ -1,38 +1,47 @@
-// lib/constants/app_lists.dart
-class AppLists {
-  static const defaultTasks = <String>[
-    "Take out the trash",
-    "Clean the kitchen",
-    "Do the laundry",
-    "Vacuum the living room",
-    "Wash the dishes",
-    "Water the plants",
-    "Cook dinner",
-    "Organize the fridge",
-    "Change bedsheets",
-    "Iron clothes",
-  ];
+import 'package:flutter/widgets.dart';
 
-  static const defaultItems = <String>[
-    "Milk",
-    "Bread",
-    "Eggs",
-    "Butter",
-    "Cheese",
-    "Rice",
-    "Pasta",
-    "Tomatoes",
-    "Potatoes",
-    "Onions",
-    "Apples",
-    "Bananas",
-    "Chicken",
-    "Beef",
-    "Fish",
-    "Olive oil",
-    "Salt",
-    "Sugar",
-    "Coffee",
-    "Tea",
-  ];
+import '../l10n/app_localizations.dart';
+
+class AppLists {
+  static List<String> defaultTasks(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
+    return [
+      t.taskTakeOutTrash,
+      t.taskCleanKitchen,
+      t.taskDoLaundry,
+      t.taskVacuumLiving,
+      t.taskWashDishes,
+      t.taskWaterPlants,
+      t.taskCookDinner,
+      t.taskOrganizeFridge,
+      t.taskChangeBedsheets,
+      t.taskIronClothes,
+    ];
+  }
+
+  static List<String> defaultItems(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
+    return [
+      t.itemMilk,
+      t.itemBread,
+      t.itemEggs,
+      t.itemButter,
+      t.itemCheese,
+      t.itemRice,
+      t.itemPasta,
+      t.itemTomatoes,
+      t.itemPotatoes,
+      t.itemOnions,
+      t.itemApples,
+      t.itemBananas,
+      t.itemChicken,
+      t.itemBeef,
+      t.itemFish,
+      t.itemOliveOil,
+      t.itemSalt,
+      t.itemSugar,
+      t.itemCoffee,
+      t.itemTea,
+    ];
+  }
 }

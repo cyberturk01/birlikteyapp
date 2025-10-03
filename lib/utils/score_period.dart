@@ -11,10 +11,6 @@ int _isoWeekNumber(DateTime d) {
   return 1 + (days / 7).floor();
 }
 
-/// Firestore doc id'si (string)
-/// day:   2025-09-24
-/// week:  2025-W39
-/// month: 2025-09
 String periodId(ScorePeriod p, DateTime now) {
   switch (p) {
     case ScorePeriod.day:

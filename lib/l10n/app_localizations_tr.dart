@@ -877,9 +877,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get editWeeklyTask => 'Haftalık görevi düzenle';
 
   @override
-  String get titleLabel => 'Başlık';
-
-  @override
   String get dayLabel => 'Gün';
 
   @override
@@ -938,4 +935,190 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get weekdaySunday => 'Pazar';
+
+  @override
+  String get editExpense => 'Harcamayı düzenle';
+
+  @override
+  String get titleLabel => 'Başlık';
+
+  @override
+  String get amountLabel => 'Tutar';
+
+  @override
+  String get newCategory => 'Yeni kategori';
+
+  @override
+  String get nameLabel => 'Ad';
+
+  @override
+  String get recentLabel => 'Son kullanılan';
+
+  @override
+  String get titleRequired => 'Başlık gerekli';
+
+  @override
+  String get enterValidAmount => 'Geçerli bir tutar girin';
+
+  @override
+  String get amountGreaterThanZero => 'Tutar 0\'dan büyük olmalı';
+
+  @override
+  String addedAmount(String amount) {
+    return '$amount eklendi';
+  }
+
+  @override
+  String updatedAmount(String amount) {
+    return '$amount güncellendi';
+  }
+
+  @override
+  String saveFailedWithError(String error) {
+    return 'Kaydetme hatası: $error';
+  }
+
+  @override
+  String get noActiveFamily => 'Aktif aile yok';
+
+  @override
+  String get add => 'Ekle';
+
+  @override
+  String get week => 'Hafta';
+
+  @override
+  String get today => 'Bugün';
+
+  @override
+  String get month => 'Ay';
+
+  @override
+  String get quickAddTitle => 'Hızlı Ekle';
+
+  @override
+  String get quickAddSubtitle => 'Yeni görevleri ve market öğelerini tek yerden ekleyin.';
+
+  @override
+  String get allTasksHeader => 'Tüm görevler';
+
+  @override
+  String get allItemsHeader => 'Tüm öğeler';
+
+  @override
+  String get enterTaskHintShort => 'Görev yazın…';
+
+  @override
+  String get enterItemHintShort => 'Öğe yazın…';
+
+  @override
+  String get taskAlreadyExists => 'Bu görev zaten var';
+
+  @override
+  String get itemAlreadyExists => 'Bu öğe zaten var';
+
+  @override
+  String get taskAddedToast => 'Görev eklendi';
+
+  @override
+  String get itemAddedToast => 'Öğe eklendi';
+
+  @override
+  String get editNameTitle => 'Adı düzenle';
+
+  @override
+  String get assignTooltip => 'Ata';
+
+  @override
+  String get editTooltip => 'Düzenle';
+
+  @override
+  String get taskTakeOutTrash => 'Çöpü çıkar';
+
+  @override
+  String get taskCleanKitchen => 'Mutfağı temizle';
+
+  @override
+  String get taskDoLaundry => 'Çamaşır yıka';
+
+  @override
+  String get taskVacuumLiving => 'Salon süpür';
+
+  @override
+  String get taskWashDishes => 'Bulaşıkları yıka';
+
+  @override
+  String get taskWaterPlants => 'Bitkileri sula';
+
+  @override
+  String get taskCookDinner => 'Akşam yemeği yap';
+
+  @override
+  String get taskOrganizeFridge => 'Buzdolabını düzenle';
+
+  @override
+  String get taskChangeBedsheets => 'Nevresim değiştir';
+
+  @override
+  String get taskIronClothes => 'Kıyafetleri ütüle';
+
+  @override
+  String get itemMilk => 'Süt';
+
+  @override
+  String get itemBread => 'Ekmek';
+
+  @override
+  String get itemEggs => 'Yumurta';
+
+  @override
+  String get itemButter => 'Tereyağı';
+
+  @override
+  String get itemCheese => 'Peynir';
+
+  @override
+  String get itemRice => 'Pirinç';
+
+  @override
+  String get itemPasta => 'Makarna';
+
+  @override
+  String get itemTomatoes => 'Domates';
+
+  @override
+  String get itemPotatoes => 'Patates';
+
+  @override
+  String get itemOnions => 'Soğan';
+
+  @override
+  String get itemApples => 'Elma';
+
+  @override
+  String get itemBananas => 'Muz';
+
+  @override
+  String get itemChicken => 'Tavuk';
+
+  @override
+  String get itemBeef => 'Dana eti';
+
+  @override
+  String get itemFish => 'Balık';
+
+  @override
+  String get itemOliveOil => 'Zeytinyağı';
+
+  @override
+  String get itemSalt => 'Tuz';
+
+  @override
+  String get itemSugar => 'Şeker';
+
+  @override
+  String get itemCoffee => 'Kahve';
+
+  @override
+  String get itemTea => 'Çay';
 }

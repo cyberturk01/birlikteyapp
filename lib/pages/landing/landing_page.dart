@@ -421,9 +421,9 @@ class _AllMembersPageUidState extends State<_AllMembersPageUid> {
           children: [
             TextField(
               controller: _searchCtrl,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 prefixIcon: Icon(Icons.search),
-                hintText: 'Search member…',
+                hintText: AppLocalizations.of(context)!.searchMember,
                 border: OutlineInputBorder(),
                 isDense: true,
               ),

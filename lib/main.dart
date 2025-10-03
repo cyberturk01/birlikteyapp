@@ -254,14 +254,14 @@ class _RootState extends State<_Root> {
     // İlk seed (sadece boşsa)
     final taskBox = Hive.box<Task>('taskBox');
     if (taskBox.isEmpty) {
-      for (final t in AppLists.defaultTasks) {
-        taskBox.add(Task(t));
+      for (final t in AppLists.defaultTasks(context)) {
+        await taskBox.add(Task(t));
       }
     }
     final itemBox = Hive.box<Item>('itemBox');
     if (itemBox.isEmpty) {
-      for (final i in AppLists.defaultItems) {
-        itemBox.add(Item(i));
+      for (final i in AppLists.defaultItems(context)) {
+        await itemBox.add(Item(i));
       }
     }
   }

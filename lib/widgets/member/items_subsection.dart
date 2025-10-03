@@ -61,7 +61,11 @@ class ItemsSubsection extends StatelessWidget {
               ),
               confirmDismiss: (dir) async {
                 if (dir == DismissDirection.startToEnd) {
-                  _handleToggleItem(context, it, withCelebrate: !it.bought);
+                  await _handleToggleItem(
+                    context,
+                    it,
+                    withCelebrate: !it.bought,
+                  );
                   return false;
                 } else {
                   // Delete + Undo
@@ -127,7 +131,9 @@ class ItemsSubsection extends StatelessWidget {
                         if (v == 'edit') {
                           _showEditItemDialog(context, it);
                         } else if (v == 'delete') {
-                          context.read<ItemCloudProvider>().removeItem(it);
+                          await context.read<ItemCloudProvider>().removeItem(
+                            it,
+                          );
                         }
                       },
                       itemBuilder: (ctx) => [
@@ -289,12 +295,6 @@ class _PricePill extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _fmtMoney(double v) {
-    if (v >= 1000) return v.toStringAsFixed(0);
-    if (v == v.roundToDouble()) return v.toStringAsFixed(0);
-    return v.toStringAsFixed(2);
   }
 }
 

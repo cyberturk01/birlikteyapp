@@ -268,7 +268,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get boughtItemsCleared => 'Gekaufte Artikel gelöscht';
 
   @override
-  String get markAllBought => 'Alle als gekauft markieren';
+  String get markAllBought => 'Als Erledigt';
 
   @override
   String get memberFallback => 'Mitglied';
@@ -877,9 +877,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get editWeeklyTask => 'Wöchentliche Aufgabe bearbeiten';
 
   @override
-  String get titleLabel => 'Titel';
-
-  @override
   String get dayLabel => 'Tag';
 
   @override
@@ -938,4 +935,190 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get weekdaySunday => 'Sonntag';
+
+  @override
+  String get editExpense => 'Ausgabe bearbeiten';
+
+  @override
+  String get titleLabel => 'Titel';
+
+  @override
+  String get amountLabel => 'Betrag';
+
+  @override
+  String get newCategory => 'Neue Kategorie';
+
+  @override
+  String get nameLabel => 'Name';
+
+  @override
+  String get recentLabel => 'Zuletzt verwendet';
+
+  @override
+  String get titleRequired => 'Titel ist erforderlich';
+
+  @override
+  String get enterValidAmount => 'Bitte einen gültigen Betrag eingeben';
+
+  @override
+  String get amountGreaterThanZero => 'Betrag muss größer als 0 sein';
+
+  @override
+  String addedAmount(String amount) {
+    return '$amount hinzugefügt';
+  }
+
+  @override
+  String updatedAmount(String amount) {
+    return '$amount aktualisiert';
+  }
+
+  @override
+  String saveFailedWithError(String error) {
+    return 'Fehler beim Speichern: $error';
+  }
+
+  @override
+  String get noActiveFamily => 'Keine aktive Familie';
+
+  @override
+  String get add => 'Hinzufügen';
+
+  @override
+  String get week => 'Woche';
+
+  @override
+  String get today => 'Heute';
+
+  @override
+  String get month => 'Monat';
+
+  @override
+  String get quickAddTitle => 'Schnell hinzufügen';
+
+  @override
+  String get quickAddSubtitle => 'Neue Aufgaben und Einkaufsartikel an einem Ort hinzufügen.';
+
+  @override
+  String get allTasksHeader => 'Alle Aufgaben';
+
+  @override
+  String get allItemsHeader => 'Alle Artikel';
+
+  @override
+  String get enterTaskHintShort => 'Aufgabe eingeben…';
+
+  @override
+  String get enterItemHintShort => 'Artikel eingeben…';
+
+  @override
+  String get taskAlreadyExists => 'Diese Aufgabe ist bereits vorhanden';
+
+  @override
+  String get itemAlreadyExists => 'Dieser Artikel ist bereits vorhanden';
+
+  @override
+  String get taskAddedToast => 'Aufgabe hinzugefügt';
+
+  @override
+  String get itemAddedToast => 'Artikel hinzugefügt';
+
+  @override
+  String get editNameTitle => 'Name bearbeiten';
+
+  @override
+  String get assignTooltip => 'Zuweisen';
+
+  @override
+  String get editTooltip => 'Bearbeiten';
+
+  @override
+  String get taskTakeOutTrash => 'Den Müll rausbringen';
+
+  @override
+  String get taskCleanKitchen => 'Die Küche putzen';
+
+  @override
+  String get taskDoLaundry => 'Wäsche waschen';
+
+  @override
+  String get taskVacuumLiving => 'Wohnzimmer staubsaugen';
+
+  @override
+  String get taskWashDishes => 'Geschirr spülen';
+
+  @override
+  String get taskWaterPlants => 'Pflanzen gießen';
+
+  @override
+  String get taskCookDinner => 'Abendessen kochen';
+
+  @override
+  String get taskOrganizeFridge => 'Kühlschrank ordnen';
+
+  @override
+  String get taskChangeBedsheets => 'Bettwäsche wechseln';
+
+  @override
+  String get taskIronClothes => 'Kleidung bügeln';
+
+  @override
+  String get itemMilk => 'Milch';
+
+  @override
+  String get itemBread => 'Brot';
+
+  @override
+  String get itemEggs => 'Eier';
+
+  @override
+  String get itemButter => 'Butter';
+
+  @override
+  String get itemCheese => 'Käse';
+
+  @override
+  String get itemRice => 'Reis';
+
+  @override
+  String get itemPasta => 'Pasta';
+
+  @override
+  String get itemTomatoes => 'Tomaten';
+
+  @override
+  String get itemPotatoes => 'Kartoffeln';
+
+  @override
+  String get itemOnions => 'Zwiebeln';
+
+  @override
+  String get itemApples => 'Äpfel';
+
+  @override
+  String get itemBananas => 'Bananen';
+
+  @override
+  String get itemChicken => 'Huhn';
+
+  @override
+  String get itemBeef => 'Rindfleisch';
+
+  @override
+  String get itemFish => 'Fisch';
+
+  @override
+  String get itemOliveOil => 'Olivenöl';
+
+  @override
+  String get itemSalt => 'Salz';
+
+  @override
+  String get itemSugar => 'Zucker';
+
+  @override
+  String get itemCoffee => 'Kaffee';
+
+  @override
+  String get itemTea => 'Tee';
 }

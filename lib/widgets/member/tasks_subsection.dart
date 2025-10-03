@@ -159,7 +159,9 @@ class TasksSubsection extends StatelessWidget {
                           onEditTask!(task);
                         } else if (v == 'delete') {
                           final removed = task;
-                          context.read<TaskCloudProvider>().removeTask(task);
+                          await context.read<TaskCloudProvider>().removeTask(
+                            task,
+                          );
                           ScaffoldMessenger.of(context)
                             ..clearSnackBars()
                             ..showSnackBar(

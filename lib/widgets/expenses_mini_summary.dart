@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../l10n/app_localizations.dart';
 import '../providers/expense_cloud_provider.dart';
 
 class ExpensesMiniSummary extends StatelessWidget {
@@ -25,7 +26,7 @@ class ExpensesMiniSummary extends StatelessWidget {
       Duration(days: (now.weekday - DateTime.monday)),
     );
     final startOfMonth = DateTime(now.year, now.month, 1);
-
+    final t = AppLocalizations.of(context)!;
     num sumToday = 0;
     num sumWeek = 0;
     num sumMonth = 0;
@@ -76,9 +77,9 @@ class ExpensesMiniSummary extends StatelessWidget {
                   runAlignment: WrapAlignment.center, // satırlar arası ortala
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    _pill(context, 'Today', sumToday),
-                    _pill(context, 'Week', sumWeek),
-                    _pill(context, 'Month', sumMonth),
+                    _pill(context, t.today, sumToday),
+                    _pill(context, t.week, sumWeek),
+                    _pill(context, t.month, sumMonth),
                   ],
                 ),
               ),

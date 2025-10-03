@@ -347,7 +347,6 @@
   "reminderTimeCleared": "Reminder time cleared",
 
   "editWeeklyTask": "Edit weekly task",
-  "titleLabel": "Title",
   "dayLabel": "Day",
   "assignToLabel": "Assign to",
   "reminderTime": "Reminder time",
@@ -369,5 +368,82 @@
   "weekdayThursday": "Thursday",
   "weekdayFriday": "Friday",
   "weekdaySaturday": "Saturday",
-  "weekdaySunday": "Sunday"
+  "weekdaySunday": "Sunday",
+  "editExpense": "Edit expense",
+
+  "titleLabel": "Title",
+  "amountLabel": "Amount",
+
+  "newCategory": "New category",
+  "nameLabel": "Name",
+  "recentLabel": "Recent",
+
+  "titleRequired": "Title is required",
+  "enterValidAmount": "Enter a valid amount",
+  "amountGreaterThanZero": "Amount must be greater than 0",
+
+  "addedAmount": "Added {amount}",
+  "@addedAmount": { "placeholders": { "amount": { "type": "String" } } },
+
+  "updatedAmount": "Updated {amount}",
+  "@updatedAmount": { "placeholders": { "amount": { "type": "String" } } },
+
+  "saveFailedWithError": "Failed: {error}",
+  "@saveFailedWithError": { "placeholders": { "error": { "type": "String" } } },
+
+  "noActiveFamily": "No active family",
+  "add": "Add",
+  "week": "Week",
+  "today": "Today",
+  "month": "Month",
+  "quickAddTitle": "Quick Add",
+  "quickAddSubtitle": "Add new tasks and market items in one place.",
+
+  "allTasksHeader": "All tasks",
+  "allItemsHeader": "All items",
+
+  "enterTaskHintShort": "Enter task…",
+  "enterItemHintShort": "Enter item…",
+
+  "taskAlreadyExists": "This task already exists",
+  "itemAlreadyExists": "This item already exists",
+
+  "taskAddedToast": "Task added",
+  "itemAddedToast": "Item added",
+
+  "editNameTitle": "Edit name",
+
+  "assignTooltip": "Assign",
+  "editTooltip": "Edit",
+  "taskTakeOutTrash": "Take out the trash",
+  "taskCleanKitchen": "Clean the kitchen",
+  "taskDoLaundry": "Do the laundry",
+  "taskVacuumLiving": "Vacuum the living room",
+  "taskWashDishes": "Wash the dishes",
+  "taskWaterPlants": "Water the plants",
+  "taskCookDinner": "Cook dinner",
+  "taskOrganizeFridge": "Organize the fridge",
+  "taskChangeBedsheets": "Change bedsheets",
+  "taskIronClothes": "Iron clothes",
+
+  "itemMilk": "Milk",
+  "itemBread": "Bread",
+  "itemEggs": "Eggs",
+  "itemButter": "Butter",
+  "itemCheese": "Cheese",
+  "itemRice": "Rice",
+  "itemPasta": "Pasta",
+  "itemTomatoes": "Tomatoes",
+  "itemPotatoes": "Potatoes",
+  "itemOnions": "Onions",
+  "itemApples": "Apples",
+  "itemBananas": "Bananas",
+  "itemChicken": "Chicken",
+  "itemBeef": "Beef",
+  "itemFish": "Fish",
+  "itemOliveOil": "Olive oil",
+  "itemSalt": "Salt",
+  "itemSugar": "Sugar",
+  "itemCoffee": "Coffee",
+  "itemTea": "Tea"
   }

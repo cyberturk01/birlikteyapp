@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../providers/expense_cloud_provider.dart';
 import '../providers/family_provider.dart';
 import '../utils/formatting.dart';
@@ -37,18 +38,18 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
   if (category == null && recents.isNotEmpty) {
     category = recents.first;
   }
+  final t = AppLocalizations.of(context)!;
 
   final allCategories = {
-    null: 'Uncategorized',
-    'Groceries': 'Groceries',
-    'Dining': 'Dining',
-    'Transport': 'Transport',
-    'Utilities': 'Utilities',
-    'Health': 'Health',
-    'Kids': 'Kids',
-    'Home': 'Home',
-    'Other': 'Other',
-    // recents’ten gelenler
+    null: t.uncategorized,
+    'Groceries': t.categoryGroceries,
+    'Dining': t.categoryDining,
+    'Transport': t.categoryTransport,
+    'Utilities': t.categoryUtilities,
+    'Health': t.categoryHealth,
+    'Kids': t.categoryKids,
+    'Home': t.categoryHome,
+    'Other': t.categoryOther,
     for (final r in recents) r: r,
   };
 
@@ -64,14 +65,13 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
 
   final famId = context.read<FamilyProvider>().familyId;
   final canSubmit = famId != null && famId.isNotEmpty;
-
   return showDialog<ExpenseEditResult>(
     context: context,
     builder: (_) => StatefulBuilder(
       builder: (ctx, setLocal) {
         final recents = RecentExpenseCats.get(limit: 5);
         return AlertDialog(
-          title: Text(id == null ? 'Add expense' : 'Edit expense'),
+          title: Text(id == null ? t.addExpense : t.editExpense),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -80,9 +80,9 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
                   controller: titleC,
                   autofocus: true, // ⬅️ Yazmaya hazır gelsin
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Title',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: t.titleLabel,
+                    border: const OutlineInputBorder(),
                     isDense: true,
                   ),
                 ),
@@ -94,9 +94,9 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
                     decimal: true,
                   ),
                   inputFormatters: [AmountInputFormatter()],
-                  decoration: const InputDecoration(
-                    labelText: 'Amount',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: t.amountLabel,
+                    border: const OutlineInputBorder(),
                     isDense: true,
                   ),
                 ),
@@ -123,8 +123,8 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
                 MemberDropdownUid(
                   value: assignUid,
                   onChanged: (v) => setLocal(() => assignUid = v),
-                  label: 'Assign to',
-                  nullLabel: 'Unassigned',
+                  label: t.assignTo,
+                  nullLabel: t.unassigned,
                 ),
                 // Dropdown altında küçük bir “+ New category” (opsiyonel)
                 const SizedBox(height: 8),
@@ -132,32 +132,32 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
                   alignment: Alignment.centerRight,
                   child: TextButton.icon(
                     icon: const Icon(Icons.add),
-                    label: const Text('New category'),
+                    label: Text(t.newCategory),
                     onPressed: () async {
                       final newCat = await showDialog<String>(
                         context: ctx,
                         builder: (_) {
                           final c = TextEditingController();
                           return AlertDialog(
-                            title: const Text('New category'),
+                            title: Text(t.newCategory),
                             content: TextField(
                               controller: c,
                               autofocus: true,
-                              decoration: const InputDecoration(
-                                labelText: 'Name',
-                                border: OutlineInputBorder(),
+                              decoration: InputDecoration(
+                                labelText: t.nameLabel,
+                                border: const OutlineInputBorder(),
                                 isDense: true,
                               ),
                             ),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(context, null),
-                                child: const Text('Cancel'),
+                                child: Text(t.cancel),
                               ),
                               FilledButton(
                                 onPressed: () =>
                                     Navigator.pop(context, c.text.trim()),
-                                child: const Text('Add'),
+                                child: Text(t.save),
                               ),
                             ],
                           );
@@ -178,7 +178,7 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Recent',
+                      t.recentLabel,
                       style: Theme.of(context).textTheme.labelMedium,
                     ),
                   ),
@@ -188,7 +188,7 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
                     runSpacing: 8,
                     children: [
                       ActionChip(
-                        label: const Text('Uncategorized'),
+                        label: Text(t.uncategorized),
                         onPressed: () => setLocal(() => category = null),
                       ),
                       ...recents.map(
@@ -213,9 +213,9 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
                     );
                   }).toList(),
                   onChanged: (v) => setLocal(() => category = v),
-                  decoration: const InputDecoration(
-                    labelText: 'Category',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: t.category,
+                    border: const OutlineInputBorder(),
                     isDense: true,
                   ),
                 ),
@@ -225,7 +225,7 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
+              child: Text(t.cancel),
             ),
             FilledButton(
               onPressed: !canSubmit
@@ -233,24 +233,22 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
                   : () async {
                       final t = titleC.text.trim();
                       final a = parseAmountFlexible(amountC.text);
-
+                      final tr = AppLocalizations.of(context)!;
                       if (t.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Title is required')),
+                          SnackBar(content: Text(tr.titleRequired)),
                         );
                         return;
                       }
                       if (a == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Enter a valid amount')),
+                          SnackBar(content: Text(tr.enterValidAmount)),
                         );
                         return;
                       }
                       if (a <= 0) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Amount must be greater than 0'),
-                          ),
+                          SnackBar(content: Text(tr.amountGreaterThanZero)),
                         );
                         return;
                       }
@@ -290,14 +288,12 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
                         } catch (_) {
                           money = a.toStringAsFixed(2); // fallback
                         }
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              (id == null ? 'Added ' : 'Updated ') +
-                                  fmtMoney(context, a),
-                            ),
-                          ),
-                        );
+                        final msg = (id == null)
+                            ? tr.addedAmount(money)
+                            : tr.updatedAmount(money);
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text(msg)));
                       } on StateError catch (e) {
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -312,7 +308,7 @@ Future<ExpenseEditResult?> showExpenseEditDialog({
                         ).showSnackBar(SnackBar(content: Text('Failed: $e')));
                       }
                     },
-              child: Text(id == null ? 'Add' : 'Save'),
+              child: Text(id == null ? t.add : t.save),
             ),
           ],
         );

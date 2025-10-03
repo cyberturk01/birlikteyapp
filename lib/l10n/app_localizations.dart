@@ -1609,12 +1609,6 @@ abstract class AppLocalizations {
   /// **'Edit weekly task'**
   String get editWeeklyTask;
 
-  /// No description provided for @titleLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Title'**
-  String get titleLabel;
-
   /// No description provided for @dayLabel.
   ///
   /// In en, this message translates to:
@@ -1734,6 +1728,366 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sunday'**
   String get weekdaySunday;
+
+  /// No description provided for @editExpense.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit expense'**
+  String get editExpense;
+
+  /// No description provided for @titleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get titleLabel;
+
+  /// No description provided for @amountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get amountLabel;
+
+  /// No description provided for @newCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'New category'**
+  String get newCategory;
+
+  /// No description provided for @nameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get nameLabel;
+
+  /// No description provided for @recentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get recentLabel;
+
+  /// No description provided for @titleRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Title is required'**
+  String get titleRequired;
+
+  /// No description provided for @enterValidAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid amount'**
+  String get enterValidAmount;
+
+  /// No description provided for @amountGreaterThanZero.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount must be greater than 0'**
+  String get amountGreaterThanZero;
+
+  /// No description provided for @addedAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Added {amount}'**
+  String addedAmount(String amount);
+
+  /// No description provided for @updatedAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated {amount}'**
+  String updatedAmount(String amount);
+
+  /// No description provided for @saveFailedWithError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed: {error}'**
+  String saveFailedWithError(String error);
+
+  /// No description provided for @noActiveFamily.
+  ///
+  /// In en, this message translates to:
+  /// **'No active family'**
+  String get noActiveFamily;
+
+  /// No description provided for @add.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get add;
+
+  /// No description provided for @week.
+  ///
+  /// In en, this message translates to:
+  /// **'Week'**
+  String get week;
+
+  /// No description provided for @today.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get today;
+
+  /// No description provided for @month.
+  ///
+  /// In en, this message translates to:
+  /// **'Month'**
+  String get month;
+
+  /// No description provided for @quickAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Add'**
+  String get quickAddTitle;
+
+  /// No description provided for @quickAddSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add new tasks and market items in one place.'**
+  String get quickAddSubtitle;
+
+  /// No description provided for @allTasksHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'All tasks'**
+  String get allTasksHeader;
+
+  /// No description provided for @allItemsHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'All items'**
+  String get allItemsHeader;
+
+  /// No description provided for @enterTaskHintShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter task…'**
+  String get enterTaskHintShort;
+
+  /// No description provided for @enterItemHintShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter item…'**
+  String get enterItemHintShort;
+
+  /// No description provided for @taskAlreadyExists.
+  ///
+  /// In en, this message translates to:
+  /// **'This task already exists'**
+  String get taskAlreadyExists;
+
+  /// No description provided for @itemAlreadyExists.
+  ///
+  /// In en, this message translates to:
+  /// **'This item already exists'**
+  String get itemAlreadyExists;
+
+  /// No description provided for @taskAddedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Task added'**
+  String get taskAddedToast;
+
+  /// No description provided for @itemAddedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Item added'**
+  String get itemAddedToast;
+
+  /// No description provided for @editNameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit name'**
+  String get editNameTitle;
+
+  /// No description provided for @assignTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign'**
+  String get assignTooltip;
+
+  /// No description provided for @editTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get editTooltip;
+
+  /// No description provided for @taskTakeOutTrash.
+  ///
+  /// In en, this message translates to:
+  /// **'Take out the trash'**
+  String get taskTakeOutTrash;
+
+  /// No description provided for @taskCleanKitchen.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean the kitchen'**
+  String get taskCleanKitchen;
+
+  /// No description provided for @taskDoLaundry.
+  ///
+  /// In en, this message translates to:
+  /// **'Do the laundry'**
+  String get taskDoLaundry;
+
+  /// No description provided for @taskVacuumLiving.
+  ///
+  /// In en, this message translates to:
+  /// **'Vacuum the living room'**
+  String get taskVacuumLiving;
+
+  /// No description provided for @taskWashDishes.
+  ///
+  /// In en, this message translates to:
+  /// **'Wash the dishes'**
+  String get taskWashDishes;
+
+  /// No description provided for @taskWaterPlants.
+  ///
+  /// In en, this message translates to:
+  /// **'Water the plants'**
+  String get taskWaterPlants;
+
+  /// No description provided for @taskCookDinner.
+  ///
+  /// In en, this message translates to:
+  /// **'Cook dinner'**
+  String get taskCookDinner;
+
+  /// No description provided for @taskOrganizeFridge.
+  ///
+  /// In en, this message translates to:
+  /// **'Organize the fridge'**
+  String get taskOrganizeFridge;
+
+  /// No description provided for @taskChangeBedsheets.
+  ///
+  /// In en, this message translates to:
+  /// **'Change bedsheets'**
+  String get taskChangeBedsheets;
+
+  /// No description provided for @taskIronClothes.
+  ///
+  /// In en, this message translates to:
+  /// **'Iron clothes'**
+  String get taskIronClothes;
+
+  /// No description provided for @itemMilk.
+  ///
+  /// In en, this message translates to:
+  /// **'Milk'**
+  String get itemMilk;
+
+  /// No description provided for @itemBread.
+  ///
+  /// In en, this message translates to:
+  /// **'Bread'**
+  String get itemBread;
+
+  /// No description provided for @itemEggs.
+  ///
+  /// In en, this message translates to:
+  /// **'Eggs'**
+  String get itemEggs;
+
+  /// No description provided for @itemButter.
+  ///
+  /// In en, this message translates to:
+  /// **'Butter'**
+  String get itemButter;
+
+  /// No description provided for @itemCheese.
+  ///
+  /// In en, this message translates to:
+  /// **'Cheese'**
+  String get itemCheese;
+
+  /// No description provided for @itemRice.
+  ///
+  /// In en, this message translates to:
+  /// **'Rice'**
+  String get itemRice;
+
+  /// No description provided for @itemPasta.
+  ///
+  /// In en, this message translates to:
+  /// **'Pasta'**
+  String get itemPasta;
+
+  /// No description provided for @itemTomatoes.
+  ///
+  /// In en, this message translates to:
+  /// **'Tomatoes'**
+  String get itemTomatoes;
+
+  /// No description provided for @itemPotatoes.
+  ///
+  /// In en, this message translates to:
+  /// **'Potatoes'**
+  String get itemPotatoes;
+
+  /// No description provided for @itemOnions.
+  ///
+  /// In en, this message translates to:
+  /// **'Onions'**
+  String get itemOnions;
+
+  /// No description provided for @itemApples.
+  ///
+  /// In en, this message translates to:
+  /// **'Apples'**
+  String get itemApples;
+
+  /// No description provided for @itemBananas.
+  ///
+  /// In en, this message translates to:
+  /// **'Bananas'**
+  String get itemBananas;
+
+  /// No description provided for @itemChicken.
+  ///
+  /// In en, this message translates to:
+  /// **'Chicken'**
+  String get itemChicken;
+
+  /// No description provided for @itemBeef.
+  ///
+  /// In en, this message translates to:
+  /// **'Beef'**
+  String get itemBeef;
+
+  /// No description provided for @itemFish.
+  ///
+  /// In en, this message translates to:
+  /// **'Fish'**
+  String get itemFish;
+
+  /// No description provided for @itemOliveOil.
+  ///
+  /// In en, this message translates to:
+  /// **'Olive oil'**
+  String get itemOliveOil;
+
+  /// No description provided for @itemSalt.
+  ///
+  /// In en, this message translates to:
+  /// **'Salt'**
+  String get itemSalt;
+
+  /// No description provided for @itemSugar.
+  ///
+  /// In en, this message translates to:
+  /// **'Sugar'**
+  String get itemSugar;
+
+  /// No description provided for @itemCoffee.
+  ///
+  /// In en, this message translates to:
+  /// **'Coffee'**
+  String get itemCoffee;
+
+  /// No description provided for @itemTea.
+  ///
+  /// In en, this message translates to:
+  /// **'Tea'**
+  String get itemTea;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

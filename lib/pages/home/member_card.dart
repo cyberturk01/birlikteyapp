@@ -596,7 +596,7 @@ class _MemberCardState extends State<MemberCard> {
     final memberLabel = widget.memberName;
     final taskProv = context.read<TaskCloudProvider>();
     final t = AppLocalizations.of(context)!;
-    const defaultTasks = AppLists.defaultTasks;
+    final defaultTasks = AppLists.defaultTasks(context);
     final frequent = taskProv.suggestedTasks;
     final existing = taskProv.tasks.map((t) => t.name).toList();
     final suggestions =
@@ -768,7 +768,7 @@ class _MemberCardState extends State<MemberCard> {
     final memberLabel = widget.memberName;
     final itemProv = context.read<ItemCloudProvider>();
     final t = AppLocalizations.of(context)!;
-    const defaultItems = AppLists.defaultItems;
+    final defaultItems = AppLists.defaultItems(context);
     final frequent = itemProv.frequentItems;
     final existing = itemProv.items.map((i) => i.name).toList();
     final suggestions =

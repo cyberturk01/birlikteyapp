@@ -26,26 +26,6 @@ class DashboardSummaryBar extends StatelessWidget {
   final DashboardTap onTap;
   const DashboardSummaryBar({super.key, required this.onTap});
 
-  String _weekdayName(DateTime d) {
-    switch (d.weekday) {
-      case DateTime.monday:
-        return 'Monday';
-      case DateTime.tuesday:
-        return 'Tuesday';
-      case DateTime.wednesday:
-        return 'Wednesday';
-      case DateTime.thursday:
-        return 'Thursday';
-      case DateTime.friday:
-        return 'Friday';
-      case DateTime.saturday:
-        return 'Saturday';
-      case DateTime.sunday:
-      default:
-        return 'Sunday';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final tasks = context.watch<TaskCloudProvider>().tasks;

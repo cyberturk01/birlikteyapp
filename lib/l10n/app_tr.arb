@@ -331,5 +331,83 @@
   "weekdayThursday": "Perşembe",
   "weekdayFriday": "Cuma",
   "weekdaySaturday": "Cumartesi",
-  "weekdaySunday": "Pazar"
+  "weekdaySunday": "Pazar",
+  "editExpense": "Harcamayı düzenle",
+
+  "amountLabel": "Tutar",
+
+  "newCategory": "Yeni kategori",
+  "nameLabel": "Ad",
+  "recentLabel": "Son kullanılan",
+
+  "titleRequired": "Başlık gerekli",
+  "enterValidAmount": "Geçerli bir tutar girin",
+  "amountGreaterThanZero": "Tutar 0'dan büyük olmalı",
+
+  "addedAmount": "{amount} eklendi",
+  "@addedAmount": { "placeholders": { "amount": { "type": "String" } } },
+
+  "updatedAmount": "{amount} güncellendi",
+  "@updatedAmount": { "placeholders": { "amount": { "type": "String" } } },
+
+  "saveFailedWithError": "Kaydetme hatası: {error}",
+  "@saveFailedWithError": { "placeholders": { "error": { "type": "String" } } },
+
+  "noActiveFamily": "Aktif aile yok",
+  "add": "Ekle",
+  "week": "Hafta",
+  "today": "Bugün",
+  "month": "Ay",
+
+  "quickAddTitle": "Hızlı Ekle",
+  "quickAddSubtitle": "Yeni görevleri ve market öğelerini tek yerden ekleyin.",
+
+  "allTasksHeader": "Tüm görevler",
+  "allItemsHeader": "Tüm öğeler",
+
+  "enterTaskHintShort": "Görev yazın…",
+  "enterItemHintShort": "Öğe yazın…",
+
+  "taskAlreadyExists": "Bu görev zaten var",
+  "itemAlreadyExists": "Bu öğe zaten var",
+
+  "taskAddedToast": "Görev eklendi",
+  "itemAddedToast": "Öğe eklendi",
+
+  "editNameTitle": "Adı düzenle",
+
+  "assignTooltip": "Ata",
+  "editTooltip": "Düzenle",
+
+  "taskTakeOutTrash": "Çöpü çıkar",
+  "taskCleanKitchen": "Mutfağı temizle",
+  "taskDoLaundry": "Çamaşır yıka",
+  "taskVacuumLiving": "Salon süpür",
+  "taskWashDishes": "Bulaşıkları yıka",
+  "taskWaterPlants": "Bitkileri sula",
+  "taskCookDinner": "Akşam yemeği yap",
+  "taskOrganizeFridge": "Buzdolabını düzenle",
+  "taskChangeBedsheets": "Nevresim değiştir",
+  "taskIronClothes": "Kıyafetleri ütüle",
+
+  "itemMilk": "Süt",
+  "itemBread": "Ekmek",
+  "itemEggs": "Yumurta",
+  "itemButter": "Tereyağı",
+  "itemCheese": "Peynir",
+  "itemRice": "Pirinç",
+  "itemPasta": "Makarna",
+  "itemTomatoes": "Domates",
+  "itemPotatoes": "Patates",
+  "itemOnions": "Soğan",
+  "itemApples": "Elma",
+  "itemBananas": "Muz",
+  "itemChicken": "Tavuk",
+  "itemBeef": "Dana eti",
+  "itemFish": "Balık",
+  "itemOliveOil": "Zeytinyağı",
+  "itemSalt": "Tuz",
+  "itemSugar": "Şeker",
+  "itemCoffee": "Kahve",
+  "itemTea": "Çay"
 }

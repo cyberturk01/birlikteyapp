@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../models/weekly_task_cloud.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/task_cloud_provider.dart';
@@ -22,18 +23,10 @@ class _WeeklyPageState extends State<WeeklyPage> {
   // 1=Mon ... 7=Sun  -> DateTime.weekday ile uyumlu tutuyoruz
   int _selectedWeekday = DateTime.now().weekday;
 
-  static const _labels = <int, String>{
-    DateTime.monday: 'Mon',
-    DateTime.tuesday: 'Tue',
-    DateTime.wednesday: 'Wed',
-    DateTime.thursday: 'Thu',
-    DateTime.friday: 'Fri',
-    DateTime.saturday: 'Sat',
-    DateTime.sunday: 'Sun',
-  };
-
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
+
     final weekly = context.watch<WeeklyCloudProvider>();
     final todayWd = DateTime.now().weekday;
 
@@ -60,7 +53,7 @@ class _WeeklyPageState extends State<WeeklyPage> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Default time',
+            tooltip: t.defaultTime,
             icon: const Icon(Icons.schedule),
             onPressed: () => _pickDefaultWeeklyTime(context),
           ),
@@ -68,7 +61,9 @@ class _WeeklyPageState extends State<WeeklyPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
-        label: Text('Add to ${_labels[_selectedWeekday]}'),
+        label: Text(
+          t.addToDayShort(_weekdayLongLabel(context, _selectedWeekday)),
+        ),
         onPressed: () =>
             _openAddDialog(context: context, weekday: _selectedWeekday),
       ),
@@ -93,7 +88,7 @@ class _WeeklyPageState extends State<WeeklyPage> {
                         child: FilterChip(
                           selected: sel,
                           label: Text(
-                            _labels[wd]!,
+                            _weekdayShortLabel(context, wd),
                             style: TextStyle(
                               fontWeight: isToday
                                   ? FontWeight.w700
@@ -120,7 +115,7 @@ class _WeeklyPageState extends State<WeeklyPage> {
               child: Card(
                 elevation: 2,
                 child: tasks.isEmpty
-                    ? const Center(child: Text('No tasks yet'))
+                    ? Center(child: Text(t.noTasks))
                     : ListView.separated(
                         padding: const EdgeInsets.all(8),
                         itemCount: tasks.length,
@@ -140,25 +135,47 @@ class _WeeklyPageState extends State<WeeklyPage> {
   }
 
   // --- Helpers ---
-
-  String _weekdayIntToCanonical(int wd) {
+  String _weekdayShortLabel(BuildContext context, int wd) {
+    final t = AppLocalizations.of(context)!;
     switch (wd) {
       case DateTime.monday:
-        return 'Monday';
+        return t.weekdayShortMon;
       case DateTime.tuesday:
-        return 'Tuesday';
+        return t.weekdayShortTue;
       case DateTime.wednesday:
-        return 'Wednesday';
+        return t.weekdayShortWed;
       case DateTime.thursday:
-        return 'Thursday';
+        return t.weekdayShortThu;
       case DateTime.friday:
-        return 'Friday';
+        return t.weekdayShortFri;
       case DateTime.saturday:
-        return 'Saturday';
+        return t.weekdayShortSat;
       case DateTime.sunday:
-        return 'Sunday';
+        return t.weekdayShortSun;
       default:
-        return 'Monday';
+        return t.weekdayShortMon;
+    }
+  }
+
+  String _weekdayIntToCanonical(int wd) {
+    final t = AppLocalizations.of(context)!;
+    switch (wd) {
+      case DateTime.monday:
+        return t.weekdayMonday;
+      case DateTime.tuesday:
+        return t.weekdayTuesday;
+      case DateTime.wednesday:
+        return t.weekdayWednesday;
+      case DateTime.thursday:
+        return t.weekdayThursday;
+      case DateTime.friday:
+        return t.weekdayFriday;
+      case DateTime.saturday:
+        return t.weekdaySaturday;
+      case DateTime.sunday:
+        return t.weekdaySunday;
+      default:
+        return t.weekdayMonday;
     }
   }
 
@@ -172,9 +189,9 @@ class _WeeklyPageState extends State<WeeklyPage> {
 
     final c = TextEditingController();
     String? assign;
-
+    final t = AppLocalizations.of(context)!;
     // --- SUGGESTIONS ---
-    const defaultWeeklySuggestions = AppLists.defaultTasks;
+    final defaultWeeklySuggestions = AppLists.defaultTasks(context);
 
     final frequent = taskProv.suggestedTasks; // varsa top5
     final existingWeekly = weekly.tasks
@@ -185,21 +202,21 @@ class _WeeklyPageState extends State<WeeklyPage> {
       ...frequent,
       ...existingWeekly,
     }.where((s) => s.trim().isNotEmpty).toList();
-
+    final dayLabel = _weekdayLongLabel(context, weekday);
     final result = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('Add task for $dayName'),
+        title: Text(t.addTaskForDay(dayLabel)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: c,
-                decoration: const InputDecoration(
-                  hintText: 'Enter task…',
-                  prefixIcon: Icon(Icons.assignment),
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  hintText: t.enterTaskHint,
+                  prefixIcon: const Icon(Icons.assignment),
+                  border: const OutlineInputBorder(),
                   isDense: true,
                 ),
                 onSubmitted: (_) => Navigator.of(context).pop('submit'),
@@ -208,8 +225,8 @@ class _WeeklyPageState extends State<WeeklyPage> {
               MemberDropdownUid(
                 value: assign, // null olabilir
                 onChanged: (v) => assign = v, // v null => Unassigned
-                label: 'Assign to (optional)',
-                nullLabel: 'Unassigned',
+                label: t.assignToOptional,
+                nullLabel: t.unassigned,
               ),
               const SizedBox(height: 12),
 
@@ -217,7 +234,7 @@ class _WeeklyPageState extends State<WeeklyPage> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Suggestions',
+                    t.suggestionsTitle,
                     style: Theme.of(context).textTheme.labelLarge,
                   ),
                 ),
@@ -256,7 +273,7 @@ class _WeeklyPageState extends State<WeeklyPage> {
         ),
         actions: [
           TextButton(
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
             onPressed: () => Navigator.pop(context),
           ),
           FilledButton(
@@ -280,19 +297,21 @@ class _WeeklyPageState extends State<WeeklyPage> {
         await weekly.syncTodayToTasks(taskProv);
       }
       if (!mounted) return;
+      final synced = (weekday == DateTime.now().weekday);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Added to $dayName${weekday == DateTime.now().weekday ? " and synced to Tasks" : ""}',
+            synced ? t.addedToDayAndSynced(dayLabel) : t.addedToDay(dayLabel),
           ),
         ),
       );
     } else if (result == 'done') {
       if (!mounted) return;
+      final synced = (weekday == DateTime.now().weekday);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Added to $dayName${weekday == DateTime.now().weekday ? " and synced to Tasks" : ""}',
+            synced ? t.addedToDayAndSynced(dayLabel) : t.addedToDay(dayLabel),
           ),
         ),
       );
@@ -318,9 +337,10 @@ Future<void> _pickDefaultWeeklyTime(BuildContext context) async {
   await sp.setInt('weeklyReminderHour', picked.hour);
   await sp.setInt('weeklyReminderMinute', picked.minute);
   if (!context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Default weekly reminder time saved')),
-  );
+  final t = AppLocalizations.of(context)!;
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(t.defaultWeeklyReminderSaved)));
 }
 
 /// Tek satır: başlık + kişi + saat, saat seçici & sil
@@ -332,13 +352,15 @@ class _WeeklyTaskTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final weekly = context.read<WeeklyCloudProvider>();
     final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
-
+    final t = AppLocalizations.of(context)!;
     return StreamBuilder<Map<String, String>>(
       stream: dictStream, // {uid: label}
       builder: (_, snap) {
         final dict = snap.data ?? const <String, String>{};
         final uid = task.assignedToUid;
-        final who = (uid == null || uid.isEmpty) ? '' : (dict[uid] ?? 'Member');
+        final who = (uid == null || uid.isEmpty)
+            ? ''
+            : (dict[uid] ?? t.memberLabel);
 
         String? timeText;
         if (task.hour != null && task.minute != null) {
@@ -350,7 +372,7 @@ class _WeeklyTaskTile extends StatelessWidget {
         final subtitle = [
           if (who.isNotEmpty) '👤 $who',
           if (timeText != null) '⏰ $timeText',
-          '🔔 ${task.notifEnabled ? "On" : "Off"}',
+          '🔔 ${task.notifEnabled ? t.onLabel : t.offLabel}',
         ].join('   •   ');
 
         return ListTile(
@@ -359,7 +381,7 @@ class _WeeklyTaskTile extends StatelessWidget {
           subtitle: subtitle.isEmpty ? null : Text(subtitle),
           onLongPress: () => _showEditWeeklyDialog(context, task), // <-- NEW
           trailing: PopupMenuButton<_WeeklyAction>(
-            tooltip: 'More',
+            tooltip: t.more,
             onSelected: (action) async {
               switch (action) {
                 case _WeeklyAction.edit:
@@ -373,7 +395,9 @@ class _WeeklyTaskTile extends StatelessWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        'Notifications ${newVal ? "enabled" : "disabled"}',
+                        newVal
+                            ? t.notificationsEnabled
+                            : t.notificationsDisabled,
                       ),
                       duration: const Duration(seconds: 1),
                     ),
@@ -398,9 +422,9 @@ class _WeeklyTaskTile extends StatelessWidget {
                   if (picked != null) {
                     await weekly.updateWeeklyTask(task, timeOfDay: picked);
                     if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Reminder updated')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(t.reminderUpdated)));
                   }
                   break;
 
@@ -411,7 +435,7 @@ class _WeeklyTaskTile extends StatelessWidget {
                   );
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Reminder time cleared')),
+                    SnackBar(content: Text(t.reminderTimeCleared)),
                   );
                   break;
 
@@ -421,12 +445,12 @@ class _WeeklyTaskTile extends StatelessWidget {
               }
             },
             itemBuilder: (ctx) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: _WeeklyAction.edit,
                 child: ListTile(
                   dense: true,
-                  leading: Icon(Icons.edit),
-                  title: Text('Edit'),
+                  leading: const Icon(Icons.edit),
+                  title: Text(t.edit),
                 ),
               ),
               PopupMenuItem(
@@ -440,34 +464,34 @@ class _WeeklyTaskTile extends StatelessWidget {
                   ),
                   title: Text(
                     task.notifEnabled
-                        ? 'Disable notifications'
-                        : 'Enable notifications',
+                        ? t.disableNotifications
+                        : t.enableNotifications,
                   ),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: _WeeklyAction.setTime,
                 child: ListTile(
                   dense: true,
-                  leading: Icon(Icons.access_time),
-                  title: Text('Set time'),
+                  leading: const Icon(Icons.access_time),
+                  title: Text(t.setTime),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: _WeeklyAction.clearTime,
                 child: ListTile(
                   dense: true,
-                  leading: Icon(Icons.close),
-                  title: Text('Clear time'),
+                  leading: const Icon(Icons.close),
+                  title: Text(t.clearTime),
                 ),
               ),
               const PopupMenuDivider(),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: _WeeklyAction.delete,
                 child: ListTile(
                   dense: true,
-                  leading: Icon(Icons.delete, color: Colors.red),
-                  title: Text('Delete'),
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: Text(t.delete),
                 ),
               ),
             ],
@@ -478,13 +502,57 @@ class _WeeklyTaskTile extends StatelessWidget {
   }
 }
 
+String _weekdayLongLabel(BuildContext context, int wd) {
+  final t = AppLocalizations.of(context)!;
+  switch (wd) {
+    case DateTime.monday:
+      return t.weekdayMonday;
+    case DateTime.tuesday:
+      return t.weekdayTuesday;
+    case DateTime.wednesday:
+      return t.weekdayWednesday;
+    case DateTime.thursday:
+      return t.weekdayThursday;
+    case DateTime.friday:
+      return t.weekdayFriday;
+    case DateTime.saturday:
+      return t.weekdaySaturday;
+    case DateTime.sunday:
+      return t.weekdaySunday;
+    default:
+      return t.weekdayMonday;
+  }
+}
+
+String _weekdayLongLabelFromString(BuildContext context, String day) {
+  final t = AppLocalizations.of(context)!;
+  switch (day.toLowerCase()) {
+    case 'monday':
+      return t.weekdayMonday;
+    case 'tuesday':
+      return t.weekdayTuesday;
+    case 'wednesday':
+      return t.weekdayWednesday;
+    case 'thursday':
+      return t.weekdayThursday;
+    case 'friday':
+      return t.weekdayFriday;
+    case 'saturday':
+      return t.weekdaySaturday;
+    case 'sunday':
+      return t.weekdaySunday;
+    default:
+      return t.weekdayMonday;
+  }
+}
+
 Future<void> _showEditWeeklyDialog(
   BuildContext context,
   WeeklyTaskCloud task,
 ) async {
   final weekly = context.read<WeeklyCloudProvider>();
   final famDictStream = context.read<FamilyProvider>().watchMemberDirectory();
-
+  final t = AppLocalizations.of(context)!;
   final titleC = TextEditingController(text: task.title);
   String day = task.day; // 'Monday'... 'Sunday'
   String? assigned = task.assignedToUid;
@@ -493,9 +561,9 @@ Future<void> _showEditWeeklyDialog(
       ? TimeOfDay(hour: task.hour!, minute: task.minute!)
       : null;
 
-  String _fmtTime(TimeOfDay? t) => t == null
-      ? 'Not set'
-      : '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  String _fmtTime(TimeOfDay? tt) => tt == null
+      ? t.notSet
+      : '${tt.hour.toString().padLeft(2, '0')}:${tt.minute.toString().padLeft(2, '0')}';
 
   final dayOptions = const [
     'Monday',
@@ -512,16 +580,16 @@ Future<void> _showEditWeeklyDialog(
     builder: (_) => StatefulBuilder(
       builder: (ctx, setLocal) {
         return AlertDialog(
-          title: const Text('Edit weekly task'),
+          title: Text(t.editWeeklyTask),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: titleC,
-                  decoration: const InputDecoration(
-                    labelText: 'Title',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: t.titleLabel,
+                    border: const OutlineInputBorder(),
                     isDense: true,
                   ),
                 ),
@@ -529,13 +597,18 @@ Future<void> _showEditWeeklyDialog(
 
                 DropdownButtonFormField<String>(
                   value: dayOptions.contains(day) ? day : 'Monday',
-                  items: dayOptions
-                      .map((d) => DropdownMenuItem(value: d, child: Text(d)))
-                      .toList(),
+                  items: dayOptions.map((d) {
+                    return DropdownMenuItem(
+                      value: d, // provider için EN string
+                      child: Text(
+                        _weekdayLongLabelFromString(context, d),
+                      ), // UI için localized
+                    );
+                  }).toList(),
                   onChanged: (v) => setLocal(() => day = v ?? 'Monday'),
-                  decoration: const InputDecoration(
-                    labelText: 'Day',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: t.dayLabel, // "Day" -> lokalize
+                    border: const OutlineInputBorder(),
                     isDense: true,
                   ),
                 ),
@@ -547,10 +620,7 @@ Future<void> _showEditWeeklyDialog(
                   builder: (_, snap) {
                     final dict = snap.data ?? const <String, String>{};
                     final items = <DropdownMenuItem<String?>>[
-                      const DropdownMenuItem(
-                        value: null,
-                        child: Text('Unassigned'),
-                      ),
+                      DropdownMenuItem(value: null, child: Text(t.unassigned)),
                       ...dict.entries.map(
                         (e) => DropdownMenuItem(
                           value: e.key,
@@ -565,9 +635,9 @@ Future<void> _showEditWeeklyDialog(
                       isExpanded: true,
                       items: items,
                       onChanged: (v) => setLocal(() => assigned = v),
-                      decoration: const InputDecoration(
-                        labelText: 'Assign to',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: t.assignTo,
+                        border: const OutlineInputBorder(),
                         isDense: true,
                       ),
                     );
@@ -584,7 +654,7 @@ Future<void> _showEditWeeklyDialog(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(Icons.access_time),
-                        title: const Text('Reminder time'),
+                        title: Text(t.reminderTime),
                         subtitle: Text(_fmtTime(pickedTime)),
                         onTap: () async {
                           final base = TimeOfDay(
@@ -604,7 +674,7 @@ Future<void> _showEditWeeklyDialog(
                           if (t != null) setLocal(() => pickedTime = t);
                         },
                         trailing: IconButton(
-                          tooltip: 'Clear',
+                          tooltip: t.clear,
                           icon: const Icon(Icons.close),
                           onPressed: () => setLocal(() => pickedTime = null),
                         ),
@@ -618,7 +688,7 @@ Future<void> _showEditWeeklyDialog(
                   contentPadding: EdgeInsets.zero,
                   value: notif,
                   onChanged: (v) => setLocal(() => notif = v),
-                  title: const Text('Notifications'),
+                  title: Text(t.notifications),
                   secondary: Icon(
                     notif
                         ? Icons.notifications_active
@@ -631,7 +701,7 @@ Future<void> _showEditWeeklyDialog(
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
+              child: Text(t.cancel),
             ),
             FilledButton(
               onPressed: () async {
@@ -653,11 +723,11 @@ Future<void> _showEditWeeklyDialog(
 
                 if (!ctx.mounted) return;
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('Weekly task updated')),
-                );
+                ScaffoldMessenger.of(
+                  ctx,
+                ).showSnackBar(SnackBar(content: Text(t.weeklyTaskUpdated)));
               },
-              child: const Text('Save'),
+              child: Text(t.save),
             ),
           ],
         );

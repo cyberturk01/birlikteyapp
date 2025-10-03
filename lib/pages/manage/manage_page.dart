@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../constants/app_strings.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/item.dart';
 import '../../models/task.dart';
 import '../../providers/family_provider.dart';
@@ -39,18 +40,19 @@ class _ManagePageState extends State<ManagePage> {
     final itemsLen = context.select<ItemCloudProvider, int>(
       (p) => p.items.length,
     );
+    final t = AppLocalizations.of(context)!;
     debugPrint('[ManagePage] fam=$famId tasks=$tasksLen items=$itemsLen');
     return Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Quick Add',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            Text(
+              t.quickAddTitle,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             Text(
-              'Add new tasks and market items in one place.',
+              t.quickAddSubtitle,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -65,16 +67,16 @@ class _ManagePageState extends State<ManagePage> {
           // Sekme
           Center(
             child: SegmentedButton<_ManageTab>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: _ManageTab.tasks,
-                  icon: Icon(Icons.task_alt),
-                  label: Text('Tasks'),
+                  icon: const Icon(Icons.task_alt),
+                  label: Text(t.tasks),
                 ),
                 ButtonSegment(
                   value: _ManageTab.items,
-                  icon: Icon(Icons.shopping_cart),
-                  label: Text('Market'),
+                  icon: const Icon(Icons.shopping_cart),
+                  label: Text(t.market),
                 ),
               ],
               selected: {_tab},
@@ -93,8 +95,8 @@ class _ManagePageState extends State<ManagePage> {
                   controller: _input,
                   decoration: InputDecoration(
                     hintText: _tab == _ManageTab.tasks
-                        ? 'Enter task…'
-                        : 'Enter item…',
+                        ? t.enterTaskHintShort
+                        : t.enterItemHintShort,
                     prefixIcon: Icon(
                       _tab == _ManageTab.tasks
                           ? Icons.task_alt
@@ -119,11 +121,17 @@ class _ManagePageState extends State<ManagePage> {
 
           // Mevcut kayıtlar — ayrı bölüm
           if (_tab == _ManageTab.tasks) ...[
-            Text('All tasks', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              t.allTasksHeader,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             _TaskListView(),
           ] else ...[
-            Text('All items', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              t.allItemsHeader,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             _ItemListView(),
           ],
@@ -137,8 +145,11 @@ class _ManagePageState extends State<ManagePage> {
     final itemProv = context.read<ItemCloudProvider>();
     final text = _input.text.trim();
     if (text.isEmpty) return;
+    final t = AppLocalizations.of(context)!;
 
-    String what = _tab == _ManageTab.tasks ? 'Task' : 'Item';
+    String what = _tab == _ManageTab.tasks
+        ? t.taskAddedToast
+        : t.itemAddedToast;
 
     if (_tab == _ManageTab.tasks) {
       final dup = taskProv.tasks.any(
@@ -146,7 +157,9 @@ class _ManagePageState extends State<ManagePage> {
       );
       if (dup) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This task already exists')),
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.taskAlreadyExists),
+          ),
         );
         return;
       }
@@ -157,7 +170,9 @@ class _ManagePageState extends State<ManagePage> {
       );
       if (dup) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This item already exists')),
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.itemAlreadyExists),
+          ),
         );
         return;
       }
@@ -192,9 +207,9 @@ class _TaskListView extends StatelessWidget {
   Widget build(BuildContext context) {
     final taskProv = context.watch<TaskCloudProvider>();
     final tasks = taskProv.tasks;
-
+    final t = AppLocalizations.of(context)!;
     if (tasks.isEmpty) {
-      return const Text('No tasks yet');
+      return Text(t.noTasks);
     }
     final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
     return StreamBuilder<Map<String, String>>(
@@ -240,12 +255,12 @@ class _TaskListView extends StatelessWidget {
                     completed: t.completed,
                     assignedToUid: t.assignedToUid,
                   );
-                  context.read<TaskCloudProvider>().removeTask(t);
+                  await context.read<TaskCloudProvider>().removeTask(t);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Task deleted'),
+                      content: Text(AppLocalizations.of(context)!.taskDeleted),
                       action: SnackBarAction(
-                        label: 'Undo',
+                        label: AppLocalizations.of(context)!.undo,
                         onPressed: () =>
                             context.read<TaskCloudProvider>().addTask(copy),
                       ),
@@ -291,19 +306,19 @@ class _TaskListView extends StatelessWidget {
                     IconButton(
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
-                      tooltip: 'Assign',
+                      tooltip: AppLocalizations.of(context)!.assign,
                       icon: const Icon(Icons.person_add_alt),
                       onPressed: () => _showAssignTaskSheet(context, t),
                     ),
                     IconButton(
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
-                      tooltip: 'Edit',
+                      tooltip: AppLocalizations.of(context)!.edit,
                       icon: const Icon(Icons.edit),
                       onPressed: () => _showRenameDialog(
                         context: context,
                         initial: t.name,
-                        hint: 'Task name',
+                        hint: AppLocalizations.of(context)!.taskName,
                         onSave: (newName) => context
                             .read<TaskCloudProvider>()
                             .renameTask(t, newName),
@@ -333,9 +348,9 @@ class _ItemListView extends StatelessWidget {
   Widget build(BuildContext context) {
     final itemProv = context.watch<ItemCloudProvider>();
     final items = itemProv.items;
-
+    final t = AppLocalizations.of(context)!;
     if (items.isEmpty) {
-      return const Text('No items yet');
+      return Text(t.noItems);
     }
 
     final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
@@ -376,7 +391,10 @@ class _ItemListView extends StatelessWidget {
               ),
               confirmDismiss: (dir) async {
                 if (dir == DismissDirection.startToEnd) {
-                  context.read<ItemCloudProvider>().toggleItem(it, !it.bought);
+                  await context.read<ItemCloudProvider>().toggleItem(
+                    it,
+                    !it.bought,
+                  );
                   return false;
                 } else {
                   final copy = Item(
@@ -384,12 +402,12 @@ class _ItemListView extends StatelessWidget {
                     bought: it.bought,
                     assignedToUid: it.assignedToUid,
                   );
-                  context.read<ItemCloudProvider>().removeItem(it);
+                  await context.read<ItemCloudProvider>().removeItem(it);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Item deleted'),
+                      content: Text(AppLocalizations.of(context)!.itemDeleted),
                       action: SnackBarAction(
-                        label: 'Undo',
+                        label: AppLocalizations.of(context)!.undo,
                         onPressed: () =>
                             context.read<ItemCloudProvider>().addItem(copy),
                       ),
@@ -435,19 +453,19 @@ class _ItemListView extends StatelessWidget {
                     IconButton(
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
-                      tooltip: 'Assign',
+                      tooltip: t.assign,
                       icon: const Icon(Icons.person_add_alt),
                       onPressed: () => _showAssignItemSheet(context, it),
                     ),
                     IconButton(
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
-                      tooltip: 'Edit',
+                      tooltip: t.edit,
                       icon: const Icon(Icons.edit),
                       onPressed: () => _showRenameDialog(
                         context: context,
                         initial: it.name,
-                        hint: 'Item name',
+                        hint: t.itemName,
                         onSave: (newName) => context
                             .read<ItemCloudProvider>()
                             .renameItem(it, newName),
@@ -479,11 +497,11 @@ Future<void> _showRenameDialog({
   required Future<void> Function(String newName) onSave,
 }) async {
   final ctrl = TextEditingController(text: initial);
-
+  final t = AppLocalizations.of(context)!;
   await showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text('Edit name'),
+      title: Text(t.editNameTitle),
       content: TextField(
         controller: ctrl,
         autofocus: true,
@@ -507,7 +525,7 @@ Future<void> _showRenameDialog({
             await onSave(ctrl.text.trim());
             Navigator.pop(context);
           },
-          child: const Text('Save'),
+          child: Text(t.save),
         ),
       ],
     ),
@@ -517,8 +535,8 @@ Future<void> _showRenameDialog({
 // ITEM
 void _showAssignItemSheet(BuildContext context, Item item) {
   String? selectedUid = item.assignedToUid; // mevcut atamayı UID olarak başlat
-  // final dictStream = context.read<FamilyProvider>().watchMemberDirectory();
 
+  final t = AppLocalizations.of(context)!;
   showModalBottomSheet(
     context: context,
     builder: (_) => Padding(
@@ -528,16 +546,16 @@ void _showAssignItemSheet(BuildContext context, Item item) {
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Assign item',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              Text(
+                t.assignItem,
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
               MemberDropdownUid(
                 value: selectedUid,
                 onChanged: (v) => setLocal(() => selectedUid = v),
-                label: 'Assign to',
-                nullLabel: 'No one',
+                label: t.assignTo,
+                nullLabel: t.noOne,
               ),
               const SizedBox(height: 12),
               SizedBox(
@@ -552,7 +570,7 @@ void _showAssignItemSheet(BuildContext context, Item item) {
                     );
                     if (context.mounted) Navigator.pop(context);
                   },
-                  child: const Text('Save'),
+                  child: Text(t.save),
                 ),
               ),
             ],
@@ -567,7 +585,7 @@ void _showAssignItemSheet(BuildContext context, Item item) {
 void _showAssignTaskSheet(BuildContext context, Task task) {
   String? selectedUid = task.assignedToUid; // mevcut atamayı UID olarak başlat
   final taskCloud = context.read<TaskCloudProvider>();
-
+  final t = AppLocalizations.of(context)!;
   showModalBottomSheet(
     context: context,
     builder: (_) => Padding(
@@ -577,16 +595,16 @@ void _showAssignTaskSheet(BuildContext context, Task task) {
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Assign task',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              Text(
+                t.assignTask,
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
               MemberDropdownUid(
                 value: selectedUid,
                 onChanged: (v) => setLocal(() => selectedUid = v),
-                label: 'Assign to',
-                nullLabel: 'No one',
+                label: t.assignTo,
+                nullLabel: t.noOne,
               ),
               const SizedBox(height: 12),
               SizedBox(
@@ -602,7 +620,7 @@ void _showAssignTaskSheet(BuildContext context, Task task) {
                     // await taskCloud.refreshNow();
                     if (context.mounted) Navigator.pop(context);
                   },
-                  child: const Text('Save'),
+                  child: Text(t.save),
                 ),
               ),
             ],

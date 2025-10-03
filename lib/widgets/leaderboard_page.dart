@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../providers/family_provider.dart';
 
 enum LBPeriod { day, week, month }
@@ -53,7 +54,7 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
     if (famId == null) {
       return const Center(child: CircularProgressIndicator());
     }
-
+    final t = AppLocalizations.of(context)!;
     final pid = _periodId(_p, DateTime.now());
     final query = FirebaseFirestore.instance
         .collection('families')
@@ -72,13 +73,13 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
         // Header
         Row(
           children: [
-            Text('Leaderboard', style: Theme.of(context).textTheme.titleLarge),
+            Text(t.leaderboard, style: Theme.of(context).textTheme.titleLarge),
             const Spacer(),
             SegmentedButton<LBPeriod>(
-              segments: const [
-                ButtonSegment(value: LBPeriod.day, label: Text('Today')),
-                ButtonSegment(value: LBPeriod.week, label: Text('Week')),
-                ButtonSegment(value: LBPeriod.month, label: Text('Month')),
+              segments: [
+                ButtonSegment(value: LBPeriod.day, label: Text(t.today)),
+                ButtonSegment(value: LBPeriod.week, label: Text(t.week)),
+                ButtonSegment(value: LBPeriod.month, label: Text(t.month)),
               ],
               selected: {_p},
               onSelectionChanged: (s) => setState(() => _p = s.first),

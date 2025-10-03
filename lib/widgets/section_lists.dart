@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../constants/app_strings.dart';
+import '../l10n/app_localizations.dart';
 import '../models/item.dart';
 import '../models/task.dart';
 import '../providers/item_cloud_provider.dart';
@@ -37,7 +38,7 @@ class TasksSection extends StatelessWidget {
     final showAll = expanded || total <= previewCount;
     final visible = showAll ? tasks : tasks.take(previewCount).toList();
     final hiddenCount = showAll ? 0 : (total - previewCount);
-
+    final tr = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -49,7 +50,7 @@ class TasksSection extends StatelessWidget {
             ),
           ),
         if (tasks.isEmpty)
-          const MutedText('No tasks')
+          MutedText(tr.noTasks)
         else
           ...visible.map((task) {
             final isDone = task.completed;
@@ -74,12 +75,12 @@ class TasksSection extends StatelessWidget {
                   return false;
                 } else {
                   final removed = task;
-                  context.read<TaskCloudProvider>().removeTask(task);
+                  await context.read<TaskCloudProvider>().removeTask(task);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Task deleted'),
+                      content: Text(tr.taskDeleted),
                       action: SnackBarAction(
-                        label: 'Undo',
+                        label: tr.undo,
                         onPressed: () =>
                             context.read<TaskCloudProvider>().addTask(removed),
                       ),
@@ -95,15 +96,6 @@ class TasksSection extends StatelessWidget {
                   vertical: -2,
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                // leading: IconButton(
-                //   tooltip: isDone ? 'Mark as pending' : 'Mark as completed',
-                //   // icon: Icon(
-                //   //   isDone
-                //   //       ? Icons.radio_button_checked
-                //   //       : Icons.radio_button_unchecked,
-                //   // ),
-                //   onPressed: () => onToggleTask(task),
-                // ),
                 title: Text(
                   '${task.name}${(task.assignedToUid != null && task.assignedToUid!.isNotEmpty) ? " " : ""}',
                   overflow: TextOverflow.ellipsis,
@@ -126,7 +118,7 @@ class TasksSection extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: onToggleExpand,
-              child: Text(showAll ? 'Show less' : 'Show all (+$hiddenCount)'),
+              child: Text(showAll ? tr.showLess : tr.showAllCount(hiddenCount)),
             ),
           ),
       ],
@@ -161,7 +153,7 @@ class ItemsSection extends StatelessWidget {
     final showAll = expanded || total <= previewCount;
     final visible = showAll ? items : items.take(previewCount).toList();
     final hiddenCount = showAll ? 0 : (total - previewCount);
-
+    final tr = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -173,7 +165,7 @@ class ItemsSection extends StatelessWidget {
             ),
           ),
         if (items.isEmpty)
-          const MutedText('No items')
+          MutedText(tr.noItems)
         else
           ...visible.map((it) {
             final bought = it.bought;
@@ -202,12 +194,12 @@ class ItemsSection extends StatelessWidget {
                     bought: removed.bought,
                     assignedToUid: removed.assignedToUid,
                   );
-                  context.read<ItemCloudProvider>().removeItem(removed);
+                  await context.read<ItemCloudProvider>().removeItem(removed);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Item deleted'),
+                      content: Text(tr.itemDeleted),
                       action: SnackBarAction(
-                        label: 'Undo',
+                        label: tr.undo,
                         onPressed: () =>
                             context.read<ItemCloudProvider>().addItem(copy),
                       ),
@@ -246,7 +238,7 @@ class ItemsSection extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: onToggleExpand,
-              child: Text(showAll ? 'Show less' : 'Show all (+$hiddenCount)'),
+              child: Text(showAll ? tr.showLess : tr.showAllCount(hiddenCount)),
             ),
           ),
       ],

@@ -86,7 +86,7 @@
   "noItems": "Keine Artikel",
   "clearBought": "Gekaufte löschen",
   "boughtItemsCleared": "Gekaufte Artikel gelöscht",
-  "markAllBought": "Alle als gekauft markieren",
+  "markAllBought": "Als Erledigt",
   "memberFallback": "Mitglied",
 
   "pendingCount": "{count, plural, =0{Offen} one{Offen (1)} other{Offen ({count})}}",
@@ -331,5 +331,81 @@
   "weekdayThursday": "Donnerstag",
   "weekdayFriday": "Freitag",
   "weekdaySaturday": "Samstag",
-  "weekdaySunday": "Sonntag"
+  "weekdaySunday": "Sonntag",
+  "editExpense": "Ausgabe bearbeiten",
+
+  "amountLabel": "Betrag",
+
+  "newCategory": "Neue Kategorie",
+  "nameLabel": "Name",
+  "recentLabel": "Zuletzt verwendet",
+
+  "titleRequired": "Titel ist erforderlich",
+  "enterValidAmount": "Bitte einen gültigen Betrag eingeben",
+  "amountGreaterThanZero": "Betrag muss größer als 0 sein",
+
+  "addedAmount": "{amount} hinzugefügt",
+  "@addedAmount": { "placeholders": { "amount": { "type": "String" } } },
+
+  "updatedAmount": "{amount} aktualisiert",
+  "@updatedAmount": { "placeholders": { "amount": { "type": "String" } } },
+
+  "saveFailedWithError": "Fehler beim Speichern: {error}",
+  "@saveFailedWithError": { "placeholders": { "error": { "type": "String" } } },
+
+  "noActiveFamily": "Keine aktive Familie",
+  "add": "Hinzufügen",
+  "week": "Woche",
+  "today": "Heute",
+  "month": "Monat",
+  "quickAddTitle": "Schnell hinzufügen",
+  "quickAddSubtitle": "Neue Aufgaben und Einkaufsartikel an einem Ort hinzufügen.",
+
+  "allTasksHeader": "Alle Aufgaben",
+  "allItemsHeader": "Alle Artikel",
+
+  "enterTaskHintShort": "Aufgabe eingeben…",
+  "enterItemHintShort": "Artikel eingeben…",
+
+  "taskAlreadyExists": "Diese Aufgabe ist bereits vorhanden",
+  "itemAlreadyExists": "Dieser Artikel ist bereits vorhanden",
+
+  "taskAddedToast": "Aufgabe hinzugefügt",
+  "itemAddedToast": "Artikel hinzugefügt",
+
+  "editNameTitle": "Name bearbeiten",
+
+  "assignTooltip": "Zuweisen",
+  "editTooltip": "Bearbeiten",
+  "taskTakeOutTrash": "Den Müll rausbringen",
+  "taskCleanKitchen": "Die Küche putzen",
+  "taskDoLaundry": "Wäsche waschen",
+  "taskVacuumLiving": "Wohnzimmer staubsaugen",
+  "taskWashDishes": "Geschirr spülen",
+  "taskWaterPlants": "Pflanzen gießen",
+  "taskCookDinner": "Abendessen kochen",
+  "taskOrganizeFridge": "Kühlschrank ordnen",
+  "taskChangeBedsheets": "Bettwäsche wechseln",
+  "taskIronClothes": "Kleidung bügeln",
+
+  "itemMilk": "Milch",
+  "itemBread": "Brot",
+  "itemEggs": "Eier",
+  "itemButter": "Butter",
+  "itemCheese": "Käse",
+  "itemRice": "Reis",
+  "itemPasta": "Pasta",
+  "itemTomatoes": "Tomaten",
+  "itemPotatoes": "Kartoffeln",
+  "itemOnions": "Zwiebeln",
+  "itemApples": "Äpfel",
+  "itemBananas": "Bananen",
+  "itemChicken": "Huhn",
+  "itemBeef": "Rindfleisch",
+  "itemFish": "Fisch",
+  "itemOliveOil": "Olivenöl",
+  "itemSalt": "Salz",
+  "itemSugar": "Zucker",
+  "itemCoffee": "Kaffee",
+  "itemTea": "Tee"
 }

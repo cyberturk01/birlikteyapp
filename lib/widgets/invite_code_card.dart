@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../l10n/app_localizations.dart';
 import '../providers/family_provider.dart';
 
 class InviteCodeCard extends StatefulWidget {
@@ -34,6 +35,7 @@ class _InviteCodeCardState extends State<InviteCodeCard> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     return Card(
       elevation: 2,
       child: Padding(
@@ -46,12 +48,12 @@ class _InviteCodeCardState extends State<InviteCodeCard> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      _code ?? 'No code',
+                      _code ?? t.noData,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Copy',
+                    tooltip: t.copy,
                     icon: const Icon(Icons.copy),
                     onPressed: (_code == null)
                         ? null
@@ -66,7 +68,7 @@ class _InviteCodeCardState extends State<InviteCodeCard> {
                           },
                   ),
                   IconButton(
-                    tooltip: 'Share',
+                    tooltip: t.share,
                     icon: const Icon(Icons.share),
                     onPressed: (_code == null)
                         ? null

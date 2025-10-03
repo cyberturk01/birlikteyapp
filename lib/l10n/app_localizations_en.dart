@@ -877,9 +877,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editWeeklyTask => 'Edit weekly task';
 
   @override
-  String get titleLabel => 'Title';
-
-  @override
   String get dayLabel => 'Day';
 
   @override
@@ -938,4 +935,190 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get weekdaySunday => 'Sunday';
+
+  @override
+  String get editExpense => 'Edit expense';
+
+  @override
+  String get titleLabel => 'Title';
+
+  @override
+  String get amountLabel => 'Amount';
+
+  @override
+  String get newCategory => 'New category';
+
+  @override
+  String get nameLabel => 'Name';
+
+  @override
+  String get recentLabel => 'Recent';
+
+  @override
+  String get titleRequired => 'Title is required';
+
+  @override
+  String get enterValidAmount => 'Enter a valid amount';
+
+  @override
+  String get amountGreaterThanZero => 'Amount must be greater than 0';
+
+  @override
+  String addedAmount(String amount) {
+    return 'Added $amount';
+  }
+
+  @override
+  String updatedAmount(String amount) {
+    return 'Updated $amount';
+  }
+
+  @override
+  String saveFailedWithError(String error) {
+    return 'Failed: $error';
+  }
+
+  @override
+  String get noActiveFamily => 'No active family';
+
+  @override
+  String get add => 'Add';
+
+  @override
+  String get week => 'Week';
+
+  @override
+  String get today => 'Today';
+
+  @override
+  String get month => 'Month';
+
+  @override
+  String get quickAddTitle => 'Quick Add';
+
+  @override
+  String get quickAddSubtitle => 'Add new tasks and market items in one place.';
+
+  @override
+  String get allTasksHeader => 'All tasks';
+
+  @override
+  String get allItemsHeader => 'All items';
+
+  @override
+  String get enterTaskHintShort => 'Enter task…';
+
+  @override
+  String get enterItemHintShort => 'Enter item…';
+
+  @override
+  String get taskAlreadyExists => 'This task already exists';
+
+  @override
+  String get itemAlreadyExists => 'This item already exists';
+
+  @override
+  String get taskAddedToast => 'Task added';
+
+  @override
+  String get itemAddedToast => 'Item added';
+
+  @override
+  String get editNameTitle => 'Edit name';
+
+  @override
+  String get assignTooltip => 'Assign';
+
+  @override
+  String get editTooltip => 'Edit';
+
+  @override
+  String get taskTakeOutTrash => 'Take out the trash';
+
+  @override
+  String get taskCleanKitchen => 'Clean the kitchen';
+
+  @override
+  String get taskDoLaundry => 'Do the laundry';
+
+  @override
+  String get taskVacuumLiving => 'Vacuum the living room';
+
+  @override
+  String get taskWashDishes => 'Wash the dishes';
+
+  @override
+  String get taskWaterPlants => 'Water the plants';
+
+  @override
+  String get taskCookDinner => 'Cook dinner';
+
+  @override
+  String get taskOrganizeFridge => 'Organize the fridge';
+
+  @override
+  String get taskChangeBedsheets => 'Change bedsheets';
+
+  @override
+  String get taskIronClothes => 'Iron clothes';
+
+  @override
+  String get itemMilk => 'Milk';
+
+  @override
+  String get itemBread => 'Bread';
+
+  @override
+  String get itemEggs => 'Eggs';
+
+  @override
+  String get itemButter => 'Butter';
+
+  @override
+  String get itemCheese => 'Cheese';
+
+  @override
+  String get itemRice => 'Rice';
+
+  @override
+  String get itemPasta => 'Pasta';
+
+  @override
+  String get itemTomatoes => 'Tomatoes';
+
+  @override
+  String get itemPotatoes => 'Potatoes';
+
+  @override
+  String get itemOnions => 'Onions';
+
+  @override
+  String get itemApples => 'Apples';
+
+  @override
+  String get itemBananas => 'Bananas';
+
+  @override
+  String get itemChicken => 'Chicken';
+
+  @override
+  String get itemBeef => 'Beef';
+
+  @override
+  String get itemFish => 'Fish';
+
+  @override
+  String get itemOliveOil => 'Olive oil';
+
+  @override
+  String get itemSalt => 'Salt';
+
+  @override
+  String get itemSugar => 'Sugar';
+
+  @override
+  String get itemCoffee => 'Coffee';
+
+  @override
+  String get itemTea => 'Tea';
 }
