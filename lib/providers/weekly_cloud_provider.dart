@@ -20,7 +20,6 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
   String? _familyId;
   StreamSubscription<QuerySnapshot>? _sub;
 
-  final Set<String> _syncingOrigins = {};
   final _uuid = const Uuid();
 
   final List<WeeklyTaskCloud> _list = [];

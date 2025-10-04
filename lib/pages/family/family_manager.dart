@@ -60,7 +60,6 @@ class _FamilyManagerSheet extends StatelessWidget {
           // Davet kodu kartı
           _InviteCodeTile(
             onTapCopy: () async {
-              final t = AppLocalizations.of(context)!;
               final code = await fam.getInviteCode();
               if (code == null) return;
               await Clipboard.setData(ClipboardData(text: code));

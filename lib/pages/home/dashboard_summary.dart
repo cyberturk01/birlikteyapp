@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:birlikteyapp/models/weekly_task_cloud.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -375,7 +376,6 @@ void _showAssignItemSheet(BuildContext context, Item item) {
 
 Future<void> showPendingTasksDialog(BuildContext context) async {
   final t = AppLocalizations.of(context)!;
-  final taskProv = context.read<TaskCloudProvider>();
   final famDictStream = context.read<FamilyProvider>().watchMemberDirectory();
 
   await showModalBottomSheet(
@@ -388,19 +388,19 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
     ),
     builder: (sheetCtx) {
       final searchC = TextEditingController();
-      String? memberFilter; // null=All, ''=Unassigned, 'uid'=member
-      bool showCompleted = false;
+      String? memberFilter; // null=All, ''=
 
       return StatefulBuilder(
         builder: (ctx, setLocal) {
-          final all = taskProv.tasks.toList();
+          final all = ctx.watch<TaskCloudProvider>().tasks.toList();
           all.sort(
             (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
           );
           final pending = all.where((t) => !t.completed).toList();
-
+          String? editingId;
+          final TextEditingController renameC = TextEditingController();
           // filtreler
-          Iterable<Task> src = showCompleted ? all : pending;
+          Iterable<Task> src = pending;
           if (memberFilter != null) {
             src = src.where(
               (t) =>
@@ -507,30 +507,6 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
                                 .toList(),
                           ),
                         ),
-
-                        const SizedBox(height: 8),
-
-                        // alt satır: pending / all toggle
-                        Center(
-                          child: SegmentedButton<bool>(
-                            segments: [
-                              ButtonSegment(
-                                value: false,
-                                icon: const Icon(Icons.timelapse),
-                                label: Text(t.pendingLabel),
-                              ),
-                              ButtonSegment(
-                                value: true,
-                                icon: const Icon(Icons.all_inclusive),
-                                label: Text(t.allLabel),
-                              ),
-                            ],
-                            selected: {showCompleted},
-                            showSelectedIcon: false,
-                            onSelectionChanged: (s) =>
-                                setLocal(() => showCompleted = s.first),
-                          ),
-                        ),
                       ],
                     );
                   },
@@ -549,18 +525,53 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
                           addRepaintBoundaries: true,
                           addSemanticIndexes: false,
                           cacheExtent: 800,
-                          itemBuilder: (_, i) => _TaskRowCompact(
-                            task: list[i],
-                            onToggle: (t, v) async {
-                              await context
+                          itemBuilder: (_, i) {
+                            final task = list[i];
+                            final isEditing =
+                                (editingId ==
+                                task.remoteId); // remoteId yoksa name+origin kullan
+                            return _TaskRowCompact(
+                              task: task,
+                              isEditing: isEditing,
+                              initialText: isEditing ? renameC.text : task.name,
+                              onStartInlineRename: (t) {
+                                renameC.text = t.name;
+                                setLocal(
+                                  () => editingId =
+                                      t.remoteId ?? '${t.origin}|${t.name}',
+                                );
+                              },
+                              onSubmitInlineRename: (t, newName) async {
+                                final v = newName.trim();
+                                if (v.isNotEmpty && v != t.name) {
+                                  await context
+                                      .read<TaskCloudProvider>()
+                                      .renameTask(t, v);
+                                }
+                                setLocal(() => editingId = null);
+                              },
+                              onCancelInlineRename: (t) {
+                                setLocal(() => editingId = null);
+                              },
+                              onToggle: (t, v) async {
+                                await context
+                                    .read<TaskCloudProvider>()
+                                    .toggleTask(t, v);
+                              },
+                              onRename: (t) {
+                                // menüden "Rename" gelirse de inline’a al
+                                renameC.text = t.name;
+                                setLocal(
+                                  () => editingId =
+                                      t.remoteId ?? '${t.origin}|${t.name}',
+                                );
+                              },
+                              onDelete: (t) => context
                                   .read<TaskCloudProvider>()
-                                  .toggleTask(t, v);
-                            },
-                            onRename: (t) => _renameInline(context, t),
-                            onDelete: (t) =>
-                                context.read<TaskCloudProvider>().removeTask(t),
-                            onAssign: (t) => _showAssignTaskSheet(context, t),
-                          ),
+                                  .removeTask(t),
+                              onAssign: (t) => _showAssignTaskSheet(context, t),
+                            );
+                          },
                         ),
                 ),
 
@@ -612,53 +623,81 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
 
 class _TaskRowCompact extends StatelessWidget {
   final Task task;
+  final bool isEditing;
+  final String initialText;
+  final void Function(Task task) onStartInlineRename;
   final Future<void> Function(Task task, bool value) onToggle;
   final void Function(Task task) onRename;
   final void Function(Task task) onDelete;
   final void Function(Task task) onAssign;
+  final Future<void> Function(Task task, String newName) onSubmitInlineRename;
+  final void Function(Task task) onCancelInlineRename;
 
   const _TaskRowCompact({
     required this.task,
+    required this.isEditing,
+    required this.initialText,
+    required this.onStartInlineRename,
     required this.onToggle,
     required this.onRename,
     required this.onDelete,
     required this.onAssign,
+    required this.onSubmitInlineRename,
+    required this.onCancelInlineRename,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDone = task.completed;
-    final DateTime? dueAt = (task as dynamic).dueAt as DateTime?;
     final t = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
 
-    Widget? duePill;
-    if (dueAt != null) {
-      final st = _dueStatus(dueAt);
-      final String? label = (dueAt == null)
-          ? null
-          : '${dueAt.day}.${dueAt.month}.${dueAt.year % 100}';
-      duePill = Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: _dueBg(cs, st),
-          borderRadius: BorderRadius.circular(999),
+    Widget titleWidget;
+    if (isEditing) {
+      final ctrl = TextEditingController(text: initialText);
+      titleWidget = Focus(
+        onFocusChange: (hasFocus) {
+          if (!hasFocus) onCancelInlineRename(task);
+        },
+        child: KeyboardListener(
+          focusNode: FocusNode(),
+          onKeyEvent: (event) {
+            if (event.logicalKey == LogicalKeyboardKey.escape &&
+                event is KeyDownEvent) {
+              onCancelInlineRename(task);
+            }
+          },
+          child: TextField(
+            controller: ctrl,
+            autofocus: true,
+            decoration: const InputDecoration(
+              isDense: true,
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            ),
+            onSubmitted: (v) => onSubmitInlineRename(task, v),
+          ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.event, size: 12, color: _dueFg(cs, st)),
-            const SizedBox(width: 4),
-            Text(
-              label!,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: _dueFg(cs, st),
-              ),
+      );
+    } else {
+      titleWidget = Row(
+        children: [
+          Expanded(
+            child: Text(
+              task.name,
+              overflow: TextOverflow.ellipsis,
+              style: task.completed
+                  ? const TextStyle(decoration: TextDecoration.lineThrough)
+                  : null,
+            ),
+          ),
+          if ((task as dynamic).dueAt != null) ...[
+            const SizedBox(width: 8),
+            DuePill(
+              dueAt: (task as dynamic).dueAt as DateTime?,
+              reminderAt: (task as dynamic).reminderAt as DateTime?,
             ),
           ],
-        ),
+        ],
       );
     }
 
@@ -669,7 +708,7 @@ class _TaskRowCompact extends StatelessWidget {
 
       leading: InkWell(
         borderRadius: BorderRadius.circular(999),
-        onTap: () => onToggle(task, !isDone),
+        onTap: () => onToggle(task, !task.completed),
         child: Container(
           width: 24,
           height: 24,
@@ -689,28 +728,10 @@ class _TaskRowCompact extends StatelessWidget {
         ),
       ),
 
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(
-              task.name,
-              overflow: TextOverflow.ellipsis,
-              style: isDone
-                  ? const TextStyle(decoration: TextDecoration.lineThrough)
-                  : null,
-            ),
-          ),
-          if ((task as dynamic).dueAt != null) ...[
-            const SizedBox(width: 8),
-            DuePill(
-              dueAt: (task as dynamic).dueAt as DateTime?,
-              reminderAt: (task as dynamic).reminderAt as DateTime?,
-            ),
-          ],
-        ],
-      ),
+      title: titleWidget,
 
-      onTap: () => onToggle(task, !isDone),
+      onTap: () => onToggle(task, !task.completed),
+      onLongPress: () => onStartInlineRename(task),
 
       trailing: PopupMenuButton<String>(
         onSelected: (v) {
@@ -764,47 +785,6 @@ class _TaskRowCompact extends StatelessWidget {
   }
 }
 
-enum _DueStatus { overdue, today, soon, later }
-
-_DueStatus _dueStatus(DateTime d) {
-  final now = DateTime.now();
-  final a = DateUtils.dateOnly(d);
-  final b = DateUtils.dateOnly(now);
-
-  if (a.isBefore(b)) return _DueStatus.overdue;
-  if (a == b) return _DueStatus.today;
-
-  final diff = a.difference(b).inDays;
-  if (diff <= 3) return _DueStatus.soon;
-  return _DueStatus.later;
-}
-
-Color _dueBg(ColorScheme cs, _DueStatus s) {
-  switch (s) {
-    case _DueStatus.overdue:
-      return cs.errorContainer;
-    case _DueStatus.today:
-      return cs.tertiaryContainer;
-    case _DueStatus.soon:
-      return cs.secondaryContainer;
-    case _DueStatus.later:
-      return cs.surfaceContainerHighest;
-  }
-}
-
-Color _dueFg(ColorScheme cs, _DueStatus s) {
-  switch (s) {
-    case _DueStatus.overdue:
-      return cs.onErrorContainer;
-    case _DueStatus.today:
-      return cs.onTertiaryContainer;
-    case _DueStatus.soon:
-      return cs.onSecondaryContainer;
-    case _DueStatus.later:
-      return cs.onSurfaceVariant;
-  }
-}
-
 List<Widget> buildAssigneeChips({
   required BuildContext context,
   required Map<String, String> dict, // {uid: label}
@@ -815,7 +795,6 @@ List<Widget> buildAssigneeChips({
 }) {
   final myUid = FirebaseAuth.instance.currentUser?.uid;
 
-  // dict'i listeye çevir ve "ben" ilk sıraya, kalanları ada göre sırala
   final entries = dict.entries.toList()
     ..sort((a, b) {
       if (a.key == myUid && b.key != myUid) return -1; // ben önce
@@ -844,45 +823,7 @@ List<Widget> buildAssigneeChips({
   ];
 }
 
-void _renameInline(BuildContext context, Task task) {
-  final t = AppLocalizations.of(context)!;
-  final c = TextEditingController(text: task.name);
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: Text(t.editTask),
-      content: TextField(
-        controller: c,
-        autofocus: true,
-        decoration: InputDecoration(
-          isDense: true,
-          border: const OutlineInputBorder(),
-          hintText: t.taskName,
-        ),
-        onSubmitted: (_) {
-          context.read<TaskCloudProvider>().renameTask(task, c.text.trim());
-          Navigator.pop(context);
-        },
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(t.cancel),
-        ),
-        FilledButton(
-          onPressed: () {
-            context.read<TaskCloudProvider>().renameTask(task, c.text.trim());
-            Navigator.pop(context);
-          },
-          child: Text(t.save),
-        ),
-      ],
-    ),
-  );
-}
-
 Future<void> showToBuyItemsDialog(BuildContext context) async {
-  final itemProv = context.read<ItemCloudProvider>();
   final famDictStream = context.read<FamilyProvider>().watchMemberDirectory();
   final t = AppLocalizations.of(context)!;
 
@@ -897,18 +838,17 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
     builder: (sheetCtx) {
       final searchC = TextEditingController();
       String? memberFilter;
-      bool showBought = false;
-
+      String? editingId;
       return StatefulBuilder(
         builder: (ctx, setLocal) {
-          final all = itemProv.items.toList()
+          final all = ctx.watch<ItemCloudProvider>().items.toList()
             ..sort(
               (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
             );
           final toBuy = all.where((i) => !i.bought).toList();
 
           // filtreler
-          Iterable<Item> src = showBought ? all : toBuy;
+          Iterable<Item> src = toBuy;
           if (memberFilter != null) {
             src = src.where(
               (it) =>
@@ -985,9 +925,8 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
                   stream: famDictStream,
                   builder: (_, snap) {
                     final dict = snap.data ?? const <String, String>{};
-
                     final chips = buildAssigneeChips(
-                      context: context,
+                      context: ctx,
                       dict: dict,
                       selected: memberFilter,
                       onPick: (v) => setLocal(() => memberFilter = v),
@@ -1020,29 +959,6 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
                                 .toList(),
                           ),
                         ),
-                        const SizedBox(height: 8),
-
-                        // alt satır: To buy / All
-                        Center(
-                          child: SegmentedButton<bool>(
-                            segments: [
-                              ButtonSegment(
-                                value: false,
-                                icon: const Icon(Icons.shopping_basket),
-                                label: Text(t.toBuy),
-                              ),
-                              ButtonSegment(
-                                value: true,
-                                icon: const Icon(Icons.all_inclusive),
-                                label: Text(t.allLabel),
-                              ),
-                            ],
-                            selected: {showBought},
-                            showSelectedIcon: false,
-                            onSelectionChanged: (s) =>
-                                setLocal(() => showBought = s.first),
-                          ),
-                        ),
                       ],
                     );
                   },
@@ -1057,23 +973,42 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
                       : ListView.separated(
                           itemCount: list.length,
                           separatorBuilder: (_, __) => const Divider(height: 1),
-                          addAutomaticKeepAlives: false,
-                          addRepaintBoundaries: true,
-                          addSemanticIndexes: false,
-                          cacheExtent: 800,
-                          itemBuilder: (_, i) => _ItemRowCompact(
-                            item: list[i],
-                            onToggle: (it, v) async {
-                              await context
-                                  .read<ItemCloudProvider>()
-                                  .toggleItem(it, v);
-                            },
-                            onRename: (it) => _renameItemInline(context, it),
-                            onDelete: (it) => context
-                                .read<ItemCloudProvider>()
-                                .removeItem(it),
-                            onAssign: (it) => _showAssignItemSheet(context, it),
-                          ),
+                          itemBuilder: (_, i) {
+                            final it = list[i];
+                            return _ItemRowCompact(
+                              item: it,
+                              isEditing: editingId == it.remoteId,
+                              onStartRename: (_) =>
+                                  setLocal(() => editingId = it.remoteId),
+                              onCancelRename: () =>
+                                  setLocal(() => editingId = null),
+                              onSaveRename: (item, newName) async {
+                                await ctx.read<ItemCloudProvider>().renameItem(
+                                  item,
+                                  newName,
+                                );
+                                if (ctx.mounted) {
+                                  setLocal(() => editingId = null);
+                                }
+                              },
+                              onToggle: (item, v) async {
+                                await ctx.read<ItemCloudProvider>().toggleItem(
+                                  item,
+                                  v,
+                                );
+                              },
+                              onDelete: (item) async {
+                                await ctx.read<ItemCloudProvider>().removeItem(
+                                  item,
+                                );
+                                if (ctx.mounted && editingId == item.remoteId) {
+                                  setLocal(() => editingId = null);
+                                }
+                              },
+                              onAssign: (item) =>
+                                  _showAssignItemSheet(ctx, item),
+                            );
+                          },
                         ),
                 ),
 
@@ -1126,15 +1061,21 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
 
 class _ItemRowCompact extends StatelessWidget {
   final Item item;
+  final bool isEditing;
+  final void Function(Item it) onStartRename;
+  final void Function() onCancelRename;
+  final Future<void> Function(Item it, String newName) onSaveRename;
   final Future<void> Function(Item it, bool value) onToggle;
-  final void Function(Item it) onRename;
   final void Function(Item it) onDelete;
   final void Function(Item it) onAssign;
 
   const _ItemRowCompact({
     required this.item,
+    required this.isEditing,
+    required this.onStartRename,
+    required this.onCancelRename,
+    required this.onSaveRename,
     required this.onToggle,
-    required this.onRename,
     required this.onDelete,
     required this.onAssign,
   });
@@ -1142,8 +1083,43 @@ class _ItemRowCompact extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
-
     final bought = item.bought;
+
+    Widget titleWidget;
+    if (isEditing) {
+      final ctrl = TextEditingController(text: item.name);
+      titleWidget = Focus(
+        onFocusChange: (has) {
+          if (!has) onCancelRename();
+        },
+        child: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: InputDecoration(
+            isDense: true,
+            border: const OutlineInputBorder(),
+            hintText: t.itemName,
+          ),
+          onSubmitted: (v) async {
+            final nn = v.trim();
+            if (nn.isNotEmpty && nn != item.name) {
+              await onSaveRename(item, nn);
+            }
+            onCancelRename();
+          },
+          onEditingComplete: () {}, // enter ile kapanmayı onSubmitted yapıyor
+        ),
+      );
+    } else {
+      titleWidget = Text(
+        item.name,
+        overflow: TextOverflow.ellipsis,
+        style: bought
+            ? const TextStyle(decoration: TextDecoration.lineThrough)
+            : null,
+      );
+    }
+
     return ListTile(
       dense: true,
       visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
@@ -1152,97 +1128,60 @@ class _ItemRowCompact extends StatelessWidget {
         value: bought,
         onChanged: (v) => onToggle(item, v ?? false),
       ),
-      title: Text(
-        item.name,
-        overflow: TextOverflow.ellipsis,
-        style: bought
-            ? const TextStyle(decoration: TextDecoration.lineThrough)
-            : null,
-      ),
-      trailing: PopupMenuButton<String>(
-        onSelected: (v) {
-          switch (v) {
-            case 'rename':
-              onRename(item);
-              break;
-            case 'assign':
-              onAssign(item);
-              break;
-            case 'delete':
-              onDelete(item);
-              break;
-          }
-        },
-        itemBuilder: (_) => [
-          PopupMenuItem(
-            value: 'rename',
-            child: ListTile(
-              dense: true,
-              leading: const Icon(Icons.edit),
-              title: Text(t.rename),
-            ),
-          ),
-          PopupMenuItem(
-            value: 'assign',
-            child: ListTile(
-              dense: true,
-              leading: const Icon(Icons.person_add_alt),
-              title: Text(t.assign),
-            ),
-          ),
-          PopupMenuItem(
-            value: 'delete',
-            child: ListTile(
-              dense: true,
-              leading: const Icon(
-                Icons.delete_outline,
-                color: Colors.redAccent,
-              ),
-              title: Text(t.delete),
-            ),
-          ),
-        ],
-      ),
+      title: titleWidget,
       onTap: () => onToggle(item, !bought),
+      trailing: isEditing
+          ? IconButton(
+              tooltip: t.cancel,
+              icon: const Icon(Icons.close),
+              onPressed: onCancelRename,
+            )
+          : PopupMenuButton<String>(
+              onSelected: (v) {
+                switch (v) {
+                  case 'rename':
+                    onStartRename(item);
+                    break;
+                  case 'assign':
+                    onAssign(item);
+                    break;
+                  case 'delete':
+                    onDelete(item);
+                    break;
+                }
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'rename',
+                  child: ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.edit),
+                    title: Text(t.rename),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'assign',
+                  child: ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.person_add_alt),
+                    title: Text(t.assign),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: ListTile(
+                    dense: true,
+                    leading: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.redAccent,
+                    ),
+                    title: Text(t.delete),
+                  ),
+                ),
+              ],
+            ),
     );
   }
-}
-
-void _renameItemInline(BuildContext context, Item it) {
-  final c = TextEditingController(text: it.name);
-  final t = AppLocalizations.of(context)!;
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: Text(t.editItem),
-      content: TextField(
-        controller: c,
-        autofocus: true,
-        decoration: InputDecoration(
-          border: const OutlineInputBorder(),
-          isDense: true,
-          hintText: t.itemName,
-        ),
-        onSubmitted: (_) {
-          context.read<ItemCloudProvider>().renameItem(it, c.text.trim());
-          Navigator.pop(context);
-        },
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(t.cancel),
-        ),
-        FilledButton(
-          onPressed: () {
-            context.read<ItemCloudProvider>().renameItem(it, c.text.trim());
-            Navigator.pop(context);
-          },
-          child: Text(t.save),
-        ),
-      ],
-    ),
-  );
 }
 
 class _SummaryCard extends StatelessWidget {

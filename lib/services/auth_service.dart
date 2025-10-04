@@ -56,18 +56,4 @@ class AuthService {
 
   Future<void> sendResetEmail(String email) =>
       _auth.sendPasswordResetEmail(email: email);
-
-  Future<void> _upsertUserDoc(User? u) async {
-    if (u == null) return;
-    final email = u.email ?? '';
-    final display = (u.displayName?.trim().isNotEmpty == true)
-        ? u.displayName!.trim()
-        : (email.contains('@') ? email.split('@').first : email);
-
-    await FirebaseFirestore.instance.collection('users').doc(u.uid).set({
-      'email': email,
-      'displayName': display,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-  }
 }

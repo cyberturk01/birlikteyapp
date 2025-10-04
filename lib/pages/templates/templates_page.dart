@@ -124,7 +124,7 @@ class _TemplatesPageState extends State<TemplatesPage> {
                     'My Templates',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  Spacer(),
+                  const Spacer(),
                   TextButton.icon(
                     onPressed: () async {
                       final created = await Navigator.push(

@@ -448,7 +448,7 @@ class _HomePageState extends State<HomePage> {
 }
 
 class _ExpensesMiniCentered extends StatelessWidget {
-  const _ExpensesMiniCentered({super.key = const ValueKey('exp-mini')});
+  const _ExpensesMiniCentered();
 
   @override
   Widget build(BuildContext context) {
