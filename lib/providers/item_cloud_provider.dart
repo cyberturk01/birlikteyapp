@@ -136,9 +136,7 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
     final data = {
       'name': it.name,
       'bought': it.bought,
-      if ((it.assignedToUid ?? '').trim().isEmpty)
-        'assignedToUid': FieldValue.delete()
-      else
+      if ((it.assignedToUid ?? '').trim().isNotEmpty)
         'assignedToUid': it.assignedToUid!.trim(),
       if ((it.category ?? '').trim().isNotEmpty)
         'category': it.category!.trim(),
@@ -148,6 +146,20 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
     debugPrint('[ItemCloud] ADDED id=${id}');
     await _qSet(path: path, data: data, merge: false);
     it.remoteId = id;
+  }
+
+  Map<String, dynamic> _jsonSafe(Map<String, dynamic> m) {
+    final out = <String, dynamic>{};
+    m.forEach((k, v) {
+      if (v is FieldValue) {
+        // SET tarafında sadece serverTimestamp bekliyoruz; delete zaten eklenmeyecek.
+        // Yerine şu anki zamanı yazalım:
+        out[k] = DateTime.now().toUtc().toIso8601String();
+      } else {
+        out[k] = v;
+      }
+    });
+    return out;
   }
 
   Future<void> updateCategory(Item it, String? category) async {
@@ -224,6 +236,7 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> updateAssignment(Item it, String? memberUid) async {
     final col = _ensureCol();
     final id = await _ensureId(col, it);
+
     await _qUpdate(
       path: '${col.path}/$id',
       data: {
@@ -232,10 +245,19 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
             : memberUid.trim(),
       },
     );
-    it.assignedToUid = (memberUid?.trim().isEmpty ?? true)
-        ? null
-        : memberUid!.trim();
-    notifyListeners();
+
+    final idx = _items.indexWhere((x) => x.remoteId == id);
+    if (idx != -1) {
+      _items[idx] = Item(
+        it.name,
+        bought: it.bought,
+        assignedToUid: (memberUid?.trim().isEmpty ?? true)
+            ? null
+            : memberUid!.trim(),
+      )..remoteId = id;
+
+      notifyListeners();
+    }
   }
 
   Future<void> renameItem(Item it, String newName) async {
@@ -335,12 +357,13 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
     try {
       await Retry.attempt(write, retryOn: isTransientFirestoreError);
     } catch (_) {
+      final safe = _jsonSafe(data);
       await OfflineQueue.I.enqueue(
         OfflineOp(
           id: _uuid.v4(),
           path: path,
           type: OpType.set,
-          data: data,
+          data: safe,
           merge: merge,
         ),
       );

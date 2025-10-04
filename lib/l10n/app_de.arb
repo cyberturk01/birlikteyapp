@@ -109,7 +109,7 @@
   "itemsHelperExample": "Beispiel: Milch, Brot, Eier",
 
   "suggestionsTitle": "Vorschläge",
-  "addTypedList": "Eingegebene Liste hinzufügen",
+  "addTypedList": "Hinzufügen",
 
   "addSelected": "Auswahl hinzufügen",
   "addSelectedCount": "Auswahl hinzufügen ({count})",

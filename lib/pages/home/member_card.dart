@@ -407,29 +407,31 @@ class _MemberCardState extends State<MemberCard> {
   }
 
   void _clearCompletedForMember(BuildContext context, String memberUid) {
-    final prov = context.read<TaskCloudProvider>();
+    final taskProv = context.read<TaskCloudProvider>();
     final t = AppLocalizations.of(context)!;
-    final removed = prov.tasks
-        .where((t) => (t.assignedToUid ?? '') == memberUid && t.completed)
+    final messenger = ScaffoldMessenger.of(context);
+
+    final removed = taskProv.tasks
+        .where((x) => (x.assignedToUid ?? '') == memberUid && x.completed)
         .map(
-          (t) => Task(
-            t.name,
-            completed: t.completed,
-            assignedToUid: t.assignedToUid,
+          (x) => Task(
+            x.name,
+            completed: x.completed,
+            assignedToUid: x.assignedToUid,
           ),
         )
         .toList();
 
-    prov.clearCompleted(forMember: memberUid);
+    taskProv.clearCompleted(forMember: memberUid);
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger.showSnackBar(
       SnackBar(
         content: Text(t.clearedUndo),
         action: SnackBarAction(
           label: t.undo,
           onPressed: () {
-            for (final t in removed) {
-              context.read<TaskCloudProvider>().addTask(t);
+            for (final x in removed) {
+              taskProv.addTask(x);
             }
           },
         ),
@@ -439,26 +441,27 @@ class _MemberCardState extends State<MemberCard> {
   }
 
   void _clearBoughtForMember(BuildContext context, String memberUid) {
-    final prov = context.read<ItemCloudProvider>();
+    final itemProv = context.read<ItemCloudProvider>();
     final t = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
 
-    final removed = prov.items
+    final removed = itemProv.items
         .where((i) => (i.assignedToUid ?? '') == memberUid && i.bought)
         .map(
           (i) => Item(i.name, bought: i.bought, assignedToUid: i.assignedToUid),
         )
         .toList();
 
-    prov.clearBought(forMember: memberUid);
+    itemProv.clearBought(forMember: memberUid);
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger.showSnackBar(
       SnackBar(
         content: Text(t.clearedUndo),
         action: SnackBarAction(
           label: t.undo,
           onPressed: () {
             for (final it in removed) {
-              context.read<ItemCloudProvider>().addItem(it);
+              itemProv.addItem(it);
             }
           },
         ),
@@ -596,6 +599,7 @@ class _MemberCardState extends State<MemberCard> {
     final memberLabel = widget.memberName;
     final taskProv = context.read<TaskCloudProvider>();
     final t = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
     final defaultTasks = AppLists.defaultTasks(context);
     final frequent = taskProv.suggestedTasks;
     final existing = taskProv.tasks.map((t) => t.name).toList();
@@ -633,11 +637,9 @@ class _MemberCardState extends State<MemberCard> {
                   assignedToUid: memberUid,
                 );
                 if (Navigator.canPop(sheetCtx)) Navigator.pop(sheetCtx);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(t.addedTasks(selected.length))),
-                  );
-                }
+                messenger.showSnackBar(
+                  SnackBar(content: Text(t.addedTasks(selected.length))),
+                );
               }
 
               Future<void> addTyped() async {
@@ -648,11 +650,9 @@ class _MemberCardState extends State<MemberCard> {
                   assignedToUid: memberUid,
                 );
                 if (Navigator.canPop(sheetCtx)) Navigator.pop(sheetCtx);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(t.addedTasks(names.length))),
-                  );
-                }
+                messenger.showSnackBar(
+                  SnackBar(content: Text(t.addedTasks(names.length))),
+                );
               }
 
               return Column(
@@ -768,6 +768,7 @@ class _MemberCardState extends State<MemberCard> {
     final memberLabel = widget.memberName;
     final itemProv = context.read<ItemCloudProvider>();
     final t = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
     final defaultItems = AppLists.defaultItems(context);
     final frequent = itemProv.frequentItems;
     final existing = itemProv.items.map((i) => i.name).toList();
@@ -805,11 +806,9 @@ class _MemberCardState extends State<MemberCard> {
                   assignedToUid: memberUid,
                 );
                 if (Navigator.canPop(sheetCtx)) Navigator.pop(sheetCtx);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(t.addedItems(selected.length))),
-                  );
-                }
+                messenger.showSnackBar(
+                  SnackBar(content: Text(t.addedItems(selected.length))),
+                );
               }
 
               Future<void> addTyped() async {
@@ -820,11 +819,9 @@ class _MemberCardState extends State<MemberCard> {
                   assignedToUid: memberUid,
                 );
                 if (Navigator.canPop(sheetCtx)) Navigator.pop(sheetCtx);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(t.addedItems(names.length))),
-                  );
-                }
+                messenger.showSnackBar(
+                  SnackBar(content: Text(t.addedItems(names.length))),
+                );
               }
 
               return Column(

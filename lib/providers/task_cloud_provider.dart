@@ -301,7 +301,6 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     return (t.remoteId?.hashCode ?? t.name.hashCode) & 0x7FFFFFFF;
   }
 
-  // TaskCloudProvider.updateAssignment(...)
   Future<void> updateAssignment(Task t, String? memberUid) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
@@ -313,17 +312,17 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
             : memberUid.trim(),
       },
     );
-    t.assignedToUid = (memberUid?.trim().isEmpty ?? true)
-        ? null
-        : memberUid!.trim();
 
     final idx = _tasks.indexWhere((x) => x.remoteId == id);
     if (idx != -1) {
       _tasks[idx] = Task(
         t.name,
         completed: t.completed,
-        assignedToUid: memberUid,
+        assignedToUid: (memberUid?.trim().isEmpty ?? true)
+            ? null
+            : memberUid!.trim(),
       )..remoteId = id;
+
       notifyListeners();
     }
   }
@@ -391,19 +390,86 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     Future<void> write() async => FirebaseFirestore.instance
         .doc(path)
         .set(data, SetOptions(merge: merge));
+
     try {
       await Retry.attempt(write, retryOn: isTransientFirestoreError);
     } catch (_) {
+      final safe = _sanitizeForQueue(data);
       await OfflineQueue.I.enqueue(
         OfflineOp(
           id: _uuid.v4(),
           path: path,
           type: OpType.set,
-          data: data,
+          data: safe,
           merge: merge,
         ),
       );
     }
+  }
+
+  Future<void> upsertByOrigin({
+    required String origin, // ör: 'weekly:<weeklyId>'
+    required String title,
+    String? assignedToUid,
+  }) async {
+    // 0) Önce yerelde var mı?
+    final localIdx = tasks.indexWhere((t) => t.origin == origin);
+    if (localIdx != -1) {
+      final t = tasks[localIdx];
+      if (t.name != title) await renameTask(t, title);
+      if ((t.assignedToUid ?? '') != (assignedToUid ?? '')) {
+        await updateAssignment(t, assignedToUid);
+      }
+      return;
+    }
+
+    // 1) Bulut’ta var mı? (origin alanı ile)
+    final col = _ensureCol(); // kendi kodundaki koleksiyon erişimi
+    final snap = await col.where('origin', isEqualTo: origin).limit(1).get();
+    if (snap.docs.isNotEmpty) {
+      final d = snap.docs.first;
+      // Yerel listeye ekle veya güncelle
+      final existingIdx = tasks.indexWhere((x) => x.remoteId == d.id);
+      if (existingIdx == -1) {
+        final t = Task(title, assignedToUid: assignedToUid, origin: origin)
+          ..remoteId = d.id;
+        tasks.add(t);
+        notifyListeners();
+      }
+      // Alanları güncel tut
+      await col.doc(d.id).update({
+        'name': title,
+        'assignedToUid': (assignedToUid == null || assignedToUid.trim().isEmpty)
+            ? FieldValue.delete()
+            : assignedToUid.trim(),
+      });
+      return;
+    }
+
+    // 2) Hiç yoksa oluştur (origin ile)
+    await addTask(Task(title, assignedToUid: assignedToUid, origin: origin));
+  }
+
+  Map<String, dynamic> _sanitizeForQueue(Map<String, dynamic> input) {
+    final Map<String, dynamic> out = {};
+    input.forEach((k, v) {
+      if (v is FieldValue) {
+        final s = v.toString();
+        if (s.contains('serverTimestamp')) {
+          out[k] = DateTime.now(); // JSON'a uygun
+        }
+      } else if (v is Map) {
+        out[k] = _sanitizeForQueue(Map<String, dynamic>.from(v));
+      } else if (v is List) {
+        out[k] = v.map((e) {
+          if (e is Map) return _sanitizeForQueue(Map<String, dynamic>.from(e));
+          return (e is FieldValue) ? null : e;
+        }).toList();
+      } else {
+        out[k] = v;
+      }
+    });
+    return out;
   }
 
   Future<void> _qUpdate({

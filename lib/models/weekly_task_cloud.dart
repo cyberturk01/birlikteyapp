@@ -2,15 +2,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class WeeklyTaskCloud {
-  late final String id; // Firestore doc id
+  String? id; // <-- late final yerine nullable
   String day;
   String title;
   String? assignedToUid;
-  int? hour; // optional reminder hour
-  int? minute; // optional reminder minute
+  int? hour;
+  int? minute;
   DateTime createdAt;
-
-  // YENİ: bildirim anahtarı
   bool notifEnabled;
 
   WeeklyTaskCloud(
@@ -19,11 +17,10 @@ class WeeklyTaskCloud {
     this.assignedToUid,
     this.hour,
     this.minute,
-    String? id,
+    this.id, // <-- opsiyonel, dokümandan gelirse dolar
     DateTime? createdAt,
     this.notifEnabled = true,
-  }) : id = id ?? '_pending_',
-       createdAt = createdAt ?? DateTime.now();
+  }) : createdAt = createdAt ?? DateTime.now();
 
   factory WeeklyTaskCloud.fromDoc(DocumentSnapshot d) {
     final m = d.data() as Map<String, dynamic>;
@@ -42,9 +39,9 @@ class WeeklyTaskCloud {
   Map<String, dynamic> toMapForCreate() => {
     'day': day,
     'title': title.trim(),
-    'assignedToUid': (assignedToUid?.trim().isEmpty ?? true)
-        ? null
-        : assignedToUid!.trim(),
+    'assignedToUid': (assignedToUid?.trim().isNotEmpty ?? false)
+        ? assignedToUid!.trim()
+        : null,
     'hour': hour,
     'minute': minute,
     'notifEnabled': notifEnabled,
@@ -54,15 +51,12 @@ class WeeklyTaskCloud {
   Map<String, dynamic> toMapForUpdate() => {
     if (day.isNotEmpty) 'day': day,
     if (title.isNotEmpty) 'title': title.trim(),
-    'assignedToUid': (assignedToUid?.trim().isEmpty ?? true)
-        ? FieldValue.delete()
-        : assignedToUid!.trim(),
+    'assignedToUid': (assignedToUid?.trim().isNotEmpty ?? false)
+        ? assignedToUid!.trim()
+        : FieldValue.delete(),
     'hour': hour,
     'minute': minute,
     'notifEnabled': notifEnabled,
     'updatedAt': FieldValue.serverTimestamp(),
   };
-
-  static String _cap(String s) =>
-      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 }

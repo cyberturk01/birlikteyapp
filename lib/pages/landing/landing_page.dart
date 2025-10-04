@@ -54,7 +54,7 @@ class _LandingPageState extends State<LandingPage> {
             IconButton(
               tooltip: AppLocalizations.of(context)!.language, // "Language"
               icon: const Icon(Icons.language),
-              onPressed: () => _showLanguagePicker(context),
+              onPressed: () => _showLanguageSheet(context),
             ),
             IconButton(
               tooltip: AppLocalizations.of(context)!.signOut,
@@ -473,6 +473,49 @@ class _AllMembersPageUidState extends State<_AllMembersPageUid> {
       ),
     );
   }
+}
+
+void _showLanguageSheet(BuildContext context) {
+  final ui = context.read<UiProvider>();
+  showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Wrap(
+          runSpacing: 8,
+          children: [
+            Text(
+              AppLocalizations.of(context)!.language,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<Locale>(
+              value: ui.locale ?? Localizations.localeOf(context),
+              isExpanded: true,
+              items: const [
+                DropdownMenuItem(value: Locale('en'), child: Text('English')),
+                DropdownMenuItem(value: Locale('tr'), child: Text('Türkçe')),
+                DropdownMenuItem(value: Locale('de'), child: Text('Deutsch')),
+              ],
+              onChanged: (loc) {
+                if (loc != null) ui.setLocale(loc);
+                Navigator.pop(context);
+              },
+              decoration: InputDecoration(
+                labelText: AppLocalizations.of(context)!.language,
+                border: const OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }
 
 void _showLanguagePicker(BuildContext context) {

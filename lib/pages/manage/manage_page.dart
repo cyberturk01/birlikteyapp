@@ -147,7 +147,7 @@ class _ManagePageState extends State<ManagePage> {
     if (text.isEmpty) return;
     final t = AppLocalizations.of(context)!;
 
-    String what = _tab == _ManageTab.tasks
+    final String what = _tab == _ManageTab.tasks
         ? t.taskAddedToast
         : t.itemAddedToast;
 
@@ -183,7 +183,7 @@ class _ManagePageState extends State<ManagePage> {
     FocusScope.of(context).unfocus();
 
     // 🎉 minik haptic + “başarılı” snackbar (tasks ve items için aynı)
-    HapticFeedback.selectionClick();
+    await HapticFeedback.selectionClick();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
@@ -191,7 +191,7 @@ class _ManagePageState extends State<ManagePage> {
           children: [
             const Icon(Icons.check_circle_outline),
             const SizedBox(width: 8),
-            Text('$what added'),
+            Text(what),
           ],
         ),
         duration: const Duration(milliseconds: 1400),

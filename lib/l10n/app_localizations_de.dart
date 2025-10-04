@@ -359,7 +359,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get suggestionsTitle => 'Vorschläge';
 
   @override
-  String get addTypedList => 'Eingegebene Liste hinzufügen';
+  String get addTypedList => 'Hinzufügen';
 
   @override
   String get itemDeleted => 'Artikel gelöscht';

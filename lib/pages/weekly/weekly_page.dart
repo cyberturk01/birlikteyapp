@@ -31,7 +31,7 @@ class _WeeklyPageState extends State<WeeklyPage> {
     final todayWd = DateTime.now().weekday;
 
     // Seçili gün için weekly listesi
-    final selectedDayName = _weekdayIntToCanonical(_selectedWeekday);
+    final selectedDayName = _weekdayIntToCanonicalEN(_selectedWeekday);
     final tasks = weekly.tasksForDay(selectedDayName);
 
     return Scaffold(
@@ -39,12 +39,12 @@ class _WeeklyPageState extends State<WeeklyPage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Weekly Task Plan',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            Text(
+              t.weeklyTaskPlanTitle,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             Text(
-              'Plan weekly routines and assign them to your family.',
+              t.weeklyTaskPlanSubtitle,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -71,7 +71,6 @@ class _WeeklyPageState extends State<WeeklyPage> {
         padding: const EdgeInsets.all(12),
         child: Column(
           children: [
-            // ===== Hafta Şeridi (7 chip) – tüm günler ekranda =====
             Card(
               elevation: 1,
               child: Padding(
@@ -179,6 +178,27 @@ class _WeeklyPageState extends State<WeeklyPage> {
     }
   }
 
+  String _weekdayIntToCanonicalEN(int wd) {
+    switch (wd) {
+      case DateTime.monday:
+        return 'Monday';
+      case DateTime.tuesday:
+        return 'Tuesday';
+      case DateTime.wednesday:
+        return 'Wednesday';
+      case DateTime.thursday:
+        return 'Thursday';
+      case DateTime.friday:
+        return 'Friday';
+      case DateTime.saturday:
+        return 'Saturday';
+      case DateTime.sunday:
+        return 'Sunday';
+      default:
+        return 'Monday';
+    }
+  }
+
   Future<void> _openAddDialog({
     required BuildContext context,
     required int weekday,
@@ -277,7 +297,7 @@ class _WeeklyPageState extends State<WeeklyPage> {
             onPressed: () => Navigator.pop(context),
           ),
           FilledButton(
-            child: const Text('Add'),
+            child: Text(t.add),
             onPressed: () => Navigator.pop(context, 'submit'),
           ),
         ],

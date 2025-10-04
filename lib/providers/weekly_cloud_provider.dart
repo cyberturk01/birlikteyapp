@@ -10,7 +10,6 @@ import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
-import '../models/task.dart';
 import '../services/offline_queue.dart';
 import '../services/retry.dart';
 import '_base_cloud.dart';
@@ -21,6 +20,7 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
   String? _familyId;
   StreamSubscription<QuerySnapshot>? _sub;
 
+  final Set<String> _syncingOrigins = {};
   final _uuid = const Uuid();
 
   final List<WeeklyTaskCloud> _list = [];
@@ -78,7 +78,10 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
 
   // ===== queries =====
   Future<void> _cleanupOrphans() async {
-    final idsInFirestore = _list.map((e) => e.id).toSet();
+    final idsInFirestore = _list
+        .map((e) => e.id)
+        .whereType<String>()
+        .toSet(); // <- null’ları at
     final keysInBox = _notifBox.keys.cast<String>().toList();
     for (final k in keysInBox) {
       if (!idsInFirestore.contains(k)) {
@@ -104,64 +107,19 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<WeeklyTaskCloud> addWeeklyTask(WeeklyTaskCloud task) async {
     if (_familyId == null) throw StateError('No familyId');
 
+    task.day = _canonicalDay(task.day);
     final colPath = 'families/$_familyId/weekly';
-    final id = task.id.isNotEmpty ? task.id : _uuid.v4();
+    final id = task.id ?? _uuid.v4();
     final path = '$colPath/$id';
 
     await _qSet(path: path, data: task.toMapForCreate(), merge: false);
 
-    task.id = id;
+    task.id ??= id;
     _list.add(task);
     notifyListeners();
 
     await _scheduleFor(task);
     return task;
-  }
-
-  Future<List<WeeklyTaskCloud>> addWeeklyBulk(
-    List<(String, String)> entries, {
-    String? assignedToUid,
-  }) async {
-    final created = <WeeklyTaskCloud>[];
-    for (final e in entries) {
-      final day = e.$1.trim();
-      final title = e.$2.trim();
-      if (day.isEmpty || title.isEmpty) continue;
-
-      final pending = WeeklyTaskCloud(day, title, assignedToUid: assignedToUid);
-      final saved = await addWeeklyTask(pending); // <-- KAYDEDİLENİ AL
-      created.add(saved); // <-- GERÇEK id’Lİ OBJ
-    }
-    return created;
-  }
-
-  Future<WeeklyTaskCloud> addTask(WeeklyTaskCloud task) => addWeeklyTask(task);
-
-  Future<void> removeWeeklyTaskById(String id) async {
-    if (_familyId == null) return;
-    await _cancelForId(id);
-    await _qDelete(path: 'families/$_familyId/weekly/$id');
-  }
-
-  Future<void> removeWeeklyTask(WeeklyTaskCloud task) =>
-      removeWeeklyTaskById(task.id);
-
-  // WeeklyCloudProvider içine (opsiyonel şeker):
-  Future<void> addSimple({
-    required String day,
-    required String title,
-    String? assignedToUid,
-    TimeOfDay? timeOfDay,
-  }) async {
-    await addWeeklyTask(
-      WeeklyTaskCloud(
-        day,
-        title,
-        assignedToUid: assignedToUid,
-        hour: timeOfDay?.hour,
-        minute: timeOfDay?.minute,
-      ),
-    );
   }
 
   Future<void> updateWeeklyTask(
@@ -180,10 +138,17 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
     if (title != null && title.trim().isNotEmpty && title != task.title) {
       task.title = title.trim();
     }
-    if (day != null && day.trim().isNotEmpty && day != task.day) {
-      task.day = day.trim();
-      needsReschedule = true;
+    if (day != null && day.trim().isNotEmpty) {
+      final canon = _canonicalDay(day);
+      if (canon != task.day) {
+        task.day = canon;
+        needsReschedule = true;
+      }
     }
+    // if (day != null && day.trim().isNotEmpty && day != task.day) {
+    //   task.day = day.trim();
+    //   needsReschedule = true;
+    // }
     if (assignedToUid != null) {
       final v = assignedToUid.trim();
       task.assignedToUid = v.isEmpty ? null : v;
@@ -227,12 +192,92 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
     }
   }
 
+  Future<List<WeeklyTaskCloud>> addWeeklyBulk(
+    List<(String, String)> entries, {
+    String? assignedToUid,
+  }) async {
+    final created = <WeeklyTaskCloud>[];
+    for (final e in entries) {
+      final day = e.$1.trim();
+      final title = e.$2.trim();
+      if (day.isEmpty || title.isEmpty) continue;
+
+      final pending = WeeklyTaskCloud(day, title, assignedToUid: assignedToUid);
+      final saved = await addWeeklyTask(pending); // <-- KAYDEDİLENİ AL
+      created.add(saved); // <-- GERÇEK id’Lİ OBJ
+    }
+    return created;
+  }
+
+  Future<WeeklyTaskCloud> addTask(WeeklyTaskCloud task) => addWeeklyTask(task);
+
+  Future<void> removeWeeklyTaskById(String? id) async {
+    if (_familyId == null || id == null) return;
+    await _cancelForId(id);
+    await _qDelete(path: 'families/$_familyId/weekly/$id');
+  }
+
+  Future<void> removeWeeklyTask(WeeklyTaskCloud task) =>
+      removeWeeklyTaskById(task.id);
+
+  // WeeklyCloudProvider içine (opsiyonel şeker):
+  Future<void> addSimple({
+    required String day,
+    required String title,
+    String? assignedToUid,
+    TimeOfDay? timeOfDay,
+  }) async {
+    await addWeeklyTask(
+      WeeklyTaskCloud(
+        day,
+        title,
+        assignedToUid: assignedToUid,
+        hour: timeOfDay?.hour,
+        minute: timeOfDay?.minute,
+      ),
+    );
+  }
+
   Future<void> removeManyWeekly(Iterable<WeeklyTaskCloud> list) async {
     for (final t in list) {
       await removeWeeklyTask(t);
     }
   }
 
+  String _canonicalDay(String s) {
+    final d = s.trim().toLowerCase();
+
+    // EN
+    if (d.startsWith('mon')) return 'Monday';
+    if (d.startsWith('tue')) return 'Tuesday';
+    if (d.startsWith('wed')) return 'Wednesday';
+    if (d.startsWith('thu')) return 'Thursday';
+    if (d.startsWith('fri')) return 'Friday';
+    if (d.startsWith('sat')) return 'Saturday';
+    if (d.startsWith('sun')) return 'Sunday';
+
+    // TR
+    if (d.startsWith('pazartesi') || d.startsWith('pzt') || d.startsWith('pts'))
+      return 'Monday';
+    if (d.startsWith('sal')) return 'Tuesday';
+    if (d.startsWith('çar') || d.startsWith('car')) return 'Wednesday';
+    if (d.startsWith('per')) return 'Thursday';
+    if (d.startsWith('cuma')) return 'Friday';
+    if (d.startsWith('cumartesi') || d.startsWith('cmt')) return 'Saturday';
+    if (d.startsWith('pazar') || d.startsWith('paz')) return 'Sunday';
+
+    // DE
+    if (d.startsWith('montag') || d == 'mo') return 'Monday';
+    if (d.startsWith('dienstag') || d == 'di') return 'Tuesday';
+    if (d.startsWith('mittwoch') || d == 'mi') return 'Wednesday';
+    if (d.startsWith('donnerstag') || d == 'do') return 'Thursday';
+    if (d.startsWith('freitag') || d == 'fr') return 'Friday';
+    if (d.startsWith('samstag') || d.startsWith('sonnabend') || d == 'sa')
+      return 'Saturday';
+    if (d.startsWith('sonntag') || d == 'so') return 'Sunday';
+
+    return 'Monday';
+  }
   // ===== daily sync to Tasks =====
 
   Future<void> ensureTodaySynced(TaskCloudProvider taskProv) async {
@@ -248,46 +293,12 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
     final today = todayTasks();
     if (today.isEmpty) return;
 
-    final existing = taskProv.tasks;
-
     for (final w in today) {
-      final title = w.title.trim();
-      final assg = w.assignedToUid?.trim();
-      final originKey = 'weekly:${w.id}';
-
-      // 1) Önce origin’e göre mevcut task var mı?
-      final idx = existing.indexWhere((t) => t.origin == originKey);
-      if (idx != -1) {
-        final t = existing[idx];
-
-        // Gerekliyse alanları güncelle (name/assigned)
-        bool needsUpdate = false;
-        if (t.name != title) {
-          await taskProv.renameTask(t, title);
-          needsUpdate = true;
-        }
-        if ((t.assignedToUid ?? '') != (assg ?? '')) {
-          await taskProv.updateAssignment(t, assg);
-          needsUpdate = true;
-        }
-        if (needsUpdate) {
-          // provider zaten notify ediyor
-        }
-        continue;
-      }
-
-      // 2) Origin yoksa, eski “duplike ada göre” kontrol korunabilir:
-      final dup = existing.any(
-        (t) =>
-            t.name.toLowerCase() == title.toLowerCase() &&
-            ((t.assignedToUid ?? '').toLowerCase() ==
-                (assg ?? '').toLowerCase()),
+      await taskProv.upsertByOrigin(
+        origin: 'weekly:${w.id}',
+        title: w.title.trim(),
+        assignedToUid: w.assignedToUid?.trim(),
       );
-      if (!dup) {
-        await taskProv.addTask(
-          Task(title, assignedToUid: assg, origin: originKey),
-        );
-      }
     }
   }
 
@@ -296,19 +307,21 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> _scheduleFor(WeeklyTaskCloud task) async {
     if (task.notifEnabled != true) return;
     if (task.hour == null || task.minute == null) return;
+    if (task.id == null) return;
 
     final weekday = _dayStringToWeekdayInt(task.day);
     final time = await _resolveTime(task);
-    final id = await NotificationService.scheduleWeekly(
+    final nid = await NotificationService.scheduleWeekly(
       title: 'Weekly task',
       body: task.title,
       weekday: weekday,
       timeOfDay: time,
     );
-    await _notifBox.put(task.id, id);
+    await _notifBox.put(task.id, nid);
   }
 
-  Future<void> _cancelForId(String docId) async {
+  Future<void> _cancelForId(String? docId) async {
+    if (docId == null) return;
     final id = _notifBox.get(docId);
     if (id != null) {
       await NotificationService.cancel(id);
@@ -329,30 +342,27 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
 
   // ===== helpers =====
 
-  bool _sameDay(String a, String b) {
-    final aa = a.trim().toLowerCase();
-    final bb = b.trim().toLowerCase();
-    final n = (aa.length < 3 || bb.length < 3) ? 1 : 3;
-    return aa.substring(0, n) == bb.substring(0, n);
-  }
+  bool _sameDay(String a, String b) => _canonicalDay(a) == _canonicalDay(b);
 
   int _dayStringToWeekdayInt(String day) {
-    final d = day.trim().toLowerCase();
-    if (d.startsWith('pazartesi') || d.startsWith('mon'))
-      return DateTime.monday;
-    if (d.startsWith('sal') || d.startsWith('tue')) return DateTime.tuesday;
-    if (d.startsWith('çar') || d.startsWith('car') || d.startsWith('wed')) {
-      return DateTime.wednesday;
+    switch (_canonicalDay(day)) {
+      case 'Monday':
+        return DateTime.monday;
+      case 'Tuesday':
+        return DateTime.tuesday;
+      case 'Wednesday':
+        return DateTime.wednesday;
+      case 'Thursday':
+        return DateTime.thursday;
+      case 'Friday':
+        return DateTime.friday;
+      case 'Saturday':
+        return DateTime.saturday;
+      case 'Sunday':
+        return DateTime.sunday;
+      default:
+        return DateTime.monday;
     }
-    if (d.startsWith('per') || d.startsWith('thu')) return DateTime.thursday;
-    if (d.startsWith('cuma') || d.startsWith('fri')) return DateTime.friday;
-    if (d.startsWith('cmt') ||
-        d.startsWith('cumartesi') ||
-        d.startsWith('sat')) {
-      return DateTime.saturday;
-    }
-    if (d.startsWith('paz') || d.startsWith('sun')) return DateTime.sunday;
-    return DateTime.monday;
   }
 
   String _weekdayIntToCanonical(int wd) {

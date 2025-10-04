@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:birlikteyapp/models/weekly_task_cloud.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -279,8 +280,7 @@ void _showAssignTaskSheet(BuildContext context, Task task) {
                         ? selectedUid
                         : null,
                   );
-                  taskCloud.refreshNow();
-                  if (context.mounted) Navigator.pop(context);
+                  if (Navigator.canPop(context)) Navigator.pop(context);
                 },
                 child: Text(t.save),
               ),
@@ -355,14 +355,14 @@ void _showAssignItemSheet(BuildContext context, Item item) {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: () {
-                context.read<ItemCloudProvider>().updateAssignment(
+              onPressed: () async {
+                await context.read<ItemCloudProvider>().updateAssignment(
                   item,
                   (selectedUid != null && selectedUid!.trim().isNotEmpty)
                       ? selectedUid
                       : null,
                 );
-                Navigator.pop(context);
+                if (Navigator.canPop(context)) Navigator.pop(context);
               },
               child: Text(t.save),
             ),
@@ -474,26 +474,14 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
                   stream: famDictStream, // {uid: label}
                   builder: (_, snap) {
                     final dict = snap.data ?? const <String, String>{};
-                    final chips = <Widget>[
-                      FilterChip(
-                        label: Text(t.allLabel),
-                        selected: memberFilter == null,
-                        onSelected: (_) => setLocal(() => memberFilter = null),
-                      ),
-                      FilterChip(
-                        label: Text(t.unassigned),
-                        selected: memberFilter == '',
-                        onSelected: (_) => setLocal(() => memberFilter = ''),
-                      ),
-                      ...dict.entries.map(
-                        (e) => FilterChip(
-                          label: Text(e.value),
-                          selected: memberFilter == e.key,
-                          onSelected: (_) =>
-                              setLocal(() => memberFilter = e.key),
-                        ),
-                      ),
-                    ];
+                    final chips = buildAssigneeChips(
+                      context: context,
+                      dict: dict,
+                      selected: memberFilter,
+                      onPick: (v) => setLocal(() => memberFilter = v),
+                      allLabel: t.allLabel,
+                      unassignedLabel: t.unassigned,
+                    );
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -817,6 +805,45 @@ Color _dueFg(ColorScheme cs, _DueStatus s) {
   }
 }
 
+List<Widget> buildAssigneeChips({
+  required BuildContext context,
+  required Map<String, String> dict, // {uid: label}
+  required String? selected, // memberFilter
+  required void Function(String?) onPick, // setLocal(() => memberFilter = ...)
+  required String allLabel, // t.allLabel
+  required String unassignedLabel, // t.unassigned
+}) {
+  final myUid = FirebaseAuth.instance.currentUser?.uid;
+
+  // dict'i listeye çevir ve "ben" ilk sıraya, kalanları ada göre sırala
+  final entries = dict.entries.toList()
+    ..sort((a, b) {
+      if (a.key == myUid && b.key != myUid) return -1; // ben önce
+      if (b.key == myUid && a.key != myUid) return 1;
+      return a.value.toLowerCase().compareTo(b.value.toLowerCase());
+    });
+
+  return <Widget>[
+    FilterChip(
+      label: Text(allLabel),
+      selected: selected == null,
+      onSelected: (_) => onPick(null),
+    ),
+    FilterChip(
+      label: Text(unassignedLabel),
+      selected: selected == '',
+      onSelected: (_) => onPick(''),
+    ),
+    ...entries.map(
+      (e) => FilterChip(
+        label: Text(e.value),
+        selected: selected == e.key,
+        onSelected: (_) => onPick(e.key),
+      ),
+    ),
+  ];
+}
+
 void _renameInline(BuildContext context, Task task) {
   final t = AppLocalizations.of(context)!;
   final c = TextEditingController(text: task.name);
@@ -959,26 +986,14 @@ Future<void> showToBuyItemsDialog(BuildContext context) async {
                   builder: (_, snap) {
                     final dict = snap.data ?? const <String, String>{};
 
-                    final chips = <Widget>[
-                      FilterChip(
-                        label: Text(t.allLabel),
-                        selected: memberFilter == null,
-                        onSelected: (_) => setLocal(() => memberFilter = null),
-                      ),
-                      FilterChip(
-                        label: Text(t.unassigned),
-                        selected: memberFilter == '',
-                        onSelected: (_) => setLocal(() => memberFilter = ''),
-                      ),
-                      ...dict.entries.map(
-                        (e) => FilterChip(
-                          label: Text(e.value),
-                          selected: memberFilter == e.key,
-                          onSelected: (_) =>
-                              setLocal(() => memberFilter = e.key),
-                        ),
-                      ),
-                    ];
+                    final chips = buildAssigneeChips(
+                      context: context,
+                      dict: dict,
+                      selected: memberFilter,
+                      onPick: (v) => setLocal(() => memberFilter = v),
+                      allLabel: t.allLabel,
+                      unassignedLabel: t.unassigned,
+                    );
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
