@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:birlikteyapp/constants/app_lists.dart';
 import 'package:birlikteyapp/firebase_options.dart';
 import 'package:birlikteyapp/models/expense.dart';
@@ -15,6 +17,7 @@ import 'package:birlikteyapp/providers/templates_provider.dart';
 import 'package:birlikteyapp/providers/ui_provider.dart';
 import 'package:birlikteyapp/providers/weekly_cloud_provider.dart';
 import 'package:birlikteyapp/services/auth_service.dart';
+import 'package:birlikteyapp/services/firestore_scores_repo.dart';
 import 'package:birlikteyapp/services/notification_service.dart';
 import 'package:birlikteyapp/services/offline_queue.dart';
 import 'package:birlikteyapp/services/scores_repo.dart';
@@ -24,6 +27,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -38,11 +42,13 @@ Future<void> main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Emülatör (debug)
-  // if (kDebugMode) {
-  //   FirebaseAuth.instance.useAuthEmulator('10.0.2.2', 9099);
-  //   FirebaseFirestore.instance.useFirestoreEmulator('10.0.2.2', 8080);
-  // }
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+
+  // async zone errors
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
 
   await FirebaseAppCheck.instance.activate(
     androidProvider: AndroidProvider.debug,
@@ -133,7 +139,7 @@ class _RootState extends State<_Root> {
             ChangeNotifierProvider(create: (_) => TemplatesProvider()),
             ChangeNotifierProvider(create: (_) => ui..loadPrefs()),
             Provider<ScoresRepo>(
-              create: (_) => ScoresRepo(FirebaseFirestore.instance),
+              create: (_) => FirestoreScoresRepo(FirebaseFirestore.instance),
             ),
             Provider<AuthService>(create: (_) => AuthService()),
             Provider<TaskService>(create: (_) => TaskService()),
@@ -173,11 +179,11 @@ class _RootState extends State<_Root> {
                 return p;
               },
             ),
-            // TaskCloudProvider: ScoresRepo’yu da ver
-            ChangeNotifierProxyProvider3<
+            ChangeNotifierProxyProvider4<
               AuthService,
               TaskService,
               ScoresRepo,
+              FamilyProvider,
               TaskCloudProvider
             >(
               create: (ctx) => TaskCloudProvider(
@@ -185,10 +191,12 @@ class _RootState extends State<_Root> {
                 ctx.read<TaskService>(),
                 ctx.read<ScoresRepo>(),
               ),
-              update: (ctx, auth, taskService, scores, prev) {
+              update: (ctx, auth, taskService, scores, family, prev) {
                 final p = prev ?? TaskCloudProvider(auth, taskService, scores);
+                // senin provider'daki update(AuthService, TaskService, ScoresRepo)
                 p.update(auth, taskService, scores);
-                p.setFamilyId(ctx.read<FamilyProvider>().familyId);
+                // familyId her değiştiğinde burada set edilecek
+                p.setFamilyId(family.familyId);
                 return p;
               },
             ),

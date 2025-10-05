@@ -511,7 +511,6 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
                     );
                   },
                 ),
-
                 const SizedBox(height: 8),
 
                 // Liste
@@ -544,14 +543,18 @@ Future<void> showPendingTasksDialog(BuildContext context) async {
                               onSubmitInlineRename: (t, newName) async {
                                 final v = newName.trim();
                                 if (v.isNotEmpty && v != t.name) {
-                                  await context
+                                  await ctx
                                       .read<TaskCloudProvider>()
                                       .renameTask(t, v);
                                 }
-                                setLocal(() => editingId = null);
+                                setLocal(() {
+                                  editingId = null;
+                                });
                               },
-                              onCancelInlineRename: (t) {
-                                setLocal(() => editingId = null);
+                              onCancelInlineRename: (_) {
+                                setLocal(() {
+                                  editingId = null;
+                                });
                               },
                               onToggle: (t, v) async {
                                 await context

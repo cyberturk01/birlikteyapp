@@ -15,7 +15,12 @@ import '../services/retry.dart';
 import '_base_cloud.dart';
 
 class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
-  final _db = FirebaseFirestore.instance;
+  final FirebaseFirestore _db;
+  final Box<int> _notifBox;
+
+  WeeklyCloudProvider({FirebaseFirestore? db, Box<int>? notifBox})
+    : _db = db ?? FirebaseFirestore.instance,
+      _notifBox = notifBox ?? Hive.box<int>('weeklyNotifCloudBox');
 
   String? _familyId;
   StreamSubscription<QuerySnapshot>? _sub;
@@ -25,8 +30,11 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
   final List<WeeklyTaskCloud> _list = [];
   List<WeeklyTaskCloud> get tasks => List.unmodifiable(_list);
 
-  /// Bildirim id’leri: key=docId, value=notificationId
-  final Box<int> _notifBox = Hive.box<int>('weeklyNotifCloudBox');
+  // /// Bildirim id’leri: key=docId, value=notificationId
+  // final Box<int> _notifBox = Hive.box<int>('weeklyNotifCloudBox');
+
+  @visibleForTesting
+  String canonicalDayForTest(String s) => _canonicalDay(s);
 
   // ===== binding =====
 
@@ -243,6 +251,13 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
     }
   }
 
+  @visibleForTesting
+  void debugInject(List<WeeklyTaskCloud> list) {
+    _list
+      ..clear()
+      ..addAll(list);
+  }
+
   String _canonicalDay(String s) {
     final d = s.trim().toLowerCase();
 
@@ -256,13 +271,16 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
     if (d.startsWith('sun')) return 'Sunday';
 
     // TR
-    if (d.startsWith('pazartesi') || d.startsWith('pzt') || d.startsWith('pts'))
+    if (d.startsWith('pazartesi') ||
+        d.startsWith('pzt') ||
+        d.startsWith('pts')) {
       return 'Monday';
+    }
     if (d.startsWith('sal')) return 'Tuesday';
     if (d.startsWith('çar') || d.startsWith('car')) return 'Wednesday';
     if (d.startsWith('per')) return 'Thursday';
-    if (d.startsWith('cuma')) return 'Friday';
     if (d.startsWith('cumartesi') || d.startsWith('cmt')) return 'Saturday';
+    if (d.startsWith('cuma')) return 'Friday';
     if (d.startsWith('pazar') || d.startsWith('paz')) return 'Sunday';
 
     // DE
@@ -271,12 +289,27 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
     if (d.startsWith('mittwoch') || d == 'mi') return 'Wednesday';
     if (d.startsWith('donnerstag') || d == 'do') return 'Thursday';
     if (d.startsWith('freitag') || d == 'fr') return 'Friday';
-    if (d.startsWith('samstag') || d.startsWith('sonnabend') || d == 'sa')
+    if (d.startsWith('samstag') || d.startsWith('sonnabend') || d == 'sa') {
       return 'Saturday';
+    }
     if (d.startsWith('sonntag') || d == 'so') return 'Sunday';
 
     return 'Monday';
   }
+
+  List<WeeklyTaskCloud> tasksForDaySorted(String day) {
+    final list = tasksForDay(day);
+    list.sort((a, b) {
+      // (hour, minute) null → en sona
+      final ah = a.hour ?? 99, am = a.minute ?? 99;
+      final bh = b.hour ?? 99, bm = b.minute ?? 99;
+      final tcmp = (ah != bh) ? ah.compareTo(bh) : am.compareTo(bm);
+      if (tcmp != 0) return tcmp;
+      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    });
+    return list;
+  }
+
   // ===== daily sync to Tasks =====
 
   Future<void> ensureTodaySynced(TaskCloudProvider taskProv) async {
@@ -388,6 +421,16 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
   String _dateKey(DateTime dt) =>
       '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 
+  Map<String, dynamic> _stripFieldValues(Map<String, dynamic> src) {
+    final out = <String, dynamic>{};
+    src.forEach((k, v) {
+      if (v == null) return; // null yazma
+      if (v is FieldValue) return; // FieldValue'ları kuyrukta tutma
+      out[k] = v;
+    });
+    return out;
+  }
+
   @override
   void dispose() {
     _sub?.cancel();
@@ -413,7 +456,7 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
           id: _uuid.v4(),
           path: path,
           type: OpType.set,
-          data: data,
+          data: _stripFieldValues(data),
           merge: merge,
         ),
       );
@@ -430,7 +473,12 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
       await Retry.attempt(write, retryOn: isTransientFirestoreError);
     } catch (_) {
       await OfflineQueue.I.enqueue(
-        OfflineOp(id: _uuid.v4(), path: path, type: OpType.update, data: data),
+        OfflineOp(
+          id: _uuid.v4(),
+          path: path,
+          type: OpType.update,
+          data: _stripFieldValues(data),
+        ),
       );
     }
   }

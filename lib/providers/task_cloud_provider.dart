@@ -18,10 +18,17 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   AuthService _auth;
   TaskService _service;
   final ScoresRepo _scores; // <- ekle
+  late final FirebaseAuth _fbAuth;
   final _uuid = Uuid();
 
-  TaskCloudProvider(this._auth, this._service, this._scores) {
-    _bindAuth();
+  TaskCloudProvider(
+    this._auth,
+    this._service,
+    this._scores, {
+    FirebaseAuth? firebaseAuth, // <-- ekle
+  }) {
+    _fbAuth = firebaseAuth ?? FirebaseAuth.instance; // <-- kritik satır
+    _bindAuth(); // mevcut akışın aynısı
   }
 
   User? _currentUser;
@@ -62,9 +69,9 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   }
 
   void _bindAuth() {
-    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+    _authSub = _fbAuth.authStateChanges().listen((user) {
       _currentUser = user;
-      _rebindTasks(); // kullanıcı değişti: task akışını yeniden bağla
+      _rebindTasks(); // senin mevcut mantığın
     });
   }
 

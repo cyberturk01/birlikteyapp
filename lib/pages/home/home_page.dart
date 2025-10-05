@@ -39,6 +39,8 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    final famId = context.read<FamilyProvider>().familyId;
+    context.read<TaskCloudProvider>().setFamilyId(famId);
     _pageController = PageController(
       // viewportFraction: 0.92, // yanlardan küçük boşluk
       initialPage: _activeIndex,

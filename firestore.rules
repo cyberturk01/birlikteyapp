@@ -2,6 +2,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{db}/documents {
 
+    /* ---------- helpers ---------- */
+
     function signedIn() {
       return request.auth != null;
     }
@@ -25,6 +27,19 @@ service cloud.firestore {
         );
     }
 
+    // tiny helpers
+    function isString(x) { return x is string; }
+    function isBool(x)   { return x is bool; }
+    function isNum(x)    { return x is number; }
+    function between(n, a, b) { return n >= a && n <= b; }
+
+    // canonical day check
+    function isCanonicalDay(d) {
+      return d in ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    }
+
+    /* ---------- root-level collections ---------- */
+
     match /users/{uid} {
       allow read, create, update: if signedIn() && request.auth.uid == uid;
       allow delete: if false;
@@ -44,94 +59,6 @@ service cloud.firestore {
       allow update: if false;
     }
 
-    match /families/{fid} {
-
-      // Owner veya üye doc'u okuyabilir
-      allow get: if isOwner(fid) || isMember(fid);
-      allow list: if false;
-
-      // Create: yalnızca kendi adını owner olarak yazarak
-      allow create: if signedIn()
-        && request.resource.data.ownerUid == request.auth.uid
-        && (request.resource.data.members is map)
-        && (request.resource.data.members[request.auth.uid] == 'owner')
-        && (request.resource.data.nameLower is string)
-        && exists(/databases/$(db)/documents/family_names/$(request.resource.data.nameLower))
-        && get(/databases/$(db)/documents/family_names/$(request.resource.data.nameLower)).data.ownerUid == request.auth.uid;
-
-      // Update:
-      allow update: if
-        // 1) Owner serbest
-        isOwner(fid)
-        ||
-        // 2) JOIN: üye değilken sadece kendini ekleyebilsin (merge ile)
-        (
-          signedIn()
-          && familyExists(fid)
-          && !(request.auth.uid in (resource.data.members is map ? resource.data.members.keys() : []))
-          && (request.resource.data.members is map)
-          && (request.resource.data.members[request.auth.uid] in ['editor','viewer'])
-          // sadece belirli alanlar değişsin
-          && request.resource.data.diff(resource.data).changedKeys()
-              .hasOnly(['members','memberNames','updatedAt'])
-        )
-        ||
-        // 3) Üye: güvenli alanlar
-        (
-          isMember(fid)
-          && request.resource.data.diff(resource.data).changedKeys()
-              .hasOnly(['name','nameLower','members','memberNames','inviteCode','updatedAt','createdAt'])
-        );
-
-      // Delete: sadece owner
-      allow delete: if isOwner(fid);
-
-      // ---- Subcollections ----
-      match /tasks/{tid} {
-        allow read, create, update, delete: if isOwner(fid) || isMember(fid);
-      }
-      match /weekly/{docId} {
-        allow read, create, update, delete: if isOwner(fid) || isMember(fid);
-      }
-      match /expenses/{eid} {
-        allow read, create, update, delete: if isOwner(fid) || isMember(fid);
-      }
-      match /items/{iid} {
-        allow read, create, update, delete: if isOwner(fid) || isMember(fid);
-      }
-
-      // ✅ SCORES (day/week/month → periodId → uid)
-      // Path: families/{fid}/scores/{period}/{periodId}/{uid}
-      match /scores/{period}/{periodId}/{uid} {
-        function isAllowedPeriod() {
-          return period in ['day', 'week', 'month'];
-        }
-        function allowedShape() {
-          // sadece points & updatedAt
-          return request.resource.data.keys().hasOnly(['points','updatedAt'])
-                 && (request.resource.data.points is number);
-        }
-        function limitedDelta() {
-          // tek yazımda değişim -20..+20 ile sınırlı (create'de old=0)
-          let old = (resource.data.points is number) ? resource.data.points : 0;
-          let delta = request.resource.data.points - old;
-          return delta <= 20 && delta >= -20;
-        }
-
-        allow read: if (isOwner(fid) || isMember(fid)) && isAllowedPeriod();
-        allow create, update: if (isOwner(fid) || isMember(fid))
-                              && isAllowedPeriod()
-                              && allowedShape()
-                              && limitedDelta();
-        allow delete: if false; // istersen owner'a açabilirsin
-      }
-
-      // diğer alt koleksiyonlar (genel izin) — bırakabilirsin
-      match /{sub=**}/{docId} {
-        allow read, create, update, delete: if isOwner(fid) || isMember(fid);
-      }
-    }
-
     match /invites/{code} {
       allow get: if signedIn();
       allow list: if false;
@@ -141,6 +68,168 @@ service cloud.firestore {
 
       allow update, delete: if signedIn()
         && request.auth.uid == resource.data.ownerUid;
+    }
+
+    /* ---------- families tree ---------- */
+
+    match /families/{fid} {
+
+      // Owner veya üye okuyabilir
+      allow get: if isOwner(fid) || isMember(fid);
+      allow list: if false;
+
+      // Create: sadece kendini owner yazarak
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && (request.resource.data.members is map)
+        && (request.resource.data.members[request.auth.uid] == 'owner')
+        && (request.resource.data.nameLower is string)
+        && exists(/databases/$(db)/documents/family_names/$(request.resource.data.nameLower))
+        && get(/databases/$(db)/documents/family_names/$(request.resource.data.nameLower)).data.ownerUid == request.auth.uid;
+
+      // Update
+      allow update: if
+        // 1) Owner serbest
+        isOwner(fid)
+        ||
+        // 2) JOIN: üye değilken sadece kendini ekleyebilirsin
+        (
+          signedIn()
+          && familyExists(fid)
+          && !(request.auth.uid in (resource.data.members is map ? resource.data.members.keys() : []))
+          && (request.resource.data.members is map)
+          && (request.resource.data.members[request.auth.uid] in ['editor','viewer'])
+          && request.resource.data.diff(resource.data).changedKeys()
+              .hasOnly(['members','memberNames','updatedAt'])
+        )
+        ||
+        // 3) Üye: güvenli alanları değiştirebilir
+        (
+          isMember(fid)
+          && request.resource.data.diff(resource.data).changedKeys()
+              .hasOnly(['name','nameLower','members','memberNames','inviteCode','updatedAt','createdAt'])
+        );
+
+      // Delete: sadece owner
+      allow delete: if isOwner(fid);
+
+      /* ---- validators ---- */
+
+      // WEEKLY
+      function validWeeklyCreate(d) {
+        return d.keys().hasOnly(['day','title','assignedToUid','hour','minute','notifEnabled','createdAt','updatedAt'])
+          && isString(d.day) && isCanonicalDay(d.day)
+          && isString(d.title)
+          && (!('assignedToUid' in d) || isString(d.assignedToUid))
+          && (!('hour' in d) || d.hour == null || isNum(d.hour))
+          && (!('minute' in d) || d.minute == null || isNum(d.minute))
+          && ( (!('hour' in d) && !('minute' in d))  // hiçbiri yok
+               || (('hour' in d) && ('minute' in d)   // ikisi birlikte ve aralıkta
+                   && (d.hour == null && d.minute == null
+                       || (between(d.hour,0,23) && between(d.minute,0,59)))) )
+          && (!('notifEnabled' in d) || isBool(d.notifEnabled));
+      }
+      function validWeeklyUpdate(d) {
+        return d.keys().hasOnly(['day','title','assignedToUid','hour','minute','notifEnabled','createdAt','updatedAt'])
+          && (!('day' in d) || (isString(d.day) && isCanonicalDay(d.day)))
+          && (!('title' in d) || isString(d.title))
+          && (!('assignedToUid' in d) || isString(d.assignedToUid))
+          && (!('hour' in d) || d.hour == null || isNum(d.hour))
+          && (!('minute' in d) || d.minute == null || isNum(d.minute))
+          && ( (!('hour' in d) && !('minute' in d))
+               || (('hour' in d) && ('minute' in d)
+                   && (d.hour == null && d.minute == null
+                       || (between(d.hour,0,23) && between(d.minute,0,59)))) )
+          && (!('notifEnabled' in d) || isBool(d.notifEnabled));
+      }
+
+      // TASKS
+      function validTaskCreate(d) {
+        return d.keys().hasOnly(['name','completed','assignedToUid','origin','createdAt','updatedAt','dueAt','reminderAt'])
+          && isString(d.name)
+          && (!('completed' in d) || isBool(d.completed))
+          && (!('assignedToUid' in d) || isString(d.assignedToUid))
+          && (!('origin' in d) || isString(d.origin));
+      }
+      function validTaskUpdate(d) {
+        return d.keys().hasOnly(['name','completed','assignedToUid','origin','createdAt','updatedAt','dueAt','reminderAt'])
+          && (!('name' in d) || isString(d.name))
+          && (!('completed' in d) || isBool(d.completed))
+          && (!('assignedToUid' in d) || isString(d.assignedToUid))
+          && (!('origin' in d) || isString(d.origin));
+      }
+
+      // ITEMS
+      function validItemCreate(d) {
+        return d.keys().hasOnly(['name','bought','assignedToUid','category','price','createdAt','updatedAt'])
+          && isString(d.name)
+          && (!('bought' in d) || isBool(d.bought))
+          && (!('assignedToUid' in d) || isString(d.assignedToUid))
+          && (!('category' in d) || isString(d.category))
+          && (!('price' in d) || isNum(d.price));
+      }
+      function validItemUpdate(d) {
+        return d.keys().hasOnly(['name','bought','assignedToUid','category','price','createdAt','updatedAt'])
+          && (!('name' in d) || isString(d.name))
+          && (!('bought' in d) || isBool(d.bought))
+          && (!('assignedToUid' in d) || isString(d.assignedToUid))
+          && (!('category' in d) || isString(d.category))
+          && (!('price' in d) || isNum(d.price));
+      }
+
+      /* ---- subcollections ---- */
+
+      match /weekly/{docId} {
+        allow read: if isOwner(fid) || isMember(fid);
+        allow create: if (isOwner(fid) || isMember(fid)) && validWeeklyCreate(request.resource.data);
+        allow update: if (isOwner(fid) || isMember(fid)) && validWeeklyUpdate(request.resource.data);
+        allow delete: if isOwner(fid) || isMember(fid);
+      }
+
+      match /tasks/{tid} {
+        allow read: if isOwner(fid) || isMember(fid);
+        allow create: if (isOwner(fid) || isMember(fid)) && validTaskCreate(request.resource.data);
+        allow update: if (isOwner(fid) || isMember(fid)) && validTaskUpdate(request.resource.data);
+        allow delete: if isOwner(fid) || isMember(fid);
+      }
+
+      match /items/{iid} {
+        allow read: if isOwner(fid) || isMember(fid);
+        allow create: if (isOwner(fid) || isMember(fid)) && validItemCreate(request.resource.data);
+        allow update: if (isOwner(fid) || isMember(fid)) && validItemUpdate(request.resource.data);
+        allow delete: if isOwner(fid) || isMember(fid);
+      }
+
+      // Expenses: şimdilik basic
+      match /expenses/{eid} {
+        allow read, create, update, delete: if isOwner(fid) || isMember(fid);
+      }
+
+      // ✅ SCORES
+      match /scores/{period}/{periodId}/{uid} {
+        function isAllowedPeriod() {
+          return period in ['day','week','month'];
+        }
+        // sadece points (number) ve updatedAt alanlarına izin
+        function allowedShape() {
+          return request.resource.data.keys().hasOnly(['points','updatedAt'])
+                 && (request.resource.data.points is number);
+        }
+        // tek istekte değişim -20..+20
+        function limitedDelta() {
+          let old = (resource.data.points is number) ? resource.data.points : 0;
+          let next = request.resource.data.points;
+          let delta = next - old;
+          return delta <= 20 && delta >= -20;
+        }
+
+        allow read: if (isOwner(fid) || isMember(fid)) && isAllowedPeriod();
+        allow create, update: if (isOwner(fid) || isMember(fid))
+                              && isAllowedPeriod()
+                              && allowedShape()
+                              && limitedDelta();
+        allow delete: if false;
+      }
     }
   }
 }

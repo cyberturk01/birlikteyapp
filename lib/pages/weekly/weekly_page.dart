@@ -31,8 +31,20 @@ class _WeeklyPageState extends State<WeeklyPage> {
     final todayWd = DateTime.now().weekday;
 
     // Seçili gün için weekly listesi
+    // final selectedDayName = _weekdayIntToCanonicalEN(_selectedWeekday);
+    // final tasks = weekly.tasksForDay(selectedDayName);
+
     final selectedDayName = _weekdayIntToCanonicalEN(_selectedWeekday);
-    final tasks = weekly.tasksForDay(selectedDayName);
+    final tasks = weekly.tasksForDaySorted(selectedDayName);
+
+    tasks.sort((a, b) {
+      final ah = a.hour ?? 99, am = a.minute ?? 99;
+      final bh = b.hour ?? 99, bm = b.minute ?? 99;
+      final at = ah * 60 + am;
+      final bt = bh * 60 + bm;
+      if (at != bt) return at.compareTo(bt);
+      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    });
 
     return Scaffold(
       appBar: AppBar(

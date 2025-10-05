@@ -626,7 +626,7 @@ class _MemberCardState extends State<MemberCard> {
             left: 16,
             right: 16,
             top: 12,
-            bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+            bottom: 16 + MediaQuery.of(sheetCtx).viewInsets.bottom,
           ),
           child: StatefulBuilder(
             builder: (ctx, setLocal) {
@@ -665,7 +665,7 @@ class _MemberCardState extends State<MemberCard> {
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 10),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).dividerColor,
+                        color: Theme.of(sheetCtx).dividerColor,
                         borderRadius: BorderRadius.circular(99),
                       ),
                     ),
@@ -705,7 +705,7 @@ class _MemberCardState extends State<MemberCard> {
                   if (suggestions.isNotEmpty) ...[
                     Text(
                       t.suggestionsTitle,
-                      style: Theme.of(context).textTheme.labelLarge,
+                      style: Theme.of(sheetCtx).textTheme.labelLarge,
                     ),
                     const SizedBox(height: 6),
                     ConstrainedBox(
@@ -795,7 +795,7 @@ class _MemberCardState extends State<MemberCard> {
             left: 16,
             right: 16,
             top: 12,
-            bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+            bottom: 16 + MediaQuery.of(sheetCtx).viewInsets.bottom,
           ),
           child: StatefulBuilder(
             builder: (ctx, setLocal) {
@@ -834,7 +834,7 @@ class _MemberCardState extends State<MemberCard> {
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 10),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).dividerColor,
+                        color: Theme.of(sheetCtx).dividerColor,
                         borderRadius: BorderRadius.circular(99),
                       ),
                     ),
@@ -874,7 +874,7 @@ class _MemberCardState extends State<MemberCard> {
                   if (suggestions.isNotEmpty) ...[
                     Text(
                       t.suggestionsTitle,
-                      style: Theme.of(context).textTheme.labelLarge,
+                      style: Theme.of(sheetCtx).textTheme.labelLarge,
                     ),
                     const SizedBox(height: 6),
                     ConstrainedBox(
