@@ -8,24 +8,33 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function ownerRolePreserved(fid) {
+      let fam = get(/databases/$(db)/documents/families/$(fid));
+      let owner = fam.data.ownerUid;
+
+      // members alanı hiç gönderilmiyorsa true,
+      // gönderildiyse owner’ın rolü mutlaka 'owner' kalmalı
+      return !(request.resource.data.members is map)
+             || request.resource.data.members[owner] == 'owner';
+    }
+
     function familyExists(fid) {
       return exists(/databases/$(db)/documents/families/$(fid));
     }
 
-    function isOwner(fid) {
-      return signedIn()
-        && familyExists(fid)
-        && get(/databases/$(db)/documents/families/$(fid)).data.ownerUid == request.auth.uid;
+    // roles: members map'inde saklanıyor
+    function roleOf(fid, uid) {
+      return get(/databases/$(db)/documents/families/$(fid)).data.members[uid];
     }
-
-    function isMember(fid) {
+    function hasRole(fid, allowed) {
       return signedIn()
-        && familyExists(fid)
-        && (
-          (get(/databases/$(db)/documents/families/$(fid)).data.members is map)
-          && (request.auth.uid in get(/databases/$(db)/documents/families/$(fid)).data.members.keys())
-        );
+             && familyExists(fid)
+             && (roleOf(fid, request.auth.uid) in allowed);
     }
+    function isOwner(fid)  { return hasRole(fid, ['owner']); }
+    function isEditor(fid) { return hasRole(fid, ['owner','editor']); }
+    function isMember(fid) { return hasRole(fid, ['owner','editor','member']); }
+    function isViewer(fid) { return hasRole(fid, ['owner','editor','member','viewer']); }
 
     // tiny helpers
     function isString(x) { return x is string; }
@@ -74,8 +83,8 @@ service cloud.firestore {
 
     match /families/{fid} {
 
-      // Owner veya üye okuyabilir
-      allow get: if isOwner(fid) || isMember(fid);
+      // Oku: herkes (rollerden herhangi biri)
+      allow get: if isViewer(fid);
       allow list: if false;
 
       // Create: sadece kendini owner yazarak
@@ -92,28 +101,27 @@ service cloud.firestore {
         // 1) Owner serbest
         isOwner(fid)
         ||
-        // 2) JOIN: üye değilken sadece kendini ekleyebilirsin
+        // 2) JOIN: üye değilken sadece kendini ekleyebilirsin (editor/viewer) ve sadece members + updatedAt
         (
           signedIn()
           && familyExists(fid)
           && !(request.auth.uid in (resource.data.members is map ? resource.data.members.keys() : []))
           && (request.resource.data.members is map)
           && (request.resource.data.members[request.auth.uid] in ['editor','viewer'])
-          && request.resource.data.diff(resource.data).changedKeys()
-              .hasOnly(['members','memberNames','updatedAt'])
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['members','updatedAt'])
         )
         ||
-        // 3) Üye: güvenli alanları değiştirebilir
+        // 3) Üye: güvenli alanları (members HARİÇ) değiştirebilir
         (
           isMember(fid)
           && request.resource.data.diff(resource.data).changedKeys()
-              .hasOnly(['name','nameLower','members','memberNames','inviteCode','updatedAt','createdAt'])
-        );
+                .hasOnly(['name','nameLower','memberNames','inviteCode','updatedAt','createdAt'])
+        )&& ownerRolePreserved(fid);
 
       // Delete: sadece owner
       allow delete: if isOwner(fid);
 
-      /* ---- validators ---- */
+
 
       // WEEKLY
       function validWeeklyCreate(d) {
@@ -123,8 +131,8 @@ service cloud.firestore {
           && (!('assignedToUid' in d) || isString(d.assignedToUid))
           && (!('hour' in d) || d.hour == null || isNum(d.hour))
           && (!('minute' in d) || d.minute == null || isNum(d.minute))
-          && ( (!('hour' in d) && !('minute' in d))  // hiçbiri yok
-               || (('hour' in d) && ('minute' in d)   // ikisi birlikte ve aralıkta
+          && ( (!('hour' in d) && !('minute' in d))
+               || (('hour' in d) && ('minute' in d)
                    && (d.hour == null && d.minute == null
                        || (between(d.hour,0,23) && between(d.minute,0,59)))) )
           && (!('notifEnabled' in d) || isBool(d.notifEnabled));
@@ -141,6 +149,14 @@ service cloud.firestore {
                    && (d.hour == null && d.minute == null
                        || (between(d.hour,0,23) && between(d.minute,0,59)))) )
           && (!('notifEnabled' in d) || isBool(d.notifEnabled));
+      }
+
+      match /expenses/{eid} {
+              // herkes (viewer+) okuyabilsin
+          allow read: if isViewer(fid);
+
+              // yazma: editor veya member yazabilsin (istersen sadece editor yap)
+          allow create, update, delete: if isEditor(fid) || isMember(fid);
       }
 
       // TASKS
@@ -177,54 +193,63 @@ service cloud.firestore {
           && (!('price' in d) || isNum(d.price));
       }
 
-      /* ---- subcollections ---- */
+      /* ---- subcollections (GÖRELİ yollar!) ---- */
 
       match /weekly/{docId} {
-        allow read: if isOwner(fid) || isMember(fid);
-        allow create: if (isOwner(fid) || isMember(fid)) && validWeeklyCreate(request.resource.data);
-        allow update: if (isOwner(fid) || isMember(fid)) && validWeeklyUpdate(request.resource.data);
-        allow delete: if isOwner(fid) || isMember(fid);
+        allow read: if isViewer(fid);
+        allow create: if isEditor(fid) && validWeeklyCreate(request.resource.data);
+        allow update: if isEditor(fid) && validWeeklyUpdate(request.resource.data);
+        allow delete: if isEditor(fid);
       }
 
       match /tasks/{tid} {
-        allow read: if isOwner(fid) || isMember(fid);
-        allow create: if (isOwner(fid) || isMember(fid)) && validTaskCreate(request.resource.data);
-        allow update: if (isOwner(fid) || isMember(fid)) && validTaskUpdate(request.resource.data);
-        allow delete: if isOwner(fid) || isMember(fid);
+        allow read: if isViewer(fid);
+        allow create: if (isEditor(fid) || isMember(fid)) && validTaskCreate(request.resource.data);
+        allow update: if
+            isEditor(fid)
+            ||
+            (
+              isMember(fid)
+              && resource.data.assignedToUid == request.auth.uid
+              && request.resource.data.diff(resource.data).changedKeys()
+                    .hasOnly(['completed','reminderAt','dueAt','updatedAt'])
+              && validTaskUpdate(request.resource.data)
+            );
+        allow delete: if isEditor(fid)
+            || (isMember(fid) && resource.data.assignedToUid == request.auth.uid);
       }
 
       match /items/{iid} {
-        allow read: if isOwner(fid) || isMember(fid);
-        allow create: if (isOwner(fid) || isMember(fid)) && validItemCreate(request.resource.data);
-        allow update: if (isOwner(fid) || isMember(fid)) && validItemUpdate(request.resource.data);
-        allow delete: if isOwner(fid) || isMember(fid);
-      }
-
-      // Expenses: şimdilik basic
-      match /expenses/{eid} {
-        allow read, create, update, delete: if isOwner(fid) || isMember(fid);
+        allow read: if isViewer(fid);
+        allow create: if (isEditor(fid) || isMember(fid)) && validItemCreate(request.resource.data);
+        allow update: if
+            isEditor(fid)
+            ||
+            (
+              isMember(fid)
+              && resource.data.assignedToUid == request.auth.uid
+              && request.resource.data.diff(resource.data).changedKeys()
+                    .hasOnly(['bought','updatedAt'])
+              && validItemUpdate(request.resource.data)
+            );
+        allow delete: if isEditor(fid);
       }
 
       // ✅ SCORES
       match /scores/{period}/{periodId}/{uid} {
-        function isAllowedPeriod() {
-          return period in ['day','week','month'];
-        }
-        // sadece points (number) ve updatedAt alanlarına izin
+        function isAllowedPeriod() { return period in ['day','week','month']; }
         function allowedShape() {
           return request.resource.data.keys().hasOnly(['points','updatedAt'])
                  && (request.resource.data.points is number);
         }
-        // tek istekte değişim -20..+20
         function limitedDelta() {
           let old = (resource.data.points is number) ? resource.data.points : 0;
-          let next = request.resource.data.points;
-          let delta = next - old;
+          let delta = request.resource.data.points - old;
           return delta <= 20 && delta >= -20;
         }
 
-        allow read: if (isOwner(fid) || isMember(fid)) && isAllowedPeriod();
-        allow create, update: if (isOwner(fid) || isMember(fid))
+        allow read: if isViewer(fid) && isAllowedPeriod();
+        allow create, update: if isEditor(fid)
                               && isAllowedPeriod()
                               && allowedShape()
                               && limitedDelta();

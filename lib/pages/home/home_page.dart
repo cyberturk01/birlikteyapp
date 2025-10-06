@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -76,8 +77,23 @@ class _HomePageState extends State<HomePage> {
     final famProv = context.watch<FamilyProvider>();
     final familyId = famProv.familyId;
     debugPrint('[HomePage] familyId=$familyId');
-
     final user = FirebaseAuth.instance.currentUser;
+    final fid = famProv.familyId;
+
+    final me = FirebaseAuth.instance.currentUser;
+    if (user == null || fid == null || fid.isEmpty) {
+      Future.microtask(() {
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthGate()),
+          (route) => false,
+        );
+      });
+      return const SizedBox.shrink();
+    }
+    ensureMembership(familyId!);
+    debugFam(familyId);
+
     if (user == null) {
       // zaten çıkılmış → AuthGate’e al
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -125,6 +141,7 @@ class _HomePageState extends State<HomePage> {
     }
 
     return StreamBuilder<List<FamilyMemberEntry>>(
+      key: ValueKey('${me?.uid ?? 'anon'}-${fid ?? 'no-fam'}'),
       stream: famProv.watchMemberEntries(),
       builder: (context, snap) {
         final entries = snap.data ?? const <FamilyMemberEntry>[];
@@ -473,6 +490,48 @@ List<FamilyMemberEntry> _orderWithMeFirstEntries(List<FamilyMemberEntry> list) {
   final me = copy.removeAt(idx);
   copy.insert(0, me);
   return copy;
+}
+
+Future<void> debugFam(String fid) async {
+  final db = FirebaseFirestore.instance;
+  final actor = FirebaseAuth.instance.currentUser?.uid;
+  final doc = await db.collection('families').doc(fid).get();
+  final data = (doc.data() ?? <String, dynamic>{});
+
+  final owner = data['ownerUid'];
+  final membersMap =
+      (data['members'] as Map?)?.cast<String, dynamic>() ?? const {};
+  final memberKeys = membersMap.keys.toList();
+
+  debugPrint(
+    '[FamCheck] fid=$fid owner=$owner memberKeys=$memberKeys actor=$actor '
+    'containsActor=${memberKeys.contains(actor)}',
+  );
+}
+
+Future<void> ensureMembership(String familyId) async {
+  final uid = FirebaseAuth.instance.currentUser?.uid;
+  if (uid == null || familyId.isEmpty) return;
+
+  final ref = FirebaseFirestore.instance.collection('families').doc(familyId);
+
+  final snap = await ref.get();
+  if (!snap.exists) {
+    throw StateError('Family does not exist');
+  }
+
+  final data = snap.data() ?? {};
+  final members = (data['members'] as Map<String, dynamic>? ?? {});
+  final roleNow = members[uid] as String?;
+
+  // Zaten üyeyse dokunma
+  if (roleNow != null && roleNow.isNotEmpty) return;
+
+  // 2) Sadece kendi key'ini ekle (DERİN MERGE YOK, DOT-PATH VAR)
+  await ref.update({
+    'members.$uid': 'editor', // varsayılan rol
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
 }
 
 class _MemberPageKeepAlive extends StatefulWidget {

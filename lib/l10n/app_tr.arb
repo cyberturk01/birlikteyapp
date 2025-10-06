@@ -409,5 +409,12 @@
   "itemSalt": "Tuz",
   "itemSugar": "Şeker",
   "itemCoffee": "Kahve",
-  "itemTea": "Çay"
+  "itemTea": "Çay",
+  "cannotAffectOthersScores": "Başka üyenin puanını değiştirme izniniz yok.",
+  "actionNotAllowed": "Bu işlem için izniniz yok.",
+  "somethingWentWrong": "Bir şeyler ters gitti.",
+  "editorLabel": "Editör",
+  "viewerLabel": "İzleyici",
+  "roleUpdated": "Rol güncellendi.",
+  "updateFailed": "Güncelleme başarısız: {error}"
 }

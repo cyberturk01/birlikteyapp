@@ -1121,4 +1121,27 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get itemTea => 'Tee';
+
+  @override
+  String get cannotAffectOthersScores => 'Sie sind nicht berechtigt, den Punktestand eines anderen Mitglieds zu ändern.';
+
+  @override
+  String get actionNotAllowed => 'Sie sind für diese Aktion nicht berechtigt.';
+
+  @override
+  String get somethingWentWrong => 'Es ist ein Fehler aufgetreten.';
+
+  @override
+  String get editorLabel => 'Bearbeiter';
+
+  @override
+  String get viewerLabel => 'Betrachter';
+
+  @override
+  String get roleUpdated => 'Rolle aktualisiert.';
+
+  @override
+  String updateFailed(Object error) {
+    return 'Aktualisierung fehlgeschlagen: $error';
+  }
 }

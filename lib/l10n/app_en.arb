@@ -445,5 +445,12 @@
   "itemSalt": "Salt",
   "itemSugar": "Sugar",
   "itemCoffee": "Coffee",
-  "itemTea": "Tea"
+  "itemTea": "Tea",
+  "cannotAffectOthersScores": "You do not have permission to change another member’s points.",
+  "actionNotAllowed": "You are not allowed to perform this action.",
+  "somethingWentWrong": "Something went wrong.",
+  "editorLabel": "Editor",
+  "viewerLabel": "Viewer",
+  "roleUpdated": "Role updated.",
+  "updateFailed": "Update failed: {error}"
   }

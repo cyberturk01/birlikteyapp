@@ -64,6 +64,7 @@ class _LandingPageState extends State<LandingPage> {
                 context.read<ItemCloudProvider>().teardown();
                 context.read<WeeklyCloudProvider>().teardown();
                 context.read<ExpenseCloudProvider>().teardown();
+                context.read<FamilyProvider>().clearActive();
                 await FirebaseAuth.instance.signOut();
                 if (!context.mounted) return;
                 Navigator.of(context).popUntil((r) => r.isFirst);

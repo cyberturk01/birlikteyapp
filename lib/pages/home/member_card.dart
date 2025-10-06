@@ -45,9 +45,41 @@ class _MemberCardState extends State<MemberCard> {
   bool _expandTasks = false;
   bool _expandItems = false;
 
-  void _toggleTask(Task task) {
+  Future<void> _toggleTask(Task task) async {
+    final t = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+
     final newVal = !task.completed;
-    context.read<TaskCloudProvider>().toggleTask(task, newVal);
+    final res = await context.read<TaskCloudProvider>().toggleTask(
+      task,
+      newVal,
+    );
+
+    if (!mounted) return;
+
+    if (res == ToggleResult.okNoScore) {
+      // Puan yazılamadı: muhtemelen owner/editor değilsin ya da başkasının görevini işaretledin
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            t.cannotAffectOthersScores /* “Başka üyenin puanını değiştirme yetkiniz yok.” */,
+          ),
+        ),
+      );
+    } else if (res == ToggleResult.denied) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(t.actionNotAllowed /* “Bu işlem için iznin yok.” */),
+        ),
+      );
+    } else if (res == ToggleResult.error) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(t.somethingWentWrong /* “Bir şeyler ters gitti.” */),
+        ),
+      );
+    }
+
     setState(() {});
   }
 

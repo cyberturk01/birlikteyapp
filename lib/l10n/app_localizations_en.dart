@@ -1121,4 +1121,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get itemTea => 'Tea';
+
+  @override
+  String get cannotAffectOthersScores => 'You do not have permission to change another member’s points.';
+
+  @override
+  String get actionNotAllowed => 'You are not allowed to perform this action.';
+
+  @override
+  String get somethingWentWrong => 'Something went wrong.';
+
+  @override
+  String get editorLabel => 'Editor';
+
+  @override
+  String get viewerLabel => 'Viewer';
+
+  @override
+  String get roleUpdated => 'Role updated.';
+
+  @override
+  String updateFailed(Object error) {
+    return 'Update failed: $error';
+  }
 }

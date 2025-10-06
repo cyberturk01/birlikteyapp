@@ -407,5 +407,12 @@
   "itemSalt": "Salz",
   "itemSugar": "Zucker",
   "itemCoffee": "Kaffee",
-  "itemTea": "Tee"
+  "itemTea": "Tee",
+  "cannotAffectOthersScores": "Sie sind nicht berechtigt, den Punktestand eines anderen Mitglieds zu ändern.",
+  "actionNotAllowed": "Sie sind für diese Aktion nicht berechtigt.",
+  "somethingWentWrong": "Es ist ein Fehler aufgetreten.",
+  "editorLabel": "Bearbeiter",
+  "viewerLabel": "Betrachter",
+  "roleUpdated": "Rolle aktualisiert.",
+  "updateFailed": "Aktualisierung fehlgeschlagen: {error}"
 }

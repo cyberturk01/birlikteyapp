@@ -14,6 +14,8 @@ import '../services/scores_repo.dart';
 import '../services/task_service.dart';
 import '_base_cloud.dart';
 
+enum ToggleResult { ok, okNoScore, denied, error }
+
 class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   AuthService _auth;
   TaskService _service;
@@ -334,7 +336,7 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     }
   }
 
-  Future<void> toggleTask(Task t, bool value) async {
+  Future<ToggleResult> toggleTask(Task t, bool value) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
 
@@ -351,7 +353,8 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
         final targetUid =
             (t.assignedToUid != null && t.assignedToUid!.trim().isNotEmpty)
             ? t.assignedToUid!.trim()
-            : _currentUser?.uid; // atama yoksa işi yapan kullanıcıya yaz
+            : _currentUser?.uid;
+
         if (targetUid != null && targetUid.isNotEmpty) {
           final delta = value ? 10 : -10;
           await _scores.addPoints(
@@ -359,11 +362,20 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
             uid: targetUid,
             delta: delta,
           );
+          return ToggleResult.ok;
         }
       }
+      return ToggleResult.okNoScore;
     } catch (e) {
-      debugPrint('[TaskCloud] score write failed: $e');
+      final msg = e.toString();
+      debugPrint('[TaskCloud] score write failed: $msg');
       setError(e);
+
+      // rules’dan permission-denied gelirse
+      if (msg.contains('permission-denied')) {
+        return ToggleResult.okNoScore; // task tamamlandı ama puan yazamadık
+      }
+      return ToggleResult.error;
     }
   }
 

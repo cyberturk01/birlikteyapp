@@ -1121,4 +1121,27 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get itemTea => 'Çay';
+
+  @override
+  String get cannotAffectOthersScores => 'Başka üyenin puanını değiştirme izniniz yok.';
+
+  @override
+  String get actionNotAllowed => 'Bu işlem için izniniz yok.';
+
+  @override
+  String get somethingWentWrong => 'Bir şeyler ters gitti.';
+
+  @override
+  String get editorLabel => 'Editör';
+
+  @override
+  String get viewerLabel => 'İzleyici';
+
+  @override
+  String get roleUpdated => 'Rol güncellendi.';
+
+  @override
+  String updateFailed(Object error) {
+    return 'Güncelleme başarısız: $error';
+  }
 }

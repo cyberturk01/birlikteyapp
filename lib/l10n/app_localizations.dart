@@ -2088,6 +2088,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tea'**
   String get itemTea;
+
+  /// No description provided for @cannotAffectOthersScores.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have permission to change another member’s points.'**
+  String get cannotAffectOthersScores;
+
+  /// No description provided for @actionNotAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'You are not allowed to perform this action.'**
+  String get actionNotAllowed;
+
+  /// No description provided for @somethingWentWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong.'**
+  String get somethingWentWrong;
+
+  /// No description provided for @editorLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor'**
+  String get editorLabel;
+
+  /// No description provided for @viewerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Viewer'**
+  String get viewerLabel;
+
+  /// No description provided for @roleUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Role updated.'**
+  String get roleUpdated;
+
+  /// No description provided for @updateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Update failed: {error}'**
+  String updateFailed(Object error);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

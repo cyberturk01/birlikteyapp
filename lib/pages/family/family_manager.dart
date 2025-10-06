@@ -83,6 +83,18 @@ class _FamilyManagerSheet extends StatelessWidget {
               stream: fam.watchMemberEntries(),
               builder: (ctx, snap) {
                 final entries = snap.data ?? const <FamilyMemberEntry>[];
+                final meUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+                final myRole = entries
+                    .firstWhere(
+                      (e) => e.uid == meUid,
+                      orElse: () => const FamilyMemberEntry(
+                        uid: '',
+                        label: '',
+                        role: 'member',
+                      ),
+                    )
+                    .role;
+                final iAmOwner = myRole == 'owner';
                 if (snap.connectionState == ConnectionState.waiting &&
                     entries.isEmpty) {
                   return const Center(child: CircularProgressIndicator());
@@ -96,7 +108,7 @@ class _FamilyManagerSheet extends StatelessWidget {
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (_, i) {
                     final e = entries[i];
-                    return MemberTile(entry: e);
+                    return MemberTile(entry: e, iAmOwner: iAmOwner);
                   },
                   addAutomaticKeepAlives: false,
                   addRepaintBoundaries: true,
@@ -114,15 +126,34 @@ class _FamilyManagerSheet extends StatelessWidget {
 
 class MemberTile extends StatelessWidget {
   final FamilyMemberEntry entry;
-  const MemberTile({super.key, required this.entry});
+  final bool iAmOwner;
+  const MemberTile({super.key, required this.entry, required this.iAmOwner});
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
+    final fam = context.read<FamilyProvider>();
     final meUid = FirebaseAuth.instance.currentUser?.uid;
-    final isOwner = entry.role == 'owner';
+
     final isSelf = entry.uid == meUid;
     final hasPhoto = (entry.photoUrl != null && entry.photoUrl!.isNotEmpty);
+
+    final myRoleStr = fam.myRoleStringOrNull?.toLowerCase() ?? 'member';
+    final iAmOwner = myRoleStr == 'owner';
+
+    String roleLabel(String r) {
+      switch (r) {
+        case 'owner':
+          return t.ownerLabel; // “Sahip”
+        case 'editor':
+          return t.editorLabel; // “Editör”
+        case 'viewer':
+          return t.viewerLabel; // “İzleyici”
+        case 'member':
+        default:
+          return t.memberLabel; // “Üye”
+      }
+    }
 
     return ListTile(
       leading: CircleAvatar(
@@ -133,136 +164,182 @@ class MemberTile extends StatelessWidget {
             : Text(entry.label.isEmpty ? '?' : entry.label[0].toUpperCase()),
       ),
       title: Text(entry.label, overflow: TextOverflow.ellipsis),
-      subtitle: Text(isOwner ? t.ownerLabel : t.memberLabel),
-      trailing: PopupMenuButton<String>(
-        onSelected: (v) async {
-          if (v == 'editLabel') {
-            _showEditLabelDialog(context, entry);
-            return;
-          }
+      subtitle: Text(roleLabel(entry.role)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ROLE DROPDOWN (sadece owner görsün; owner kendisini değiştiremesin)
+          if (iAmOwner && !isSelf)
+            DropdownButton<String>(
+              value: entry.role,
+              onChanged: (val) async {
+                if (val == null) return;
+                try {
+                  await context.read<FamilyProvider>().setMemberRole(
+                    memberUid: entry.uid,
+                    role: val, // 'owner' | 'editor' | 'member' | 'viewer'
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(t.roleUpdated)));
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(t.updateFailed('$e'))),
+                    );
+                  }
+                }
+              },
+              items: const [
+                DropdownMenuItem(value: 'owner', child: Text('owner')),
+                DropdownMenuItem(value: 'editor', child: Text('editor')),
+                DropdownMenuItem(value: 'member', child: Text('member')),
+                DropdownMenuItem(value: 'viewer', child: Text('viewer')),
+              ],
+            ),
 
-          if (v == 'photo') {
-            final picker = ImagePicker();
-            final x = await picker.pickImage(
-              source: ImageSource.gallery,
-              imageQuality: 85,
-              maxWidth: 1024,
-            );
-            if (x == null) return;
+          const SizedBox(width: 8),
+          PopupMenuButton<String>(
+            onSelected: (v) async {
+              if (v == 'editLabel') {
+                _showEditLabelDialog(context, entry);
+                return;
+              }
 
-            await showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (_) => const Center(child: CircularProgressIndicator()),
-            );
-            try {
-              await context.read<FamilyProvider>().setMemberPhoto(
-                memberUid: entry.uid,
-                file: File(x.path),
-              );
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(t.photoUpdateFailed('$e'))),
+              if (v == 'photo') {
+                final picker = ImagePicker();
+                final x = await picker.pickImage(
+                  source: ImageSource.gallery,
+                  imageQuality: 85,
+                  maxWidth: 1024,
                 );
-              }
-            } finally {
-              if (context.mounted) Navigator.pop(context);
-            }
-            return;
-          }
+                if (x == null) return;
 
-          if (v == 'removePhoto') {
-            try {
-              await context.read<FamilyProvider>().removeMemberPhoto(entry.uid);
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(t.removeFailed('$e'))));
+                await showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) =>
+                      const Center(child: CircularProgressIndicator()),
+                );
+                try {
+                  await context.read<FamilyProvider>().setMemberPhoto(
+                    memberUid: entry.uid,
+                    file: File(x.path),
+                  );
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(t.photoUpdateFailed('$e'))),
+                    );
+                  }
+                } finally {
+                  if (context.mounted) Navigator.pop(context);
+                }
+                return;
               }
-            }
-            return;
-          }
 
-          if (v == 'removeUser') {
-            final ok = await showDialog<bool>(
-              context: context,
-              builder: (_) => AlertDialog(
-                title: Text(t.removeMemberTitle),
-                content: Text(t.removeMemberBody(entry.label)),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: Text(t.cancel),
+              if (v == 'removePhoto') {
+                try {
+                  await context.read<FamilyProvider>().removeMemberPhoto(
+                    entry.uid,
+                  );
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(t.removeFailed('$e'))),
+                    );
+                  }
+                }
+                return;
+              }
+
+              if (v == 'removeUser') {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: Text(t.removeMemberTitle),
+                    content: Text(t.removeMemberBody(entry.label)),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: Text(t.cancel),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: Text(t.remove),
+                      ),
+                    ],
                   ),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: Text(t.remove),
-                  ),
-                ],
-              ),
-            );
-            if (ok != true) return;
+                );
+                if (ok != true) return;
 
-            try {
-              await context.read<FamilyProvider>().removeMemberFromFamily(
-                entry.uid,
-              );
-              if (context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(t.memberRemoved)));
+                try {
+                  await context.read<FamilyProvider>().removeMemberFromFamily(
+                    entry.uid,
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(t.memberRemoved)));
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(t.removeFailed('$e'))),
+                    );
+                  }
+                }
+                return;
               }
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(t.removeFailed('$e'))));
-              }
-            }
-            return;
-          }
-        },
-        itemBuilder: (ctx) => [
-          PopupMenuItem(
-            value: 'editLabel',
-            child: ListTile(
-              leading: const Icon(Icons.edit),
-              title: Text(AppLocalizations.of(context)!.editMember),
-            ),
-          ),
-          PopupMenuItem(
-            value: 'photo',
-            child: ListTile(
-              leading: const Icon(Icons.photo),
-              title: Text(AppLocalizations.of(context)!.changePhoto),
-            ),
-          ),
-          if (hasPhoto)
-            PopupMenuItem(
-              value: 'removePhoto',
-              child: ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: Text(AppLocalizations.of(context)!.removePhoto),
-              ),
-            ),
-          const PopupMenuDivider(),
-          PopupMenuItem(
-            enabled: !isOwner && !isSelf, // owner veya kendini silme!
-            value: 'removeUser',
-            child: ListTile(
-              leading: Icon(
-                Icons.person_remove,
-                color: (!isOwner && !isSelf) ? Colors.red : Colors.grey,
-              ),
-              title: Text(
-                AppLocalizations.of(context)!.removeUser,
-                style: TextStyle(
-                  color: (!isOwner && !isSelf) ? Colors.red : Colors.grey,
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem(
+                value: 'editLabel',
+                child: ListTile(
+                  leading: const Icon(Icons.edit),
+                  title: Text(AppLocalizations.of(context)!.editMember),
                 ),
               ),
-            ),
+              PopupMenuItem(
+                value: 'photo',
+                child: ListTile(
+                  leading: const Icon(Icons.photo),
+                  title: Text(AppLocalizations.of(context)!.changePhoto),
+                ),
+              ),
+              if (hasPhoto)
+                PopupMenuItem(
+                  value: 'removePhoto',
+                  child: ListTile(
+                    leading: const Icon(Icons.delete_outline),
+                    title: Text(AppLocalizations.of(context)!.removePhoto),
+                  ),
+                ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                // owner ya da kendini silme yok
+                enabled: entry.role != 'owner' && !isSelf,
+                value: 'removeUser',
+                child: ListTile(
+                  leading: Icon(
+                    Icons.person_remove,
+                    color: (entry.role != 'owner' && !isSelf)
+                        ? Colors.red
+                        : Colors.grey,
+                  ),
+                  title: Text(
+                    AppLocalizations.of(context)!.removeUser,
+                    style: TextStyle(
+                      color: (entry.role != 'owner' && !isSelf)
+                          ? Colors.red
+                          : Colors.grey,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

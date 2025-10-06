@@ -10,24 +10,38 @@ import 'package:flutter/services.dart';
 import 'package:hive/hive.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../models/family_role.dart';
+
 class FamilyProvider extends ChangeNotifier {
   final _familyBox = Hive.box<String>('familyBox');
   String? _familyId;
   String? get familyId => _familyId;
+
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _famSub;
+
+  FamilyRole? _myRole;
+  FamilyRole? get myRole => _myRole;
 
   final List<String> _labelsCache = const [];
   List<String> get familyMembers => _labelsCache;
   static const _kActiveFamilyKey = 'activeFamilyId';
   static const _kOwnerUidKey = 'activeFamilyOwnerUid';
 
+  String? get myRoleStringOrNull => roleToString(_myRole);
+
   FamilyProvider() {
     FirebaseAuth.instance.authStateChanges().listen((u) async {
       // Kullanıcı tamamen çıktıysa temizle
       if (u == null) {
         _familyId = null;
+        await _famSub?.cancel();
+        _famSub = null;
+
+        _myRole = null;
         await _familyBox.delete(_kActiveFamilyKey);
         await _familyBox.delete(_kOwnerUidKey);
         notifyListeners();
+        return;
       } else {
         // Hesap değiştiyse yerel kayıt başka kullanıcıya ait olabilir
         final localOwner = _familyBox.get(_kOwnerUidKey);
@@ -46,6 +60,30 @@ class FamilyProvider extends ChangeNotifier {
     final me = FirebaseAuth.instance.currentUser;
     final my = 'You (${(me?.email ?? 'me').split('@').first})';
     return [my];
+  }
+
+  Future<void> setMemberRole({
+    required String memberUid,
+    required String role, // 'owner' | 'editor' | 'member' | 'viewer'
+  }) async {
+    final fid = familyId;
+    if (fid == null || fid.isEmpty) {
+      throw StateError('No active familyId');
+    }
+    final famDoc = await FirebaseFirestore.instance
+        .collection('families')
+        .doc(fid)
+        .get();
+    final data = famDoc.data() ?? {};
+    final ownerUid = data['ownerUid'] as String?;
+    if (memberUid == ownerUid && role != 'owner') {
+      throw StateError('Owner role cannot be changed from owner');
+    }
+
+    await FirebaseFirestore.instance.collection('families').doc(fid).update({
+      'members.$memberUid': role,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   /// UID -> Label sözlüğü yayar.
@@ -123,6 +161,29 @@ class FamilyProvider extends ChangeNotifier {
       }, SetOptions(merge: true));
     }
     return code;
+  }
+
+  void _bindFamilyDoc(String fid, String myUid) {
+    _famSub?.cancel();
+    _famSub = FirebaseFirestore.instance
+        .collection('families')
+        .doc(fid)
+        .snapshots()
+        .listen(
+          (snap) {
+            final data = snap.data() ?? {};
+            final members = (data['members'] as Map<String, dynamic>?) ?? {};
+            final roleStr = members[myUid] as String?;
+            final newRole = roleFromString(roleStr);
+            if (_myRole != newRole) {
+              _myRole = newRole;
+              notifyListeners();
+            }
+          },
+          onError: (e, st) {
+            debugPrint('[FamilyProvider] family doc stream error: $e');
+          },
+        );
   }
 
   Future<void> shareInvite(BuildContext context) async {
@@ -300,35 +361,56 @@ class FamilyProvider extends ChangeNotifier {
       famRef = q.docs.first.reference;
     }
 
-    final userRef = db.collection('users').doc(uid);
+    // --- Yeni: mevcut rolü oku
+    final famSnap = await famRef!.get();
+    final famData = famSnap.data() ?? {};
+    final ownerUid = famData['ownerUid'] as String?;
+    final membersMap = (famData['members'] as Map<String, dynamic>?) ?? {};
+
+    // Zaten members'ta varsa ve rol 'owner' ise => hiçbir şekilde düşürmeyin
+    final currentRole = membersMap[uid] as String?;
+    if (currentRole == 'owner') {
+      // Sadece users/{uid} güncelle; members’a yazma!
+      await db.collection('users').doc(uid).set({
+        'families': FieldValue.arrayUnion([famRef.id]),
+        'activeFamilyId': famRef.id,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      await _persistActive(famRef.id, ownerUid: uid);
+      return true;
+    }
+
+    // Eğer kullanıcı hiç yoksa editor yap; varsa rolü koru (overwriteme!)
+    final roleToSet = currentRole ?? 'editor';
 
     final batch = db.batch();
     batch.set(famRef, {
-      'members': {uid: 'editor'},
+      'members': {uid: roleToSet}, // OWNER ise buraya düşmüyorsunuz
       'memberNames': {uid: display},
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
-    batch.set(userRef, {
+    batch.set(db.collection('users').doc(uid), {
       'families': FieldValue.arrayUnion([famRef.id]),
       'activeFamilyId': famRef.id,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
     await batch.commit();
-
     await _persistActive(famRef.id, ownerUid: uid);
     return true;
   }
 
   void clearActive() {
+    _famSub?.cancel();
+    _famSub = null;
+
     _familyId = null;
-    // varsa lokal cache/stream temizlikleri
+    _myRole = null;
     notifyListeners();
   }
 
   Future<void> _persistActive(String id, {required String ownerUid}) async {
-    // ❗ aynı id ise hiçbir şey yapma
     if (_familyId == id &&
         _familyBox.get(_kActiveFamilyKey) == id &&
         _familyBox.get(_kOwnerUidKey) == ownerUid) {
@@ -338,6 +420,11 @@ class FamilyProvider extends ChangeNotifier {
     _familyId = id;
     await _familyBox.put(_kActiveFamilyKey, id);
     await _familyBox.put(_kOwnerUidKey, ownerUid);
+
+    final myUid = FirebaseAuth.instance.currentUser?.uid;
+    if (myUid != null) {
+      _bindFamilyDoc(id, myUid); // <<< rol stream’ini bağla
+    }
     debugPrint('persistActive: $id');
     notifyListeners();
   }
@@ -346,12 +433,18 @@ class FamilyProvider extends ChangeNotifier {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
     if (!await _amIMemberOf(famId)) return;
+    _familyId = famId;
     await _persistActive(famId, ownerUid: uid);
+    _bindFamilyDoc(famId, uid);
+    notifyListeners();
   }
 
   Future<bool> amIOwner() async {
     final fid = _familyId;
     final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      throw StateError('Not signed in'); // ya da erken return
+    }
     if (fid == null || uid == null) return false;
     final doc = await FirebaseFirestore.instance
         .collection('families')
@@ -530,13 +623,16 @@ class FamilyProvider extends ChangeNotifier {
   }
 
   Stream<List<FamilyMemberEntry>> watchMemberEntries() {
+    final me = FirebaseAuth.instance.currentUser;
+    if (me == null) {
+      return Stream.value(const <FamilyMemberEntry>[]);
+    }
     final famId = _familyId;
     if (famId == null || famId.isEmpty) {
       return Stream.value(const <FamilyMemberEntry>[]);
     }
 
-    final me = FirebaseAuth.instance.currentUser;
-    final myLabel = 'You (${(me?.email ?? 'me').split('@').first})';
+    final myLabel = 'You (${(me.email ?? 'me').split('@').first})';
 
     return FirebaseFirestore.instance
         .collection('families')
@@ -554,7 +650,7 @@ class FamilyProvider extends ChangeNotifier {
           for (final uid in uids) {
             final role = (members[uid] as String?) ?? 'editor';
             String label;
-            if (uid == me?.uid) {
+            if (uid == me.uid) {
               label = myLabel;
             } else {
               final nm = (names[uid] as String?)?.trim();
@@ -664,6 +760,10 @@ Future<void> removeMemberFromFamilyAndFixAssignments({
   // 1) Aile dokümanında üyeyi ve görünen adını sil
   final famRef = db.doc('families/$familyId');
   final famSnap = await famRef.get();
+  final members = (famSnap.data()?['members'] as Map<String, dynamic>?);
+
+  debugPrint('[Scores] family members keys=${members?.keys}');
+
   if (!famSnap.exists) return;
 
   final batch1 = db.batch();
@@ -706,7 +806,6 @@ Future<void> removeMemberFromFamilyAndFixAssignments({
       return false;
     }
 
-    // küçük batch’lerle yaz (500 limitini aşmamak için)
     Future<void> _fixCol(String col, String field) async {
       final snap = await db.collection('families/$familyId/$col').get();
       var writes = db.batch();
@@ -723,7 +822,7 @@ Future<void> removeMemberFromFamilyAndFixAssignments({
             newVal = null;
             break;
           case ReassignStrategy.reassignTo:
-            newVal = reassignToLabel; // "You (gokhan)" gibi
+            newVal = reassignToLabel;
             break;
           case ReassignStrategy.leaveAsText:
             newVal = at;
