@@ -416,5 +416,7 @@
   "editorLabel": "Editör",
   "viewerLabel": "İzleyici",
   "roleUpdated": "Rol güncellendi.",
-  "updateFailed": "Güncelleme başarısız: {error}"
+  "updateFailed": "Güncelleme başarısız: {error}",
+  "signIn": "Giriş yap",
+  "retry":"Yeniden dene"
 }

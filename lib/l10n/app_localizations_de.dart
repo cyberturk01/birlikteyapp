@@ -1144,4 +1144,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String updateFailed(Object error) {
     return 'Aktualisierung fehlgeschlagen: $error';
   }
+
+  @override
+  String get signIn => 'Anmelden';
+
+  @override
+  String get retry => 'Wiederholen';
 }

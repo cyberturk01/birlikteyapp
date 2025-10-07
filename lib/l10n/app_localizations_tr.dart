@@ -1144,4 +1144,10 @@ class AppLocalizationsTr extends AppLocalizations {
   String updateFailed(Object error) {
     return 'Güncelleme başarısız: $error';
   }
+
+  @override
+  String get signIn => 'Giriş yap';
+
+  @override
+  String get retry => 'Yeniden dene';
 }

@@ -12,6 +12,7 @@ import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../providers/weekly_cloud_provider.dart';
+import '../../widgets/empty_state.dart';
 import '../../widgets/expenses_mini_summary.dart';
 import '../../widgets/mini_members_bar.dart';
 import '../config/config_page.dart';
@@ -36,28 +37,21 @@ class _HomePageState extends State<HomePage> {
   int _activeIndex = 0;
   bool _appliedInitial = false;
   bool _cloudBound = false;
+  String? _boundFamilyId;
 
   @override
   void initState() {
     super.initState();
-    final famId = context.read<FamilyProvider>().familyId;
-    context.read<TaskCloudProvider>().setFamilyId(famId);
-    _pageController = PageController(
-      // viewportFraction: 0.92, // yanlardan küçük boşluk
-      initialPage: _activeIndex,
-    );
+    _pageController = PageController(initialPage: _activeIndex);
 
     // initialFilterMember geldiyse index’e çevir
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      if (FirebaseAuth.instance.currentUser == null) return;
       final weekly = context.read<WeeklyCloudProvider>();
       final taskProv = context.read<TaskCloudProvider>();
       await weekly.ensureTodaySynced(taskProv);
     });
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
   }
 
   @override
@@ -78,32 +72,59 @@ class _HomePageState extends State<HomePage> {
     final familyId = famProv.familyId;
     debugPrint('[HomePage] familyId=$familyId');
     final user = FirebaseAuth.instance.currentUser;
-    final fid = famProv.familyId;
-
-    final me = FirebaseAuth.instance.currentUser;
-    if (user == null || fid == null || fid.isEmpty) {
-      Future.microtask(() {
-        if (!mounted) return;
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const AuthGate()),
-          (route) => false,
-        );
-      });
-      return const SizedBox.shrink();
-    }
-    ensureMembership(familyId!);
-    debugFam(familyId);
 
     if (user == null) {
-      // zaten çıkılmış → AuthGate’e al
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      return EmptyState(
+        title: t.appTitle,
+        message: t.welcome, // "Welcome" vb.
+        actions: [
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const AuthGate()),
+                (route) => false,
+              );
+            },
+            child: Text(t.signIn), // "Sign in"
+          ),
+        ],
+      );
+    }
+
+    // 3.b) familyId yoksa → onboarding/manager’e yönlendiren "empty state"
+    if (familyId == null || familyId.isEmpty) {
+      return EmptyState(
+        title: t.appTitle,
+        message: t.setupFamilyDesc, // "Create or join a family" gibi
+        actions: [
+          FilledButton.icon(
+            icon: const Icon(Icons.group_add),
+            onPressed: () async {
+              await showFamilyManager(context);
+              if (!context.mounted) return;
+              setState(() {}); // döndükten sonra yeniden çiz
+            },
+            label: Text(t.setupFamily),
+          ),
+        ],
+      );
+    }
+
+    // 3.c) Bulut provider’ları güvenli bağla (yalnızca 1 kez)
+    if (!_cloudBound || _boundFamilyId != familyId) {
+      _cloudBound = true;
+      _boundFamilyId = familyId;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const AuthGate()),
-          (_) => false,
-        );
+        context.read<TaskCloudProvider>().setFamilyId(familyId);
+        context.read<ItemCloudProvider>().setFamilyId(familyId);
+        context.read<WeeklyCloudProvider>().setFamilyId(familyId);
+        context.read<ExpenseCloudProvider>().setFamilyId(familyId);
+
+        try {
+          await ensureMembership(familyId);
+        } catch (_) {}
       });
-      return const SizedBox.shrink();
     }
 
     final taskError = context.select<TaskCloudProvider, String?>(
@@ -126,24 +147,25 @@ class _HomePageState extends State<HomePage> {
       expenseError,
     ].whereType<String>().toList();
 
-    if (familyId == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    if (!_cloudBound) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.read<TaskCloudProvider>().setFamilyId(familyId);
-        context.read<ItemCloudProvider>().setFamilyId(familyId);
-        context.read<WeeklyCloudProvider>().setFamilyId(familyId);
-        context.read<ExpenseCloudProvider>().setFamilyId(familyId);
-      });
-      _cloudBound = true;
-    }
-
     return StreamBuilder<List<FamilyMemberEntry>>(
-      key: ValueKey('${me?.uid ?? 'anon'}-${fid ?? 'no-fam'}'),
+      key: ValueKey('${user.uid}-$familyId'),
       stream: famProv.watchMemberEntries(),
       builder: (context, snap) {
+        if (snap.hasError) {
+          // izin hataları dahil — boş ekran yerine uyarı göster
+          return EmptyState(
+            title: t.appTitle,
+            message: t.somethingWentWrong, // "Something went wrong"
+            actions: [
+              Text(snap.error.toString(), textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: () => setState(() {}),
+                child: Text(t.retry),
+              ),
+            ],
+          );
+        }
         final entries = snap.data ?? const <FamilyMemberEntry>[];
         if (snap.connectionState == ConnectionState.waiting &&
             entries.isEmpty) {
@@ -153,6 +175,29 @@ class _HomePageState extends State<HomePage> {
         }
 
         final ordered = _orderWithMeFirstEntries(entries);
+
+        if (ordered.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(title: Text(t.appTitle)),
+            body: EmptyState(
+              title: t.members,
+              message:
+                  t.noMembersFound, // ya da “Henüz üye yok, birini ekleyin.”
+              actions: [
+                FilledButton.icon(
+                  icon: const Icon(Icons.person_add_alt_1),
+                  onPressed: () => showFamilyManager(context),
+                  label: Text(t.addMember),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (_boundFamilyId != familyId) {
+          _appliedInitial = false;
+          _activeIndex = 0;
+        }
 
         // ✅ İlk seçim: entries hazırken ve henüz yapılmamışken
         if (!_appliedInitial && ordered.isNotEmpty) {

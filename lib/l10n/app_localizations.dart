@@ -2130,6 +2130,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Update failed: {error}'**
   String updateFailed(Object error);
+
+  /// No description provided for @signIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get signIn;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

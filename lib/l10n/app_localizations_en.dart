@@ -1144,4 +1144,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String updateFailed(Object error) {
     return 'Update failed: $error';
   }
+
+  @override
+  String get signIn => 'Sign in';
+
+  @override
+  String get retry => 'Retry';
 }

@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../main.dart';
 import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../providers/weekly_cloud_provider.dart';
+import '../../widgets/empty_state.dart';
 import '../../widgets/leaderboard_page.dart';
 import '../family/family_manager.dart';
 import '../home/home_page.dart';
@@ -32,32 +34,52 @@ class _LandingPageState extends State<LandingPage> {
   @override
   Widget build(BuildContext context) {
     final famProv = context.watch<FamilyProvider>();
+    final t = AppLocalizations.of(context)!;
+    final user = FirebaseAuth.instance.currentUser;
+    final familyId = famProv.familyId;
+
+    if (familyId == null || familyId.isEmpty) {
+      return EmptyState(
+        title: 'Togetherly',
+        message: t.setupFamilyDesc,
+        actions: [
+          FilledButton.icon(
+            icon: const Icon(Icons.group_add),
+            onPressed: () async {
+              await showFamilyManager(context);
+              if (!context.mounted) return;
+              setState(() {});
+            },
+            label: Text(t.setupFamily),
+          ),
+        ],
+      );
+    }
+
+    // B) familyId yok → Aile kur/katıl "empty state"
+    if (familyId == null || familyId.isEmpty) {
+      return _buildEmpty(context);
+    }
 
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Togetherly — ${AppLocalizations.of(context)!.welcome}'),
+          title: Text('Togetherly — ${t.welcome}'),
           bottom: TabBar(
             tabs: [
-              Tab(
-                text: AppLocalizations.of(context)!.members,
-                icon: const Icon(Icons.group),
-              ),
-              Tab(
-                text: AppLocalizations.of(context)!.leaderboard,
-                icon: const Icon(Icons.emoji_events),
-              ),
+              Tab(text: t.members, icon: const Icon(Icons.group)),
+              Tab(text: t.leaderboard, icon: const Icon(Icons.emoji_events)),
             ],
           ),
           actions: [
             IconButton(
-              tooltip: AppLocalizations.of(context)!.language, // "Language"
+              tooltip: t.language, // "Language"
               icon: const Icon(Icons.language),
               onPressed: () => _showLanguageSheet(context),
             ),
             IconButton(
-              tooltip: AppLocalizations.of(context)!.signOut,
+              tooltip: t.signOut,
               icon: const Icon(Icons.logout, color: Colors.redAccent),
               onPressed: () async {
                 context.read<TaskCloudProvider>().teardown();
@@ -65,9 +87,14 @@ class _LandingPageState extends State<LandingPage> {
                 context.read<WeeklyCloudProvider>().teardown();
                 context.read<ExpenseCloudProvider>().teardown();
                 context.read<FamilyProvider>().clearActive();
+
                 await FirebaseAuth.instance.signOut();
                 if (!context.mounted) return;
-                Navigator.of(context).popUntil((r) => r.isFirst);
+
+                await Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const AuthGate()),
+                  (route) => false,
+                );
               },
             ),
           ],
@@ -78,8 +105,32 @@ class _LandingPageState extends State<LandingPage> {
             children: [
               // TAB 1
               StreamBuilder<List<FamilyMemberEntry>>(
+                key: ValueKey('${user?.uid}-${familyId}'),
                 stream: famProv.watchMemberEntries(),
                 builder: (_, snap) {
+                  if (snap.hasError) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, size: 40),
+                          const SizedBox(height: 8),
+                          Text(t.somethingWentWrong),
+                          const SizedBox(height: 8),
+                          Text(
+                            snap.error.toString(),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          const SizedBox(height: 12),
+                          OutlinedButton(
+                            onPressed: () => setState(() {}),
+                            child: Text(t.retry),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
                   final raw = snap.data ?? const <FamilyMemberEntry>[];
                   if (snap.connectionState == ConnectionState.waiting &&
                       raw.isEmpty) {

@@ -414,5 +414,7 @@
   "editorLabel": "Bearbeiter",
   "viewerLabel": "Betrachter",
   "roleUpdated": "Rolle aktualisiert.",
-  "updateFailed": "Aktualisierung fehlgeschlagen: {error}"
+  "updateFailed": "Aktualisierung fehlgeschlagen: {error}",
+  "signIn": "Anmelden",
+  "retry":"Wiederholen"
 }

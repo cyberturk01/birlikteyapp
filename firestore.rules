@@ -235,24 +235,29 @@ service cloud.firestore {
         allow delete: if isEditor(fid);
       }
 
-      // ✅ SCORES
+      // ✅ SCORES (member kendi skorunu yazabilir; editor herkesinkini)
+      // families/{fid}/scores/{period}/{periodId}/{uid}
       match /scores/{period}/{periodId}/{uid} {
         function isAllowedPeriod() { return period in ['day','week','month']; }
-        function allowedShape() {
-          return request.resource.data.keys().hasOnly(['points','updatedAt'])
-                 && (request.resource.data.points is number);
-        }
-        function limitedDelta() {
-          let old = (resource.data.points is number) ? resource.data.points : 0;
-          let delta = request.resource.data.points - old;
-          return delta <= 20 && delta >= -20;
-        }
 
         allow read: if isViewer(fid) && isAllowedPeriod();
-        allow create, update: if isEditor(fid)
-                              && isAllowedPeriod()
-                              && allowedShape()
-                              && limitedDelta();
+
+        // İlk oluşturma: points bir sayı olmalı (transform değil)
+        allow create: if
+            isAllowedPeriod()
+            && (request.resource.data.points is number)
+            && (
+                 isEditor(fid)                         // owner/editor herhangi bir UID için
+                 || (isMember(fid) && request.auth.uid == uid) // member sadece kendi UID’si
+               );
+
+        allow update: if
+            isAllowedPeriod()
+            && (
+                 isEditor(fid)
+                 || (isMember(fid) && request.auth.uid == uid)
+               );
+
         allow delete: if false;
       }
     }
