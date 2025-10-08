@@ -11,7 +11,7 @@ class EmptyState extends StatelessWidget {
     required this.title,
     required this.message,
     this.actions = const [],
-    this.icon = Icons.hourglass_empty,
+    this.icon = Icons.family_restroom,
   }) : super(key: key);
 
   @override

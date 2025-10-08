@@ -1,3 +1,4 @@
+import 'package:birlikteyapp/utils/context_perms.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../main.dart';
 import '../../models/view_section.dart';
+import '../../permissions/permissions.dart';
 import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
@@ -65,6 +67,73 @@ class _HomePageState extends State<HomePage> {
     setState(() => _section = s);
   }
 
+  List<PopupMenuEntry<String>> _buildMainMenuItems(
+    BuildContext context,
+    AppLocalizations t,
+  ) {
+    final items = <PopupMenuEntry<String>>[];
+
+    // Aile yönetimi (owner/editor → görünür; diğerleri gizli)
+    if (context.can(FamilyPermission.manageMembers)) {
+      items.add(
+        PopupMenuItem(
+          value: 'manage',
+          child: ListTile(
+            leading: const Icon(Icons.group),
+            title: Text(t.menuManageFamily),
+          ),
+        ),
+      );
+    }
+
+    // Add Center (örn: toplu ekleme/temizlik merkezi) → tasks/items/weekly yazabilen roller
+    final canAddCenter =
+        context.canWriteTasks ||
+        context.canWriteItems ||
+        context.canWriteWeekly;
+    if (canAddCenter) {
+      items.add(
+        PopupMenuItem(
+          value: 'addCenter',
+          child: ListTile(
+            leading: const Icon(Icons.add_circle_outline),
+            title: Text(t.menuAddCenter),
+          ),
+        ),
+      );
+    }
+
+    // Config (Bütçe vb.) → manageBudgets izni
+    if (context.canManageBudgets) {
+      items.add(
+        PopupMenuItem(
+          value: 'config',
+          child: ListTile(
+            leading: const Icon(Icons.tune),
+            title: Text(t.configTitle),
+          ),
+        ),
+      );
+    }
+
+    if (items.isNotEmpty) {
+      items.add(const PopupMenuDivider());
+    }
+
+    // Çıkış → herkes görsün
+    items.add(
+      PopupMenuItem(
+        value: 'signout',
+        child: ListTile(
+          leading: const Icon(Icons.logout, color: Colors.redAccent),
+          title: Text(t.signOut),
+        ),
+      ),
+    );
+
+    return items;
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
@@ -116,10 +185,10 @@ class _HomePageState extends State<HomePage> {
       _boundFamilyId = familyId;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
-        context.read<TaskCloudProvider>().setFamilyId(familyId);
-        context.read<ItemCloudProvider>().setFamilyId(familyId);
-        context.read<WeeklyCloudProvider>().setFamilyId(familyId);
-        context.read<ExpenseCloudProvider>().setFamilyId(familyId);
+        await context.read<TaskCloudProvider>().setFamilyId(familyId);
+        await context.read<ItemCloudProvider>().setFamilyId(familyId);
+        await context.read<WeeklyCloudProvider>().setFamilyId(familyId);
+        await context.read<ExpenseCloudProvider>().setFamilyId(familyId);
 
         try {
           await ensureMembership(familyId);
@@ -277,10 +346,10 @@ class _HomePageState extends State<HomePage> {
                       );
                       break;
                     case 'signout':
-                      context.read<TaskCloudProvider>().teardown();
-                      context.read<ItemCloudProvider>().teardown();
-                      context.read<WeeklyCloudProvider>().teardown();
-                      context.read<ExpenseCloudProvider>().teardown();
+                      await context.read<TaskCloudProvider>().teardown();
+                      await context.read<ItemCloudProvider>().teardown();
+                      await context.read<WeeklyCloudProvider>().teardown();
+                      await context.read<ExpenseCloudProvider>().teardown();
                       context.read<FamilyProvider>().clearActive();
 
                       await FirebaseAuth.instance.signOut();
@@ -293,40 +362,7 @@ class _HomePageState extends State<HomePage> {
                       break;
                   }
                 },
-                itemBuilder: (ctx) => [
-                  PopupMenuItem(
-                    value: 'manage',
-                    child: ListTile(
-                      leading: const Icon(Icons.group),
-                      title: Text(t.menuManageFamily),
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'addCenter',
-                    child: ListTile(
-                      leading: const Icon(Icons.add_circle_outline),
-                      title: Text(t.menuAddCenter),
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'config',
-                    child: ListTile(
-                      leading: const Icon(Icons.tune),
-                      title: Text(t.configTitle),
-                    ),
-                  ),
-                  const PopupMenuDivider(),
-                  PopupMenuItem(
-                    value: 'signout',
-                    child: ListTile(
-                      leading: const Icon(
-                        Icons.logout,
-                        color: Colors.redAccent,
-                      ),
-                      title: Text(t.signOut),
-                    ),
-                  ),
-                ],
+                itemBuilder: (ctx) => _buildMainMenuItems(ctx, t),
               ),
             ],
           ),

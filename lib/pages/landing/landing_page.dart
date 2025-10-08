@@ -1,3 +1,4 @@
+import 'package:birlikteyapp/utils/context_perms.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -171,11 +172,12 @@ class _LandingPageState extends State<LandingPage> {
                               style: Theme.of(context).textTheme.headlineSmall,
                             ),
                           ),
-                          IconButton(
-                            tooltip: AppLocalizations.of(context)!.addMember,
-                            icon: const Icon(Icons.person_add_alt_1),
-                            onPressed: () => showFamilyManager(context),
-                          ),
+                          if (context.canManageMembers)
+                            IconButton(
+                              tooltip: t.menuManageFamily,
+                              icon: const Icon(Icons.group),
+                              onPressed: () => showFamilyManager(context),
+                            ),
                         ],
                       ),
                       const SizedBox(height: 6),
