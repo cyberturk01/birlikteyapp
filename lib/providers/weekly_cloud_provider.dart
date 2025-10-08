@@ -19,6 +19,9 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
   final FirebaseFirestore _db;
   final Box<int> _notifBox;
 
+  bool _listening = false;
+  String? _boundFamilyId; // opsiyonel: debug/guard
+
   WeeklyCloudProvider({FirebaseFirestore? db, Box<int>? notifBox})
     : _db = db ?? FirebaseFirestore.instance,
       _notifBox = notifBox ?? Hive.box<int>('weeklyNotifCloudBox');
@@ -39,23 +42,36 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
 
   // ===== binding =====
 
-  Future<void> setFamilyId(String? fam) async {
+  void setFamilyId(String? fam) {
     if (_familyId == fam) return;
-
-    // önce mevcut stream’i kapat + state’i temizle
-    await _cancelWeeklyStream();
-    _list.clear();
-    clearError();
-
     _familyId = fam;
+    _boundFamilyId = fam;
 
-    if (_familyId == null || _familyId!.isEmpty) {
+    if (!_listening) {
+      // lazy: dinleme kapalıysa sadece state’i temizle
+      _sub?.cancel();
+      _list.clear();
       notifyListeners();
       return;
     }
-
-    // yeniden bağlan
     _rebind();
+  }
+
+  void startListening() {
+    if (_listening) return;
+    _listening = true;
+    _rebind(); // familyId varsa stream’i bağla
+  }
+
+  void stopListening({bool clear = false}) {
+    if (!_listening) return;
+    _listening = false;
+    _sub?.cancel();
+    _sub = null;
+    if (clear) {
+      _list.clear();
+      notifyListeners();
+    }
   }
 
   Future<void> _cancelWeeklyStream() async {
@@ -65,6 +81,12 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
 
   void _rebind() {
     _sub?.cancel();
+    if (!_listening || _familyId == null) {
+      // <<< guard
+      _list.clear();
+      notifyListeners();
+      return;
+    }
     _sub = null;
     _list.clear();
 

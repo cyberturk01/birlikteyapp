@@ -23,6 +23,7 @@ import 'package:birlikteyapp/services/offline_queue.dart';
 import 'package:birlikteyapp/services/scores_repo.dart';
 import 'package:birlikteyapp/services/task_service.dart';
 import 'package:birlikteyapp/theme/app_theme.dart';
+import 'package:birlikteyapp/utils/privacy_policy_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -206,6 +207,7 @@ class _RootState extends State<_Root> {
           child: Consumer<UiProvider>(
             builder: (_, ui, __) => MaterialApp(
               locale: ui.locale,
+              routes: {'/privacy': (_) => const PrivacyPolicyPage()},
               localizationsDelegates: const [
                 AppLocalizations.delegate,
                 GlobalMaterialLocalizations.delegate,

@@ -60,6 +60,7 @@ class DashboardSummaryBar extends StatelessWidget {
       builder: (context, c) {
         final isWide = c.maxWidth >= 720;
         final cards = <Widget>[
+          // TASKS
           _SummaryCard(
             icon: Icons.task_alt,
             title: t.tasks,
@@ -68,7 +69,9 @@ class DashboardSummaryBar extends StatelessWidget {
             onTap: () {
               onTap(SummaryDest.tasks);
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                showPendingTasksDialog(context);
+                if (context.mounted) {
+                  showPendingTasksDialog(context);
+                }
               });
             },
           ),
@@ -80,24 +83,29 @@ class DashboardSummaryBar extends StatelessWidget {
             onTap: () {
               onTap(SummaryDest.items);
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                showToBuyItemsDialog(context);
+                if (context.mounted) {
+                  showToBuyItemsDialog(context);
+                }
               });
             },
           ),
-          // Expenses kutusu (opsiyonel). Provider yoksa sayacı 0 gösterelim.
           _SummaryCard(
             icon: Icons.payments,
             title: t.expenses,
             value: '$todayExpenses',
             subtitle: t.totalRecords,
-            onTap: () => onTap(SummaryDest.expenses),
+            onTap: () {
+              onTap(SummaryDest.expenses);
+            },
           ),
           _SummaryCard(
             icon: Icons.calendar_today,
             title: t.weekly,
             value: '${todaysWeekly.length}',
             subtitle: todayName,
-            onTap: () => onTap(SummaryDest.weekly),
+            onTap: () {
+              onTap(SummaryDest.weekly);
+            },
           ),
         ];
 

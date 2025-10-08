@@ -56,6 +56,8 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
   final _uuid = const Uuid();
+  bool _listening = false;
+  bool get isListening => _listening;
 
   ExpenseCloudProvider(this._auth, this._db) {
     _bindAuth();
@@ -92,7 +94,6 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> setFamilyId(String? fid) async {
     if (_familyId == fid) return;
 
-    // önce tüm mevcut streamleri kapat + state temizle
     await _cancelExpenseStream();
     await _cancelFamilyStream();
     _expenses = [];
@@ -106,8 +107,38 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
       return;
     }
 
-    _bindFamilySettings();
-    _bindExpenses();
+    // LAZY: yalnızca listening açıkken bağlan
+    if (_listening) {
+      _bindFamilySettings();
+      _bindExpenses();
+    } else {
+      notifyListeners();
+    }
+  }
+
+  void startListening() {
+    if (_listening) return;
+    _listening = true;
+
+    // familyId + user uygunsa stream’leri bağla
+    if (_currentUser != null && (_familyId?.isNotEmpty ?? false)) {
+      _bindFamilySettings();
+      _bindExpenses();
+    }
+  }
+
+  void stopListening({bool clear = false}) {
+    if (!_listening) return;
+    _listening = false;
+
+    _cancelExpenseStream();
+    _cancelFamilyStream();
+
+    if (clear) {
+      _expenses = [];
+      _monthlyBudgets.clear();
+      notifyListeners();
+    }
   }
 
   void _bindAuth() {
@@ -120,18 +151,34 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
 
   void _bindExpenses() {
     final c = _col;
-    if (c == null) {
+    if (!_listening || c == null) {
+      // <<< guard
       _expenses = [];
       notifyListeners();
       return;
     }
     _expSub?.cancel();
     _expSub = c
-        .orderBy('date', descending: true)
+        .orderBy('createdAt', descending: true)
         .snapshots()
         .listen(
           (snap) {
-            _expenses = snap.docs.map((d) => ExpenseDoc.fromSnap(d)).toList();
+            _expenses = snap.docs.map((d) {
+              final data = d.data();
+              // Fallback: date yoksa createdAt → DateTime
+              final tsDate = data['date'] as Timestamp?;
+              final tsCreated = data['createdAt'] as Timestamp?;
+              final effectiveDate =
+                  tsDate?.toDate() ?? tsCreated?.toDate() ?? DateTime.now();
+              return ExpenseDoc(
+                id: d.id,
+                title: (data['title'] as String).trim(),
+                amount: (data['amount'] as num).toDouble(),
+                date: effectiveDate, // ✅ fallback uygulanmış
+                assignedToUid: data['assignedToUid'] as String?,
+                category: (data['category'] as String?)?.trim(),
+              );
+            }).toList();
             clearError();
             notifyListeners();
           },
@@ -147,7 +194,8 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
   void _bindFamilySettings() {
     _famSub?.cancel();
     final fid = _familyId;
-    if (fid == null || fid.isEmpty) {
+    if (!_listening || fid == null || fid.isEmpty) {
+      // <<< guard
       _monthlyBudgets.clear();
       notifyListeners();
       return;
@@ -179,7 +227,10 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
     _monthlyBudgets.clear();
     clearError();
 
-    if (_currentUser != null && (_familyId?.isNotEmpty ?? false)) {
+    if (_currentUser != null &&
+        (_familyId?.isNotEmpty ?? false) &&
+        _listening) {
+      // <<< guard
       _bindFamilySettings();
       _bindExpenses();
     } else {

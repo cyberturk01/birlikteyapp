@@ -1155,6 +1155,15 @@ class AppLocalizationsTr extends AppLocalizations {
   String get ok => 'Tamam';
 
   @override
+  String get openInBrowser => 'Tarayıcıda aç';
+
+  @override
+  String get privacyTitle => 'Gizlilik Politikası';
+
+  @override
+  String get menuPrivacyPolicy => 'Gizlilik Politikası';
+
+  @override
   String get errPermissionTitle => 'Yetki gerekli';
 
   @override

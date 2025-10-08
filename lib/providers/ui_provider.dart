@@ -41,32 +41,45 @@ class UiProvider extends ChangeNotifier {
   Future<void> init() async {
     final sp = await SharedPreferences.getInstance();
 
-    // ThemeMode (int öncelikli, eski string'i de oku)
-    final tmInt = sp.getInt('themeMode');
-    final tmStr = sp.getString('themeMode');
-    if (tmInt != null && tmInt >= 0 && tmInt < ThemeMode.values.length) {
-      _themeMode = ThemeMode.values[tmInt];
-    } else if (tmStr != null) {
-      _themeMode = _parseThemeModeLegacy(tmStr);
+    // ---- ThemeMode (tek anahtar, tip güvenli) ----
+    final tm = sp.get('themeMode');
+    if (tm is int) {
+      if (tm >= 0 && tm < ThemeMode.values.length) {
+        _themeMode = ThemeMode.values[tm];
+      }
+    } else if (tm is String) {
+      _themeMode = _parseThemeModeLegacy(tm); // "light" | "dark" | "system"
+      // (opsiyonel): V2'ye migrate et
+      await sp.setInt('themeMode', _themeMode.index);
     }
 
-    // BrandSeed (int)
-    final bs = sp.getInt('brandSeed');
-    if (bs != null && bs >= 0 && bs < BrandSeed.values.length) {
-      _brand = BrandSeed.values[bs];
+    // ---- BrandSeed (benzer mantık; eskide string tutulmuş olabilir) ----
+    final bs = sp.get('brandSeed');
+    if (bs is int) {
+      if (bs >= 0 && bs < BrandSeed.values.length) {
+        _brand = BrandSeed.values[bs];
+      }
+    } else if (bs is String) {
+      final asInt = int.tryParse(bs);
+      if (asInt != null && asInt >= 0 && asInt < BrandSeed.values.length) {
+        _brand = BrandSeed.values[asInt];
+        await sp.setInt('brandSeed', asInt); // migrate
+      }
     }
 
-    // Locale (languageCode)
-    final code = sp.getString('ui_locale_code');
-    if (code != null && code.isNotEmpty) {
-      _locale = Locale(code);
+    // ---- Locale ----
+    final lc = sp.get('ui_locale_code');
+    if (lc is String && lc.isNotEmpty) {
+      _locale = Locale(lc);
     }
 
-    // Active member (UID) — önce yeni anahtar, sonra eski
-    _activeMember =
-        sp.getString('activeMemberUid') ?? sp.getString('activeMember');
+    // ---- Active member (UID) ----
+    final am = sp.get('activeMemberUid') ?? sp.get('activeMember');
+    if (am is String && am.trim().isNotEmpty) {
+      _activeMember = am.trim();
+    }
 
-    // Weekly reminder
+    // ---- Weekly reminder ----
     final h = sp.getInt('weeklyReminderHour');
     final m = sp.getInt('weeklyReminderMinute');
     if (h != null && m != null) {

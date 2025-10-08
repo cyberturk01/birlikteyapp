@@ -420,7 +420,9 @@
   "signIn": "Giriş yap",
   "retry":"Yeniden dene",
   "ok": "Tamam",
-
+  "openInBrowser":  "Tarayıcıda aç",
+  "privacyTitle": "Gizlilik Politikası",
+  "menuPrivacyPolicy": "Gizlilik Politikası",
   "errPermissionTitle": "Yetki gerekli",
   "errPermissionBody": "Bu işlemi yapma yetkiniz yok. Lütfen aile yöneticisiyle iletişime geçin.",
   "errSigninTitle": "Oturum gerekli",

@@ -418,7 +418,9 @@
   "signIn": "Anmelden",
   "ok": "OK",
   "retry": "Erneut versuchen",
-
+  "openInBrowser":  "Im Browser öffnen",
+  "privacyTitle": "Datenschutzerklärung",
+  "menuPrivacyPolicy": "Datenschutzrichtlinie",
   "errPermissionTitle": "Berechtigung erforderlich",
   "errPermissionBody": "Sie haben keine Berechtigung für diese Aktion. Bitte wenden Sie sich an den Familieninhaber.",
   "errSigninTitle": "Anmeldung erforderlich",

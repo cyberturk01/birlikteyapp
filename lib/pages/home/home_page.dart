@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../main.dart';
+import '../../models/item.dart';
+import '../../models/task.dart';
 import '../../models/view_section.dart';
 import '../../permissions/permissions.dart';
 import '../../providers/expense_cloud_provider.dart';
@@ -49,6 +51,7 @@ class _HomePageState extends State<HomePage> {
     // initialFilterMember geldiyse index’e çevir
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      _applyLazyListeningFor(_section);
       if (FirebaseAuth.instance.currentUser == null) return;
       final weekly = context.read<WeeklyCloudProvider>();
       final taskProv = context.read<TaskCloudProvider>();
@@ -62,9 +65,22 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
+  void _applyLazyListeningFor(HomeSection s) {
+    final expense = context.read<ExpenseCloudProvider>();
+
+    if (s == HomeSection.expenses) {
+      expense.startListening();
+    } else {
+      expense.stopListening(clear: false); // veri kalsın istersen false
+    }
+
+    // Weekly’i HomePage’te göstermiyoruz; WeeklyPage’e gidince açacağız (aşağıda).
+  }
+
   void _jumpTo(HomeSection s) {
     if (_section == s) return;
     setState(() => _section = s);
+    _applyLazyListeningFor(s);
   }
 
   List<PopupMenuEntry<String>> _buildMainMenuItems(
@@ -187,7 +203,7 @@ class _HomePageState extends State<HomePage> {
         if (!mounted) return;
         await context.read<TaskCloudProvider>().setFamilyId(familyId);
         await context.read<ItemCloudProvider>().setFamilyId(familyId);
-        await context.read<WeeklyCloudProvider>().setFamilyId(familyId);
+        context.read<WeeklyCloudProvider>().setFamilyId(familyId);
         await context.read<ExpenseCloudProvider>().setFamilyId(familyId);
 
         try {
@@ -306,8 +322,6 @@ class _HomePageState extends State<HomePage> {
           });
         }
 
-        final tasks = context.watch<TaskCloudProvider>().tasks;
-        final items = context.watch<ItemCloudProvider>().items;
         final h = MediaQuery.of(context).size.height;
         final isShort = h < 640;
         debugPrint('Home labels=$ordered.map((e)=>e.label)');
@@ -344,6 +358,9 @@ class _HomePageState extends State<HomePage> {
                           builder: (_) => const ConfigurationPage(),
                         ),
                       );
+                      break;
+                    case 'privacy':
+                      await Navigator.pushNamed(context, '/privacy');
                       break;
                     case 'signout':
                       await context.read<TaskCloudProvider>().teardown();
@@ -399,29 +416,29 @@ class _HomePageState extends State<HomePage> {
                         children: [
                           DashboardSummaryBar(
                             onTap: (dest) {
-                              setState(() {
-                                switch (dest) {
-                                  case SummaryDest.tasks:
-                                    _section = HomeSection.tasks;
-                                    break;
-                                  case SummaryDest.items:
-                                    _section = HomeSection.items;
-                                    break;
-                                  case SummaryDest.expenses:
-                                    _section = HomeSection.expenses;
-                                    break;
-                                  case SummaryDest.weekly:
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => const WeeklyPage(),
-                                      ),
-                                    );
-                                    return;
-                                }
+                              if (!mounted) return;
+
+                              if (dest == SummaryDest.weekly) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const WeeklyPage(),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              // 🟢 YENİ: _jumpTo çağır → içinde hem setState hem de start/stopListening var
+                              _jumpTo(switch (dest) {
+                                SummaryDest.tasks => HomeSection.tasks,
+                                SummaryDest.items => HomeSection.items,
+                                SummaryDest.expenses => HomeSection.expenses,
+                                SummaryDest.weekly =>
+                                  _section, // zaten yukarıda push edildi
                               });
                             },
                           ),
+
                           const SizedBox(height: 4),
 
                           AnimatedSwitcher(
@@ -435,7 +452,9 @@ class _HomePageState extends State<HomePage> {
                                   ],
                                 ),
                             child: (_section == HomeSection.expenses)
-                                ? const _ExpensesMiniCentered()
+                                ? const _ExpensesMiniCentered(
+                                    key: ValueKey('exp-mini-on'),
+                                  )
                                 : const SizedBox.shrink(
                                     key: ValueKey('exp-mini-off'),
                                   ),
@@ -452,31 +471,20 @@ class _HomePageState extends State<HomePage> {
                               itemCount: ordered.length,
                               itemBuilder: (context, i) {
                                 final ent = ordered[i]; // FamilyMemberEntry
-                                final uid = ent.uid; // ← filtre artık UID
+                                final uid = ent.uid;
                                 final label = ent.label;
 
-                                final memberTasks = tasks
-                                    .where((t) => t.assignedToUid == uid)
-                                    .toList();
-                                final memberItems = items
-                                    .where((it) => it.assignedToUid == uid)
-                                    .toList();
-
                                 final card = (_section == HomeSection.expenses)
-                                    ? ExpensesCard(
-                                        memberUid: uid,
-                                      ) // ExpensesCard zaten UID’i destekliyordu
-                                    : MemberCard(
-                                        memberUid: uid,
-                                        memberName: label,
-                                        tasks: memberTasks,
-                                        items: memberItems,
+                                    ? ExpensesCard(memberUid: uid)
+                                    : _MemberCardForUid(
+                                        uid: uid,
+                                        label: label,
                                         section: _section,
                                         onJumpSection: _jumpTo,
                                       );
 
                                 final versionKey = ValueKey<String>(
-                                  'member-$i-t${memberTasks.length}-i${memberItems.length}-s${_section.name}',
+                                  'member-$i-s${_section.name}',
                                 );
                                 return Center(
                                   child: _MemberPageKeepAlive(
@@ -547,18 +555,71 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class _ExpensesMiniCentered extends StatelessWidget {
-  const _ExpensesMiniCentered();
+class _MemberCardForUid extends StatelessWidget {
+  final String uid;
+  final String label;
+  final HomeSection section;
+  final void Function(HomeSection) onJumpSection;
+
+  const _MemberCardForUid({
+    required this.uid,
+    required this.label,
+    required this.section,
+    required this.onJumpSection,
+  });
 
   @override
   Widget build(BuildContext context) {
+    return Selector<TaskCloudProvider, List<Task>>(
+      selector: (ctx, p) =>
+          p.tasks.where((t) => t.assignedToUid == uid).toList(growable: false),
+      shouldRebuild: _listChangedShallow<Task>,
+      builder: (_, memberTasks, __) {
+        return Selector<ItemCloudProvider, List<Item>>(
+          selector: (ctx, p) => p.items
+              .where((it) => it.assignedToUid == uid)
+              .toList(growable: false),
+          shouldRebuild: _listChangedShallow<Item>,
+          builder: (_, memberItems, __) {
+            return MemberCard(
+              memberUid: uid,
+              memberName: label,
+              tasks: memberTasks,
+              items: memberItems,
+              section: section,
+              onJumpSection: onJumpSection,
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+/// Basit, hızlı shallow karşılaştırma – gereksiz rebuild’leri keser
+bool _listChangedShallow<T>(List<T> prev, List<T> next) {
+  if (identical(prev, next)) return false;
+  if (prev.length != next.length) return true;
+  for (var i = 0; i < prev.length; i++) {
+    if (!identical(prev[i], next[i])) return true;
+  }
+  return false;
+}
+
+class _ExpensesMiniCentered extends StatelessWidget {
+  const _ExpensesMiniCentered({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final expProv = context.watch<ExpenseCloudProvider>();
+    final list = expProv.all; // sıralı kopya, UI için ideal
+    if (list.isEmpty) {
+      return const SizedBox(height: 56); // ufak yer tutucu
+    }
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 540), // opsiyonel
-        child: ExpensesMiniSummary(
-          expenses: context.watch<ExpenseCloudProvider>().expenses,
-          onTap: null,
-        ),
+        constraints: const BoxConstraints(maxWidth: 540),
+        child: ExpensesMiniSummary(expenses: list, onTap: null),
       ),
     );
   }

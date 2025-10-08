@@ -1155,6 +1155,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ok => 'OK';
 
   @override
+  String get openInBrowser => 'Open in browser';
+
+  @override
+  String get privacyTitle => 'Privacy Policy';
+
+  @override
+  String get menuPrivacyPolicy => 'PrivacyPolicy';
+
+  @override
   String get errPermissionTitle => 'Permission required';
 
   @override

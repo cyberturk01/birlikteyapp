@@ -2149,6 +2149,24 @@ abstract class AppLocalizations {
   /// **'OK'**
   String get ok;
 
+  /// No description provided for @openInBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get openInBrowser;
+
+  /// No description provided for @privacyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Policy'**
+  String get privacyTitle;
+
+  /// No description provided for @menuPrivacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'PrivacyPolicy'**
+  String get menuPrivacyPolicy;
+
   /// No description provided for @errPermissionTitle.
   ///
   /// In en, this message translates to:
