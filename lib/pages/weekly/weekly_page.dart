@@ -20,7 +20,6 @@ class WeeklyPage extends StatefulWidget {
 }
 
 class _WeeklyPageState extends State<WeeklyPage> {
-  // 1=Mon ... 7=Sun  -> DateTime.weekday ile uyumlu tutuyoruz
   int _selectedWeekday = DateTime.now().weekday;
 
   @override

@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/task.dart';
 import '../services/auth_service.dart';
+import '../services/cloud_error_handler.dart';
 import '../services/notification_service.dart';
 import '../services/offline_queue.dart';
 import '../services/retry.dart';
@@ -21,7 +22,7 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   TaskService _service;
   final ScoresRepo _scores; // <- ekle
   late final FirebaseAuth _fbAuth;
-  final _uuid = Uuid();
+  final _uuid = const Uuid();
 
   TaskCloudProvider(
     this._auth,
@@ -64,83 +65,85 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
 
   // === Binding ===
   // <<< AİLE ID SETTERI
-  void setFamilyId(String? id) {
+  Future<void> setFamilyId(String? id) async {
     if (_familyId == id) return;
     _familyId = id;
-    _rebindTasks();
+
+    await _cancelTaskStream(); // sadece task stream’i kapat
+    _tasks.clear();
+    clearError();
+
+    if (_currentUser == null || id == null || id.isEmpty) {
+      _col = null;
+      notifyListeners();
+      return;
+    }
+    _bindTasks(); // yeni family için task stream’i kur
   }
 
   void _bindAuth() {
-    _authSub = _fbAuth.authStateChanges().listen((user) {
+    _authSub?.cancel();
+    _authSub = _fbAuth.authStateChanges().listen((user) async {
       _currentUser = user;
-      _rebindTasks(); // senin mevcut mantığın
+      await setFamilyId(_familyId); // mevcut family ile task stream’i resetle
     });
   }
 
-  void _rebindAuth() {
-    _authSub?.cancel();
+  Future<void> _rebindAuth() async {
+    await _authSub?.cancel();
     _authSub = null;
     _bindAuth();
+    await setFamilyId(_familyId);
   }
 
-  void _rebindTasks() {
-    debugPrint('[TaskCloud] REBIND → user=${_currentUser?.uid} fam=$_familyId');
-
-    _taskSub?.cancel();
-    _taskSub = null;
-    _tasks.clear();
-    notifyListeners();
-
-    if (_currentUser == null || _familyId == null || _familyId!.isEmpty) {
+  void _bindTasks() {
+    final fid = _familyId;
+    final uid = _currentUser?.uid;
+    if (fid == null || fid.isEmpty || uid == null) {
       _col = null;
-      debugPrint('[TaskCloud] SKIP (user/family null)');
       return;
     }
 
     _col = FirebaseFirestore.instance
         .collection('families')
-        .doc(_familyId!)
+        .doc(fid)
         .collection('tasks');
 
-    debugPrint('[TaskCloud] PATH = ${_col!.path}');
+    _taskSub?.cancel();
+    _taskSub = _col!.snapshots().listen(
+      (qs) {
+        clearError();
+        _tasks
+          ..clear()
+          ..addAll(
+            qs.docs.map((d) {
+              final m = d.data();
+              final t = Task(
+                (m['name'] as String?)?.trim() ?? '',
+                completed: (m['completed'] as bool?) ?? false,
+                assignedToUid:
+                    ((m['assignedToUid'] ?? m['assignedTo']) as String?)
+                        ?.trim(),
+                origin: m['origin'] as String?,
+                dueAt: (m['dueAt'] as Timestamp?)?.toDate(),
+                reminderAt: (m['reminderAt'] as Timestamp?)?.toDate(),
+              )..remoteId = d.id;
+              return t;
+            }),
+          );
+        notifyListeners();
+      },
+      onError: (e, st) {
+        setError(e);
+        CloudErrorHandler.showFromException(e);
+        notifyListeners();
+      },
+    );
+  }
 
-    // TEST: orderBy'ı geçici kaldır → snapshot geliyor mu görelim
-    _taskSub = _col!
-        //.orderBy(FieldPath.documentId, descending: true)
-        .snapshots()
-        .listen(
-          (qs) {
-            clearError();
-            debugPrint('[TaskCloud] SNAP size=${qs.size}');
-            _tasks
-              ..clear()
-              ..addAll(
-                qs.docs.map((d) {
-                  final data = d.data();
-                  debugPrint('[TaskCloud] doc ${d.id} => $data');
-                  final t = Task(
-                    (data['name'] as String?)?.trim() ?? '',
-                    completed: (data['completed'] as bool?) ?? false,
-                    assignedToUid:
-                        ((data['assignedToUid'] ?? data['assignedTo'])
-                                as String?)
-                            ?.trim(),
-                    origin: data['origin'] as String?,
-                    dueAt: (data['dueAt'] as Timestamp?)?.toDate(),
-                    reminderAt: (data['reminderAt'] as Timestamp?)?.toDate(),
-                  );
-                  t.remoteId = d.id;
-                  return t;
-                }),
-              );
-            clearError();
-            notifyListeners();
-          },
-          onError: (e, st) {
-            debugPrint('[TaskCloud] STREAM ERROR: $e');
-            setError(e);
-          },
-        );
+  Future<void> _cancelTaskStream() async {
+    await _taskSub?.cancel();
+    _taskSub = null;
   }
 
   List<String> get suggestedTasks {
@@ -367,23 +370,25 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
       }
       return ToggleResult.okNoScore;
     } catch (e) {
-      final msg = e.toString();
-      debugPrint('[TaskCloud] score write failed: $msg');
+      debugPrint('[TaskCloud] score write failed: $e');
       setError(e);
 
-      // rules’dan permission-denied gelirse
-      if (msg.contains('permission-denied')) {
-        return ToggleResult.okNoScore; // task tamamlandı ama puan yazamadık
+      final kind = mapExceptionToKind(e);
+
+      // Kullanıcıya nazikçe anlat
+      CloudErrorHandler.show(kind);
+
+      // Task tamamlandı fakat skor yazamadık: izin/oturum/network gibi durumlarda
+      if (kind == CloudErrorKind.permissionDenied ||
+          kind == CloudErrorKind.unauthenticated ||
+          kind == CloudErrorKind.network ||
+          kind == CloudErrorKind.unavailable ||
+          kind == CloudErrorKind.quota) {
+        return ToggleResult.okNoScore;
       }
+
       return ToggleResult.error;
     }
-  }
-
-  @override
-  void dispose() {
-    _authSub?.cancel();
-    _taskSub?.cancel();
-    super.dispose();
   }
 
   Future<void> renameTask(Task t, String newName) async {
@@ -395,11 +400,36 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     notifyListeners();
   }
 
-  void refreshNow() {
-    _rebindTasks(); // mevcut stream'i iptal edip yeniden bağlar, _tasks'ı temizleyip yeniden doldurur
+  Future<void> refreshNow() async {
+    await _cancelTaskStream();
+    _tasks.clear();
+    clearError();
+
+    if (_currentUser != null && (_familyId?.isNotEmpty ?? false)) {
+      _bindTasks();
+    } else {
+      _col = null;
+      notifyListeners();
+    }
   }
 
-  void teardown() => setFamilyId(null);
+  Future<void> teardown() async {
+    await _cancelTaskStream();
+    await _authSub?.cancel();
+    _authSub = null;
+
+    _tasks.clear();
+    clearError();
+    _col = null;
+    // _familyId = null; // istersen burada da sıfırlayabilirsin
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    teardown();
+    super.dispose();
+  }
 
   Future<void> _qSet({
     required String path,

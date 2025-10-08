@@ -1150,4 +1150,49 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get retry => 'Retry';
+
+  @override
+  String get ok => 'OK';
+
+  @override
+  String get errPermissionTitle => 'Permission required';
+
+  @override
+  String get errPermissionBody => 'You don’t have permission to perform this action. Please contact the family owner.';
+
+  @override
+  String get errSigninTitle => 'Sign in required';
+
+  @override
+  String get errSigninBody => 'Please sign in to continue.';
+
+  @override
+  String get errNetworkTitle => 'Network error';
+
+  @override
+  String get errNetworkBody => 'There was a connection problem. Please check your internet and try again.';
+
+  @override
+  String get errBusyTitle => 'Service is busy';
+
+  @override
+  String get errBusyBody => 'The service is temporarily unavailable. Please try again shortly.';
+
+  @override
+  String get errNotFoundTitle => 'Not found';
+
+  @override
+  String get errNotFoundBody => 'The requested resource could not be found.';
+
+  @override
+  String get errQuotaTitle => 'Limit reached';
+
+  @override
+  String get errQuotaBody => 'Usage limit or quota has been reached. Please try again later.';
+
+  @override
+  String get errUnknownTitle => 'Something went wrong';
+
+  @override
+  String get errUnknownBody => 'An unexpected error occurred. Please try again.';
 }

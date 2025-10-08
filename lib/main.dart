@@ -37,6 +37,8 @@ import 'package:provider/provider.dart';
 import 'auth/login_page.dart';
 import 'l10n/app_localizations.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -102,6 +104,7 @@ Future<void> main() async {
 
 class _Root extends StatefulWidget {
   const _Root();
+
   @override
   State<_Root> createState() => _RootState();
 }
@@ -117,7 +120,6 @@ class _RootState extends State<_Root> {
 
   @override
   Widget build(BuildContext context) {
-    // Splash + tek runApp mimarisi
     return FutureBuilder<void>(
       future: _init,
       builder: (_, snap) {
@@ -137,7 +139,7 @@ class _RootState extends State<_Root> {
           providers: [
             ChangeNotifierProvider(create: (_) => FamilyProvider()),
             ChangeNotifierProvider(create: (_) => TemplatesProvider()),
-            ChangeNotifierProvider(create: (_) => ui..loadPrefs()),
+            ChangeNotifierProvider(create: (_) => ui..init()),
             Provider<ScoresRepo>(
               create: (_) => FirestoreScoresRepo(FirebaseFirestore.instance),
             ),
@@ -215,6 +217,7 @@ class _RootState extends State<_Root> {
                 Locale('tr'), // Türkçe
                 Locale('de'), // Almanca
               ],
+              navigatorKey: navigatorKey,
               debugShowCheckedModeBanner: false,
               title: 'Togetherly',
               themeMode: ui.themeMode,

@@ -362,9 +362,8 @@ class FamilyProvider extends ChangeNotifier {
     }
 
     // --- Yeni: mevcut rolü oku
-    final famSnap = await famRef!.get();
+    final famSnap = await famRef.get();
     final famData = famSnap.data() ?? {};
-    final ownerUid = famData['ownerUid'] as String?;
     final membersMap = (famData['members'] as Map<String, dynamic>?) ?? {};
 
     // Zaten members'ta varsa ve rol 'owner' ise => hiçbir şekilde düşürmeyin
@@ -723,7 +722,6 @@ class FamilyProvider extends ChangeNotifier {
     }, SetOptions(merge: true));
   }
 
-  /// Üyeyi aileden çıkar (sahip kendini ya da owner’ı silemesin)
   Future<void> removeMemberFromFamily(String uid) async {
     final famId = _familyId;
     if (famId == null) return;
@@ -745,102 +743,27 @@ class FamilyProvider extends ChangeNotifier {
     }, SetOptions(merge: true));
   }
 
-  /// (İsteğe bağlı) davet kodunu gösterip kopyalamak için zaten getInviteCode() var.
-}
+  Future<void> unassignAllByUid({
+    required String familyId,
+    required String memberUid,
+  }) async {
+    final db = FirebaseFirestore.instance;
 
-Future<void> removeMemberFromFamilyAndFixAssignments({
-  required String familyId,
-  required String memberUid,
-  required String memberLabelText, // "nuran" ya da "You (nuran)"
-  ReassignStrategy strategy = ReassignStrategy.leaveAsText,
-  String? reassignToLabel, // "You (gokhan)" gibi
-}) async {
-  final db = FirebaseFirestore.instance;
-
-  // 1) Aile dokümanında üyeyi ve görünen adını sil
-  final famRef = db.doc('families/$familyId');
-  final famSnap = await famRef.get();
-  final members = (famSnap.data()?['members'] as Map<String, dynamic>?);
-
-  debugPrint('[Scores] family members keys=${members?.keys}');
-
-  if (!famSnap.exists) return;
-
-  final batch1 = db.batch();
-  batch1.update(famRef, {
-    'members.$memberUid': FieldValue.delete(),
-    'memberNames.$memberUid': FieldValue.delete(), // <-- memberLabels değil
-    'updatedAt': FieldValue.serverTimestamp(),
-  });
-  await batch1.commit();
-
-  // 2) Kullanıcının user dokümanı: families array’inden bu aileyi çıkar,
-  //    activeFamilyId bu aile ise temizle (koşullu).
-  final userRef = db.doc('users/$memberUid');
-  await db.runTransaction((txn) async {
-    final uSnap = await txn.get(userRef);
-    if (!uSnap.exists) return;
-    final data = uSnap.data() as Map<String, dynamic>;
-    final active = (data['activeFamilyId'] as String?) ?? '';
-    final updates = <String, dynamic>{
-      'families': FieldValue.arrayRemove([familyId]),
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-    if (active == familyId) {
-      // temizle; istersen null da verebilirsin
-      updates['activeFamilyId'] = FieldValue.delete();
-    }
-    txn.set(userRef, updates, SetOptions(merge: true));
-  });
-
-  // 3) (Opsiyonel) görev & market atamalarını düzelt
-  if (strategy != ReassignStrategy.leaveAsText) {
-    bool matchesLabel(String s) {
-      if (s == memberLabelText) return true;
-      // "You (xxx)" <-> "xxx" simetrik eşleşme
-      final re = RegExp(r'^You \((.+)\)$');
-      final m1 = re.firstMatch(s);
-      final m2 = re.firstMatch(memberLabelText);
-      if (m1 != null && m1.group(1) == memberLabelText) return true;
-      if (m2 != null && m2.group(1) == s) return true;
-      return false;
-    }
-
-    Future<void> _fixCol(String col, String field) async {
-      final snap = await db.collection('families/$familyId/$col').get();
-      var writes = db.batch();
-      var count = 0;
+    Future<void> clear(String col, String field) async {
+      final snap = await db
+          .collection('families/$familyId/$col')
+          .where(field, isEqualTo: memberUid)
+          .get();
+      final batch = db.batch();
       for (final d in snap.docs) {
-        final m = d.data();
-        final at = (m[field] as String?)?.trim() ?? '';
-        if (at.isEmpty) continue;
-        if (!matchesLabel(at)) continue;
-
-        String? newVal;
-        switch (strategy) {
-          case ReassignStrategy.unassign:
-            newVal = null;
-            break;
-          case ReassignStrategy.reassignTo:
-            newVal = reassignToLabel;
-            break;
-          case ReassignStrategy.leaveAsText:
-            newVal = at;
-            break;
-        }
-        writes.update(d.reference, {field: newVal});
-        count++;
-        if (count % 400 == 0) {
-          // güvenli sınır
-          await writes.commit();
-          writes = db.batch();
-        }
+        batch.update(d.reference, {field: FieldValue.delete()});
       }
-      await writes.commit();
+      await batch.commit();
     }
 
-    await _fixCol('tasks', 'assignedTo');
-    await _fixCol('items', 'assignedTo');
+    await clear('tasks', 'assignedToUid');
+    await clear('items', 'assignedToUid');
+    await clear('expenses', 'assignedToUid'); // kullanıyorsan
   }
 }
 

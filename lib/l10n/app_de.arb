@@ -416,5 +416,22 @@
   "roleUpdated": "Rolle aktualisiert.",
   "updateFailed": "Aktualisierung fehlgeschlagen: {error}",
   "signIn": "Anmelden",
-  "retry":"Wiederholen"
+  "ok": "OK",
+  "retry": "Erneut versuchen",
+
+  "errPermissionTitle": "Berechtigung erforderlich",
+  "errPermissionBody": "Sie haben keine Berechtigung für diese Aktion. Bitte wenden Sie sich an den Familieninhaber.",
+  "errSigninTitle": "Anmeldung erforderlich",
+  "errSigninBody": "Bitte melden Sie sich an, um fortzufahren.",
+  "errNetworkTitle": "Netzwerkfehler",
+  "errNetworkBody": "Es gab ein Verbindungsproblem. Bitte prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.",
+  "errBusyTitle": "Dienst ausgelastet",
+  "errBusyBody": "Der Dienst ist vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut.",
+  "errNotFoundTitle": "Nicht gefunden",
+  "errNotFoundBody": "Die angeforderte Ressource wurde nicht gefunden.",
+  "errQuotaTitle": "Limit erreicht",
+  "errQuotaBody": "Das Nutzungs- oder Kontingentlimit wurde erreicht. Bitte versuchen Sie es später erneut.",
+  "errUnknownTitle": "Etwas ist schiefgelaufen",
+  "errUnknownBody": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
+
 }

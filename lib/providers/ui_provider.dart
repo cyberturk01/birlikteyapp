@@ -14,25 +14,67 @@ class UiProvider extends ChangeNotifier {
   HomeSection _section = HomeSection.tasks;
   TaskViewFilter _taskFilter = TaskViewFilter.pending;
   ItemViewFilter _itemFilter = ItemViewFilter.toBuy;
-  String? _activeMember;
+
+  String? _activeMember; // UID
   String? get activeMember => _activeMember;
+  String? get activeMemberUid => _activeMember;
+
   Locale? _locale;
   Locale? get locale => _locale;
 
-  // ====== tema modu ======
   ThemeMode _themeMode = ThemeMode.system;
   ThemeMode get themeMode => _themeMode;
+
   BrandSeed _brand = BrandSeed.teal;
   BrandSeed get brand => _brand;
+
+  TimeOfDay? _weeklyDefaultReminder; // null => UI tarafında 19:00 fallback
+  TimeOfDay? get weeklyDefaultReminder => _weeklyDefaultReminder;
+
   // getters
   String? get filterMember => _filterMember;
   HomeSection get section => _section;
   TaskViewFilter get taskFilter => _taskFilter;
   ItemViewFilter get itemFilter => _itemFilter;
-  String? get activeMemberUid => _activeMember;
 
-  TimeOfDay? _weeklyDefaultReminder; // null ise 19:00 fallback
-  TimeOfDay? get weeklyDefaultReminder => _weeklyDefaultReminder;
+  /// Tek giriş noktası: tüm prefs burada okunur
+  Future<void> init() async {
+    final sp = await SharedPreferences.getInstance();
+
+    // ThemeMode (int öncelikli, eski string'i de oku)
+    final tmInt = sp.getInt('themeMode');
+    final tmStr = sp.getString('themeMode');
+    if (tmInt != null && tmInt >= 0 && tmInt < ThemeMode.values.length) {
+      _themeMode = ThemeMode.values[tmInt];
+    } else if (tmStr != null) {
+      _themeMode = _parseThemeModeLegacy(tmStr);
+    }
+
+    // BrandSeed (int)
+    final bs = sp.getInt('brandSeed');
+    if (bs != null && bs >= 0 && bs < BrandSeed.values.length) {
+      _brand = BrandSeed.values[bs];
+    }
+
+    // Locale (languageCode)
+    final code = sp.getString('ui_locale_code');
+    if (code != null && code.isNotEmpty) {
+      _locale = Locale(code);
+    }
+
+    // Active member (UID) — önce yeni anahtar, sonra eski
+    _activeMember =
+        sp.getString('activeMemberUid') ?? sp.getString('activeMember');
+
+    // Weekly reminder
+    final h = sp.getInt('weeklyReminderHour');
+    final m = sp.getInt('weeklyReminderMinute');
+    if (h != null && m != null) {
+      _weeklyDefaultReminder = TimeOfDay(hour: h, minute: m);
+    }
+
+    notifyListeners();
+  }
 
   Future<void> setBrand(BrandSeed b) async {
     _brand = b;
@@ -41,105 +83,42 @@ class UiProvider extends ChangeNotifier {
     await sp.setInt('brandSeed', b.index);
   }
 
-  Future<void> loadPrefs() async {
-    final sp = await SharedPreferences.getInstance();
-
-    // ThemeMode
-    int? tm = sp.getInt('themeMode');
-    if (tm == null) {
-      final s = sp.getString('themeMode');
-      if (s != null) tm = int.tryParse(s);
-    }
-    if (tm != null && tm >= 0 && tm < ThemeMode.values.length) {
-      _themeMode = ThemeMode.values[tm];
-    }
-
-    // BrandSeed
-    int? bs = sp.getInt('brandSeed');
-    if (bs == null) {
-      final s = sp.getString('brandSeed');
-      if (s != null) bs = int.tryParse(s);
-    }
-    if (bs != null && bs >= 0 && bs < BrandSeed.values.length) {
-      _brand = BrandSeed.values[bs];
-    }
-    final code = sp.getString('ui_locale_code');
-    if (code != null && code.isNotEmpty) {
-      _locale = Locale(code);
-    }
-    notifyListeners();
-  }
-
   Future<void> setLocale(Locale loc) async {
     _locale = loc;
+    notifyListeners();
     final sp = await SharedPreferences.getInstance();
     await sp.setString('ui_locale_code', loc.languageCode);
-    notifyListeners();
   }
 
   Future<void> setWeeklyDefaultReminder(TimeOfDay time) async {
     _weeklyDefaultReminder = time;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('weeklyReminderHour', time.hour);
-    await prefs.setInt('weeklyReminderMinute', time.minute);
+    final sp = await SharedPreferences.getInstance();
+    await sp.setInt('weeklyReminderHour', time.hour);
+    await sp.setInt('weeklyReminderMinute', time.minute);
   }
 
-  // --- load() içinde küçük ekler ---
-  Future<void> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final h = prefs.getInt('weeklyReminderHour');
-    final m = prefs.getInt('weeklyReminderMinute');
-    final saved = prefs.getString('themeMode');
-
-    if (saved != null) {
-      _themeMode = _parseThemeMode(saved);
-    }
-
-    // Önce yeni anahtar (UID), yoksa eskiyi oku
-    _activeMember =
-        prefs.getString('activeMemberUid') ?? prefs.getString('activeMember');
-
-    if (h != null && m != null) {
-      _weeklyDefaultReminder = TimeOfDay(hour: h, minute: m);
-    }
+  Future<void> setActiveMemberUid(String? uid) async {
+    _activeMember = (uid != null && uid.trim().isEmpty) ? null : uid?.trim();
     notifyListeners();
-  }
-
-  @deprecated
-  Future<void> setActiveMember(String? nameOrUid) async {
-    // Eski anahtarı da yazmaya devam edelim ki geriye dönük çalışsın.
-    _activeMember = (nameOrUid != null && nameOrUid.trim().isEmpty)
-        ? null
-        : nameOrUid?.trim();
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final sp = await SharedPreferences.getInstance();
     if (_activeMember == null) {
-      await prefs.remove('activeMember');
-      await prefs.remove('activeMemberUid');
+      await sp.remove('activeMemberUid');
+      // geri uyumluluk anahtarını da temizle
+      await sp.remove('activeMember');
     } else {
-      await prefs.setString('activeMember', _activeMember!);
-      await prefs.setString('activeMemberUid', _activeMember!);
+      await sp.setString('activeMemberUid', _activeMember!);
+      // (opsiyonel) bir-iki sürüm sonra bunu yazmayı bırakabilirsin:
+      await sp.setString('activeMember', _activeMember!);
     }
   }
 
   /// Yeni tercih edilen API: UID ver.
-  Future<void> setActiveMemberUid(String? uid) async {
-    _activeMember = (uid != null && uid.trim().isEmpty) ? null : uid?.trim();
+  void setFilterMemberUid(String? uid) {
+    _filterMember = (uid != null && uid.trim().isEmpty) ? null : uid?.trim();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    if (_activeMember == null) {
-      await prefs.remove('activeMemberUid');
-      // Eski anahtarı da temizle (opsiyonel)
-      await prefs.remove('activeMember');
-    } else {
-      await prefs.setString('activeMemberUid', _activeMember!);
-      // Eski anahtarı da doldur (geri uyumluluk için)
-      await prefs.setString('activeMember', _activeMember!);
-    }
   }
 
-  /// UID listesi üzerinden aktif olanı çöz.
   String? resolveActiveUid(List<String> memberUids) {
     if (_activeMember != null && memberUids.contains(_activeMember)) {
       return _activeMember;
@@ -147,12 +126,10 @@ class UiProvider extends ChangeNotifier {
     return memberUids.isNotEmpty ? memberUids.first : null;
   }
 
-  String? resolveActive(List<String> family) {
-    if (_activeMember != null && family.contains(_activeMember)) {
-      return _activeMember;
-    }
-    return family.isNotEmpty ? family.first : null;
-  }
+  String? resolveActive(List<String> family) => resolveActiveUid(family);
+
+  TimeOfDay get weeklyReminderOrDefault =>
+      _weeklyDefaultReminder ?? const TimeOfDay(hour: 19, minute: 0);
 
   // setters
   void setMember(String? member) {
@@ -190,7 +167,8 @@ class UiProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ThemeMode _parseThemeMode(String s) {
+  /// Sadece eski string değerleri parse eder (geriye dönük).
+  ThemeMode _parseThemeModeLegacy(String s) {
     switch (s) {
       case 'light':
         return ThemeMode.light;
@@ -201,18 +179,17 @@ class UiProvider extends ChangeNotifier {
     }
   }
 
-  /// 🔄 Sadece tema + weekly reminder saatini sıfırlar
+  /// Yalnızca tema + weekly reminder sıfırlar
   Future<void> resetSettings() async {
     _themeMode = ThemeMode.system;
     _weeklyDefaultReminder = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('weeklyReminderHour');
-    await prefs.remove('weeklyReminderMinute');
-    await prefs.setString('themeMode', ThemeMode.system.name); // isteğe bağlı
+    final sp = await SharedPreferences.getInstance();
+    await sp.remove('weeklyReminderHour');
+    await sp.remove('weeklyReminderMinute');
+    await sp.setInt('themeMode', ThemeMode.system.index); // tek tip: int
   }
 
-  // istersen reset:
   Future<void> resetUi() async {
     _themeMode = ThemeMode.system;
     _brand = BrandSeed.teal;

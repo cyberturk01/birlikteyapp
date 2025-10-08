@@ -548,7 +548,7 @@ class _MonthlyBarChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
-    final List<dynamic> _labels = [
+    final List<dynamic> labels = [
       t.monthShortJan,
       t.monthShortFeb,
       t.monthShortMar,
@@ -574,7 +574,7 @@ class _MonthlyBarChart extends StatelessWidget {
           height: 200,
           child: BarChart(
             BarChartData(
-              gridData: FlGridData(show: true),
+              gridData: const FlGridData(show: true),
               borderData: FlBorderData(show: false),
               alignment: BarChartAlignment.spaceAround,
               maxY: maxY,
@@ -604,7 +604,7 @@ class _MonthlyBarChart extends StatelessWidget {
                       return Padding(
                         padding: const EdgeInsets.only(top: 4.0),
                         child: Text(
-                          _labels[i],
+                          labels[i],
                           style: const TextStyle(fontSize: 11),
                         ),
                       );

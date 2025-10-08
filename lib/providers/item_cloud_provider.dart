@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/item.dart';
 import '../services/auth_service.dart';
+import '../services/cloud_error_handler.dart';
 import '../services/offline_queue.dart';
 import '../services/retry.dart';
 import '../services/task_service.dart';
@@ -44,85 +45,90 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
     if (changed) _rebindAuth();
   }
 
-  // Aile id'si App boot’ta/FamilyProvider’dan gelir
-  void setFamilyId(String? id) {
+  // ---- AİLE ID ----
+  Future<void> setFamilyId(String? id) async {
     if (_familyId == id) return;
     _familyId = id;
-    _rebindItems();
+    await _cancelItemStream(); // sadece item stream'i kapat
+    _items.clear();
+    clearError();
+
+    if (_currentUser == null || id == null || id.isEmpty) {
+      _col = null;
+      notifyListeners();
+      return;
+    }
+    _bindItems(); // yeni family için item stream
   }
 
   // ==== Bindings ====
+
+  // ==== Auth binding (BAG'e EKLEME) ====
   void _bindAuth() {
-    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+    _authSub?.cancel();
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) async {
       _currentUser = user;
-      _rebindItems();
+      await setFamilyId(
+        _familyId,
+      ); // mevcut family ile item stream'i yeniden kur/temizle
     });
   }
 
-  void _rebindAuth() {
-    _authSub?.cancel();
-    _authSub = null;
+  Future<void> _rebindAuth() async {
+    await _authSub?.cancel();
     _bindAuth();
+    await setFamilyId(_familyId);
   }
 
-  void _rebindItems() {
-    debugPrint('[ItemCloud] REBIND → user=${_currentUser?.uid} fam=$_familyId');
-
-    _itemSub?.cancel();
-    _itemSub = null;
-    _items.clear();
-    notifyListeners();
-
-    if (_currentUser == null || _familyId == null || _familyId!.isEmpty) {
+  // ==== Item stream ====
+  void _bindItems() {
+    final fid = _familyId;
+    final uid = _currentUser?.uid;
+    if (fid == null || fid.isEmpty || uid == null) {
       _col = null;
-      debugPrint('[ItemCloud] SKIP (user/family null)');
       return;
     }
 
     _col = FirebaseFirestore.instance
         .collection('families')
-        .doc(_familyId!)
+        .doc(fid)
         .collection('items');
 
-    debugPrint('[ItemCloud] PATH = ${_col!.path}');
+    _itemSub?.cancel();
+    _itemSub = _col!.snapshots().listen(
+      (qs) {
+        clearError();
+        _items
+          ..clear()
+          ..addAll(
+            qs.docs.map((d) {
+              final m = d.data();
+              final it = Item(
+                (m['name'] as String?)?.trim() ?? '',
+                bought: (m['bought'] as bool?) ?? false,
+                assignedToUid:
+                    ((m['assignedToUid'] ?? m['assignedTo']) as String?)
+                        ?.trim(),
+                category: (m['category'] as String?)?.trim(),
+                price: (m['price'] as num?)?.toDouble(),
+              )..remoteId = d.id;
+              return it;
+            }),
+          );
+        notifyListeners();
+      },
+      onError: (e, st) {
+        _items.clear();
+        setError(e);
+        CloudErrorHandler.showFromException(e);
+        notifyListeners();
+      },
+    );
+  }
 
-    _itemSub = _col!
-        //.orderBy(FieldPath.documentId, descending: true) // test için kapalı
-        .snapshots()
-        .listen(
-          (qs) {
-            clearError();
-            debugPrint('[ItemCloud] SNAP size=${qs.size}');
-            _items
-              ..clear()
-              ..addAll(
-                qs.docs.map((d) {
-                  final data = d.data();
-                  debugPrint('[ItemCloud] doc ${d.id} => $data');
-                  final it = Item(
-                    (data['name'] as String?)?.trim() ?? '',
-                    bought: (data['bought'] as bool?) ?? false,
-                    assignedToUid:
-                        ((data['assignedToUid'] ?? data['assignedTo'])
-                                as String?)
-                            ?.trim(),
-                    category: (data['category'] as String?)?.trim(),
-                    price: (data['price'] as num?)?.toDouble(),
-                  );
-                  it.remoteId = d.id;
-                  return it;
-                }),
-              );
-            clearError();
-            notifyListeners();
-          },
-          onError: (e, st) {
-            debugPrint('[ItemCloud] STREAM ERROR: $e');
-            _items.clear();
-            setError(e);
-            notifyListeners();
-          },
-        );
+  Future<void> _cancelItemStream() async {
+    await _itemSub?.cancel();
+    _itemSub = null;
   }
 
   // addItem çağrısında (eğer ileriye dönük set etmek istersen parametre ekleyebilirsin)
@@ -143,7 +149,7 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
       if (it.price != null) 'price': it.price,
       'createdAt': FieldValue.serverTimestamp(),
     };
-    debugPrint('[ItemCloud] ADDED id=${id}');
+    debugPrint('[ItemCloud] ADDED id=$id');
     await _qSet(path: path, data: data, merge: false);
     it.remoteId = id;
   }
@@ -190,9 +196,16 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
     notifyListeners();
   }
 
-  // İsteğe bağlı: dışarıdan manuel tetiklemek için
   Future<void> refreshNow() async {
-    _rebindItems();
+    await _cancelItemStream(); // auth'e dokunma
+    _items.clear();
+    clearError();
+    if (_currentUser != null && (_familyId?.isNotEmpty ?? false)) {
+      _bindItems();
+    } else {
+      _col = null;
+      notifyListeners();
+    }
   }
 
   // ==== Public API ====
@@ -300,7 +313,6 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
     if (it.remoteId != null) return it.remoteId!;
 
     Query<Map<String, dynamic>> q = col.where('name', isEqualTo: it.name);
-
     if ((it.assignedToUid ?? '').isEmpty) {
       q = q.where('assignedToUid', isNull: true);
     } else {
@@ -312,7 +324,25 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
       it.remoteId = snap.docs.first.id;
       return it.remoteId!;
     }
-    throw StateError('Cloud doc not found for item "${it.name}"');
+
+    // --- fallback: oluştur ---
+    final genId = const Uuid().v4();
+    await _qSet(
+      path: '${col.path}/$genId',
+      data: {
+        'name': it.name,
+        'bought': it.bought,
+        if ((it.assignedToUid ?? '').trim().isNotEmpty)
+          'assignedToUid': it.assignedToUid!.trim(),
+        if ((it.category ?? '').trim().isNotEmpty)
+          'category': it.category!.trim(),
+        if (it.price != null) 'price': it.price,
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+      merge: false,
+    );
+    it.remoteId = genId;
+    return genId;
   }
 
   Future<List<Item>> addItemsBulkCloud(
@@ -337,14 +367,26 @@ class ItemCloudProvider extends ChangeNotifier with CloudErrorMixin {
     if (list.isNotEmpty) notifyListeners();
   }
 
-  @override
-  void dispose() {
-    _authSub?.cancel();
-    _itemSub?.cancel();
-    super.dispose();
+  // ==== tam temizlik ====
+  Future<void> teardown() async {
+    await _cancelItemStream();
+    await _authSub?.cancel(); // teardown’da auth’u da kapat
+    _authSub = null;
+
+    _items.clear();
+    clearError();
+    _col = null;
+    // _familyId’ı burada null yapmak istersen (opsiyonel):
+    // _familyId = null;
+
+    notifyListeners();
   }
 
-  void teardown() => setFamilyId(null);
+  @override
+  void dispose() {
+    teardown();
+    super.dispose();
+  }
 
   Future<void> _qSet({
     required String path,

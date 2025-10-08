@@ -418,5 +418,21 @@
   "roleUpdated": "Rol güncellendi.",
   "updateFailed": "Güncelleme başarısız: {error}",
   "signIn": "Giriş yap",
-  "retry":"Yeniden dene"
+  "retry":"Yeniden dene",
+  "ok": "Tamam",
+
+  "errPermissionTitle": "Yetki gerekli",
+  "errPermissionBody": "Bu işlemi yapma yetkiniz yok. Lütfen aile yöneticisiyle iletişime geçin.",
+  "errSigninTitle": "Oturum gerekli",
+  "errSigninBody": "Devam etmek için lütfen oturum açın.",
+  "errNetworkTitle": "Ağ hatası",
+  "errNetworkBody": "Bağlantı sorunuyla karşılaşıldı. İnternetinizi kontrol edip tekrar deneyin.",
+  "errBusyTitle": "Hizmet meşgul",
+  "errBusyBody": "Hizmet geçici olarak kullanılamıyor. Lütfen kısa süre sonra tekrar deneyin.",
+  "errNotFoundTitle": "Bulunamadı",
+  "errNotFoundBody": "İstediğiniz kaynak bulunamadı.",
+  "errQuotaTitle": "Limit aşıldı",
+  "errQuotaBody": "Kullanım limiti veya kota aşıldı. Lütfen daha sonra tekrar deneyin.",
+  "errUnknownTitle": "Bir şeyler ters gitti",
+  "errUnknownBody": "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin."
 }

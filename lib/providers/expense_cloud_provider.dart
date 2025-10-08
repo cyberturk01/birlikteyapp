@@ -2,11 +2,10 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import '../services/cloud_error_handler.dart';
 import '../services/offline_queue.dart';
 import '../services/retry.dart';
 import '../utils/recent_categories.dart';
@@ -56,15 +55,23 @@ class ExpenseDoc {
 class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
-  final Map<String, double> _monthlyBudgets = {};
   final _uuid = const Uuid();
 
-  double? getMonthlyBudgetFor(String category) => _monthlyBudgets[category];
-  ExpenseCloudProvider(this._auth, this._db);
+  ExpenseCloudProvider(this._auth, this._db) {
+    _bindAuth();
+  }
 
+  // ---- state ----
   String? _familyId;
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
+  User? _currentUser;
+
+  StreamSubscription<User?>? _authSub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _expSub;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _famSub;
+
+  final Map<String, double> _monthlyBudgets = {};
+  double? getMonthlyBudgetFor(String category) => _monthlyBudgets[category];
+
   List<ExpenseDoc> _expenses = [];
   List<ExpenseDoc> get expenses => _expenses;
 
@@ -74,11 +81,67 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
     return list;
   }
 
-  void setFamilyId(String? fid) {
+  // ---- helpers ----
+  CollectionReference<Map<String, dynamic>>? get _col {
+    final fid = _familyId;
+    if (fid == null || fid.isEmpty) return null;
+    return _db.collection('families/$fid/expenses');
+  }
+
+  // ---- lifecycle ----
+  Future<void> setFamilyId(String? fid) async {
     if (_familyId == fid) return;
+
+    // önce tüm mevcut streamleri kapat + state temizle
+    await _cancelExpenseStream();
+    await _cancelFamilyStream();
+    _expenses = [];
+    _monthlyBudgets.clear();
+    clearError();
+
     _familyId = fid;
-    _bind();
+
+    if (_currentUser == null || fid == null || fid.isEmpty) {
+      notifyListeners();
+      return;
+    }
+
     _bindFamilySettings();
+    _bindExpenses();
+  }
+
+  void _bindAuth() {
+    _authSub?.cancel();
+    _authSub = _auth.authStateChanges().listen((u) async {
+      _currentUser = u;
+      await setFamilyId(_familyId); // mevcut aileyle yeniden bağlan/temizle
+    });
+  }
+
+  void _bindExpenses() {
+    final c = _col;
+    if (c == null) {
+      _expenses = [];
+      notifyListeners();
+      return;
+    }
+    _expSub?.cancel();
+    _expSub = c
+        .orderBy('date', descending: true)
+        .snapshots()
+        .listen(
+          (snap) {
+            _expenses = snap.docs.map((d) => ExpenseDoc.fromSnap(d)).toList();
+            clearError();
+            notifyListeners();
+          },
+          onError: (e, _) {
+            debugPrint('[ExpenseCloud] expenses stream error: $e');
+            setError(e);
+            CloudErrorHandler.showFromException(e);
+            notifyListeners();
+          },
+        );
   }
 
   void _bindFamilySettings() {
@@ -102,16 +165,60 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
       },
       onError: (e) {
         debugPrint('[ExpenseCloud] settings stream error: $e');
+        setError(e);
+        CloudErrorHandler.showFromException(e);
+        notifyListeners();
       },
     );
   }
 
-  CollectionReference<Map<String, dynamic>>? get _col {
-    final fid = _familyId;
-    if (fid == null) return null;
-    return _db.collection('families/$fid/expenses');
+  Future<void> refreshNow() async {
+    await _cancelExpenseStream();
+    await _cancelFamilyStream();
+    _expenses = [];
+    _monthlyBudgets.clear();
+    clearError();
+
+    if (_currentUser != null && (_familyId?.isNotEmpty ?? false)) {
+      _bindFamilySettings();
+      _bindExpenses();
+    } else {
+      notifyListeners();
+    }
   }
 
+  Future<void> teardown() async {
+    await _cancelExpenseStream();
+    await _cancelFamilyStream();
+    await _authSub?.cancel();
+    _authSub = null;
+
+    _expenses = [];
+    _monthlyBudgets.clear();
+    clearError();
+    // _familyId'ı null yapmak istersen:
+    // _familyId = null;
+
+    notifyListeners();
+  }
+
+  Future<void> _cancelExpenseStream() async {
+    await _expSub?.cancel();
+    _expSub = null;
+  }
+
+  Future<void> _cancelFamilyStream() async {
+    await _famSub?.cancel();
+    _famSub = null;
+  }
+
+  @override
+  void dispose() {
+    teardown();
+    super.dispose();
+  }
+
+  // ---- budgets ----
   Future<void> setMonthlyBudget(String category, double? amount) async {
     final fid = _familyId;
     if (fid == null || fid.isEmpty) {
@@ -123,7 +230,6 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
     final docPath = _db.collection('families').doc(fid).path;
 
     if (amount == null) {
-      // string path kullan
       final field = 'settings.budgets.$category';
       await _qUpdateDoc(docPath: docPath, data: {field: FieldValue.delete()});
       _monthlyBudgets.remove(category);
@@ -142,114 +248,7 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
     notifyListeners();
   }
 
-  Future<void> _qSetDoc({
-    required String docPath,
-    required Map<String, dynamic> data,
-    bool merge = false,
-  }) async {
-    Future<void> write() async => FirebaseFirestore.instance
-        .doc(docPath)
-        .set(data, SetOptions(merge: merge));
-    try {
-      await Retry.attempt(write, retryOn: isTransientFirestoreError);
-    } catch (_) {
-      await OfflineQueue.I.enqueue(
-        OfflineOp(
-          id: _uuid.v4(),
-          path: docPath,
-          type: OpType.set,
-          data: data,
-          merge: merge,
-        ),
-      );
-    }
-  }
-
-  Future<void> _qUpdateDoc({
-    required String docPath,
-    required Map<String, dynamic> data,
-  }) async {
-    Future<void> write() async =>
-        FirebaseFirestore.instance.doc(docPath).update(data);
-    try {
-      await Retry.attempt(write, retryOn: isTransientFirestoreError);
-    } catch (_) {
-      await OfflineQueue.I.enqueue(
-        OfflineOp(
-          id: _uuid.v4(),
-          path: docPath,
-          type: OpType.update,
-          data: data,
-        ),
-      );
-    }
-  }
-
-  /// Drill-down için basit filtre:
-  List<ExpenseDoc> forCategory({required String category, String? uid}) {
-    final all = expenses; // mevcut liste
-    return all.where((e) {
-      final catOk = (e.category ?? 'Other') == category;
-      final uidOk = uid == null ? true : e.assignedToUid == uid;
-      return catOk && uidOk;
-    }).toList()..sort((a, b) => b.date.compareTo(a.date));
-  }
-
-  /// Stacked bar için: son N ay kategorilere göre toplam
-  /// return: { 'YYYY-MM': { 'Groceries': 120.0, 'Dining': 80.0, ... }, ... }
-  Map<String, Map<String, double>> totalsByMonthAndCategory({
-    String? uid,
-    int lastMonths = 6,
-  }) {
-    final now = DateTime.now();
-    final monthsKeys = List.generate(lastMonths, (i) {
-      final d = DateTime(now.year, now.month - (lastMonths - 1 - i), 1);
-      return '${d.year}-${d.month.toString().padLeft(2, '0')}';
-    });
-
-    final out = {for (final k in monthsKeys) k: <String, double>{}};
-
-    for (final e in expenses) {
-      if (uid != null && e.assignedToUid != uid) continue;
-      final key = '${e.date.year}-${e.date.month.toString().padLeft(2, '0')}';
-      if (!out.containsKey(key)) continue; // sadece son N ay
-      final cat = (e.category ?? 'Other');
-      out[key]![cat] = (out[key]![cat] ?? 0) + e.amount;
-    }
-    return out;
-  }
-
-  void _bind() {
-    _sub?.cancel();
-    final c = _col;
-    if (c == null) {
-      _expenses = [];
-      notifyListeners();
-      return;
-    }
-    _sub = c
-        .orderBy('date', descending: true)
-        .snapshots()
-        .listen(
-          (snap) {
-            _expenses = snap.docs.map((d) => ExpenseDoc.fromSnap(d)).toList();
-            clearError();
-            notifyListeners();
-          },
-          onError: (e) {
-            debugPrint('[ExpenseCloud] STREAM ERROR: $e');
-            setError(e);
-          },
-        );
-  }
-
-  @override
-  void dispose() {
-    _sub?.cancel();
-    _famSub?.cancel();
-    super.dispose();
-  }
-
+  // ---- CRUD ----
   Future<void> add({
     required String title,
     required double amount,
@@ -258,14 +257,15 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
     String? category,
   }) async {
     final c = _col;
-    if (c == null) {
-      throw StateError('[ExpenseCloud] No active familyId set');
-    }
+    if (c == null) throw StateError('[ExpenseCloud] No active familyId set');
+
     final id = _uuid.v4();
     final path = '${c.path}/$id';
+
     if ((category ?? '').trim().isNotEmpty) {
       RecentExpenseCats.push(category!.trim());
     }
+
     final data = {
       'title': title.trim(),
       'amount': amount,
@@ -280,7 +280,7 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> remove(String id) async {
     final c = _col;
     if (c == null) throw StateError('[ExpenseCloud] No active familyId set');
-    await _qDelete(path: '${_col!.path}/$id');
+    await _qDelete(path: '${c.path}/$id');
   }
 
   Future<void> updateCategory(String id, String? category) async {
@@ -296,18 +296,76 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
     );
   }
 
-  // yardımcılar (UI filtreleri)
+  Future<void> updateExpense(
+    String id, {
+    String? title,
+    double? amount,
+    DateTime? date,
+    String? assignedToUid,
+    String? category,
+  }) async {
+    final c = _col;
+    if (c == null) throw StateError('No active family/collection');
+
+    final data = <String, dynamic>{};
+    if (title != null) data['title'] = title.trim();
+    if (amount != null) data['amount'] = amount;
+    if (date != null) data['date'] = Timestamp.fromDate(date);
+    if (assignedToUid != null) {
+      data['assignedToUid'] = assignedToUid.trim().isEmpty
+          ? null
+          : assignedToUid.trim();
+    }
+    if (category != null) {
+      data['category'] = category.trim().isEmpty ? null : category.trim();
+      if (category.trim().isNotEmpty) {
+        RecentExpenseCats.push(category.trim());
+      }
+    }
+    if (data.isEmpty) return;
+
+    await c.doc(id).set(data, SetOptions(merge: true));
+  }
+
+  // ---- queries / aggregates ----
+  List<ExpenseDoc> forCategory({required String category, String? uid}) {
+    final allList = expenses;
+    return allList.where((e) {
+      final catOk = (e.category ?? 'Other') == category;
+      final uidOk = uid == null ? true : e.assignedToUid == uid;
+      return catOk && uidOk;
+    }).toList()..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  Map<String, Map<String, double>> totalsByMonthAndCategory({
+    String? uid,
+    int lastMonths = 6,
+  }) {
+    final now = DateTime.now();
+    final monthsKeys = List.generate(lastMonths, (i) {
+      final d = DateTime(now.year, now.month - (lastMonths - 1 - i), 1);
+      return '${d.year}-${d.month.toString().padLeft(2, '0')}';
+    });
+
+    final out = {for (final k in monthsKeys) k: <String, double>{}};
+
+    for (final e in expenses) {
+      if (uid != null && e.assignedToUid != uid) continue;
+      final key = '${e.date.year}-${e.date.month.toString().padLeft(2, '0')}';
+      if (!out.containsKey(key)) continue;
+      final cat = (e.category ?? 'Other');
+      out[key]![cat] = (out[key]![cat] ?? 0) + e.amount;
+    }
+    return out;
+  }
+
   List<ExpenseDoc> forMemberFiltered(String? uid, ExpenseDateFilter filter) {
     List<ExpenseDoc> base;
-
     if (uid == null) {
-      // All members
       base = _expenses;
     } else if (uid.isEmpty) {
-      // Unassigned
       base = _expenses.where((e) => e.assignedToUid == null).toList();
     } else {
-      // Belirli üye UID
       base = _expenses.where((e) => e.assignedToUid == uid).toList();
     }
 
@@ -354,38 +412,6 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
     return buckets;
   }
 
-  Future<void> updateExpense(
-    String id, {
-    String? title,
-    double? amount,
-    DateTime? date,
-    String? assignedToUid,
-    String? category,
-  }) async {
-    final c = _col;
-    if (c == null) throw StateError('No active family/collection');
-
-    final data = <String, dynamic>{};
-    if (title != null) data['title'] = title.trim();
-    if (amount != null) data['amount'] = amount;
-    if (date != null) data['date'] = Timestamp.fromDate(date);
-    // assignedToUid null gelirse kategorik olarak temizlemek isteyebiliriz:
-    if (assignedToUid != null) {
-      data['assignedToUid'] = assignedToUid.trim().isEmpty
-          ? null
-          : assignedToUid.trim();
-    }
-    if (category != null) {
-      data['category'] = category.trim().isEmpty ? null : category.trim();
-    }
-    if (category != null && category.trim().isNotEmpty) {
-      RecentExpenseCats.push(category.trim());
-    }
-    if (data.isEmpty) return;
-
-    await c.doc(id).set(data, SetOptions(merge: true));
-  }
-
   Map<String, double> totalsByCategory({
     required String? uid,
     required ExpenseDateFilter filter,
@@ -395,14 +421,13 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
     for (final e in list) {
       final key = (e.category?.trim().isEmpty ?? true)
           ? 'Uncategorized'
-          : e.category!.trim();
+          : e.category!;
       map.update(key, (v) => v + e.amount, ifAbsent: () => e.amount);
     }
     return map;
   }
 
-  void teardown() => setFamilyId(null);
-
+  // ---- queued writes ----
   Future<void> _qSet({
     required String path,
     required Map<String, dynamic> data,
@@ -448,6 +473,49 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
     } catch (_) {
       await OfflineQueue.I.enqueue(
         OfflineOp(id: _uuid.v4(), path: path, type: OpType.delete),
+      );
+    }
+  }
+
+  Future<void> _qSetDoc({
+    required String docPath,
+    required Map<String, dynamic> data,
+    bool merge = false,
+  }) async {
+    Future<void> write() async => FirebaseFirestore.instance
+        .doc(docPath)
+        .set(data, SetOptions(merge: merge));
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(
+          id: _uuid.v4(),
+          path: docPath,
+          type: OpType.set,
+          data: data,
+          merge: merge,
+        ),
+      );
+    }
+  }
+
+  Future<void> _qUpdateDoc({
+    required String docPath,
+    required Map<String, dynamic> data,
+  }) async {
+    Future<void> write() async =>
+        FirebaseFirestore.instance.doc(docPath).update(data);
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(
+          id: _uuid.v4(),
+          path: docPath,
+          type: OpType.update,
+          data: data,
+        ),
       );
     }
   }

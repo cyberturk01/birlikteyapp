@@ -1150,4 +1150,49 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get retry => 'Yeniden dene';
+
+  @override
+  String get ok => 'Tamam';
+
+  @override
+  String get errPermissionTitle => 'Yetki gerekli';
+
+  @override
+  String get errPermissionBody => 'Bu işlemi yapma yetkiniz yok. Lütfen aile yöneticisiyle iletişime geçin.';
+
+  @override
+  String get errSigninTitle => 'Oturum gerekli';
+
+  @override
+  String get errSigninBody => 'Devam etmek için lütfen oturum açın.';
+
+  @override
+  String get errNetworkTitle => 'Ağ hatası';
+
+  @override
+  String get errNetworkBody => 'Bağlantı sorunuyla karşılaşıldı. İnternetinizi kontrol edip tekrar deneyin.';
+
+  @override
+  String get errBusyTitle => 'Hizmet meşgul';
+
+  @override
+  String get errBusyBody => 'Hizmet geçici olarak kullanılamıyor. Lütfen kısa süre sonra tekrar deneyin.';
+
+  @override
+  String get errNotFoundTitle => 'Bulunamadı';
+
+  @override
+  String get errNotFoundBody => 'İstediğiniz kaynak bulunamadı.';
+
+  @override
+  String get errQuotaTitle => 'Limit aşıldı';
+
+  @override
+  String get errQuotaBody => 'Kullanım limiti veya kota aşıldı. Lütfen daha sonra tekrar deneyin.';
+
+  @override
+  String get errUnknownTitle => 'Bir şeyler ters gitti';
+
+  @override
+  String get errUnknownBody => 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.';
 }

@@ -454,5 +454,21 @@
   "roleUpdated": "Role updated.",
   "updateFailed": "Update failed: {error}",
   "signIn": "Sign in",
-  "retry":"Retry"
+  "retry":"Retry",
+  "ok": "OK",
+
+  "errPermissionTitle": "Permission required",
+  "errPermissionBody": "You don’t have permission to perform this action. Please contact the family owner.",
+  "errSigninTitle": "Sign in required",
+  "errSigninBody": "Please sign in to continue.",
+  "errNetworkTitle": "Network error",
+  "errNetworkBody": "There was a connection problem. Please check your internet and try again.",
+  "errBusyTitle": "Service is busy",
+  "errBusyBody": "The service is temporarily unavailable. Please try again shortly.",
+  "errNotFoundTitle": "Not found",
+  "errNotFoundBody": "The requested resource could not be found.",
+  "errQuotaTitle": "Limit reached",
+  "errQuotaBody": "Usage limit or quota has been reached. Please try again later.",
+  "errUnknownTitle": "Something went wrong",
+  "errUnknownBody": "An unexpected error occurred. Please try again."
   }

@@ -10,6 +10,7 @@ import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../services/cloud_error_handler.dart';
 import '../services/offline_queue.dart';
 import '../services/retry.dart';
 import '_base_cloud.dart';
@@ -38,19 +39,40 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
 
   // ===== binding =====
 
-  void setFamilyId(String? fam) {
+  Future<void> setFamilyId(String? fam) async {
     if (_familyId == fam) return;
+
+    // önce mevcut stream’i kapat + state’i temizle
+    await _cancelWeeklyStream();
+    _list.clear();
+    clearError();
+
     _familyId = fam;
+
+    if (_familyId == null || _familyId!.isEmpty) {
+      notifyListeners();
+      return;
+    }
+
+    // yeniden bağlan
     _rebind();
+  }
+
+  Future<void> _cancelWeeklyStream() async {
+    await _sub?.cancel();
+    _sub = null;
   }
 
   void _rebind() {
     _sub?.cancel();
+    _sub = null;
     _list.clear();
-    if (_familyId == null) {
+
+    if (_familyId == null || _familyId!.isEmpty) {
       notifyListeners();
       return;
     }
+
     final col = _db.collection('families/$_familyId/weekly');
 
     _sub = col
@@ -62,7 +84,6 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
             _list
               ..clear()
               ..addAll(snap.docs.map(WeeklyTaskCloud.fromDoc));
-            clearError();
             notifyListeners();
 
             await _cleanupOrphans();
@@ -78,6 +99,7 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
           },
           onError: (e) {
             debugPrint('[WeeklyTaskCloud] STREAM ERROR: $e');
+            CloudErrorHandler.showFromException(e);
             setError(e);
           },
         );
@@ -310,6 +332,26 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
     return list;
   }
 
+  Future<void> refreshNow() async {
+    await _cancelWeeklyStream();
+    _list.clear();
+    clearError();
+
+    if (_familyId != null && _familyId!.isNotEmpty) {
+      _rebind();
+    } else {
+      notifyListeners();
+    }
+  }
+
+  Future<void> teardown() async {
+    await _cancelWeeklyStream();
+    _list.clear();
+    clearError();
+    // istersen:
+    // _familyId = null;
+    notifyListeners();
+  }
   // ===== daily sync to Tasks =====
 
   Future<void> ensureTodaySynced(TaskCloudProvider taskProv) async {
@@ -436,9 +478,6 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
     _sub?.cancel();
     super.dispose();
   }
-
-  // istersen açık bir teardown metodu
-  void teardown() => setFamilyId(null);
 
   Future<void> _qSet({
     required String path,

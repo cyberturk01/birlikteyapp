@@ -2142,6 +2142,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Retry'**
   String get retry;
+
+  /// No description provided for @ok.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get ok;
+
+  /// No description provided for @errPermissionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission required'**
+  String get errPermissionTitle;
+
+  /// No description provided for @errPermissionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You don’t have permission to perform this action. Please contact the family owner.'**
+  String get errPermissionBody;
+
+  /// No description provided for @errSigninTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in required'**
+  String get errSigninTitle;
+
+  /// No description provided for @errSigninBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Please sign in to continue.'**
+  String get errSigninBody;
+
+  /// No description provided for @errNetworkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Network error'**
+  String get errNetworkTitle;
+
+  /// No description provided for @errNetworkBody.
+  ///
+  /// In en, this message translates to:
+  /// **'There was a connection problem. Please check your internet and try again.'**
+  String get errNetworkBody;
+
+  /// No description provided for @errBusyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Service is busy'**
+  String get errBusyTitle;
+
+  /// No description provided for @errBusyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The service is temporarily unavailable. Please try again shortly.'**
+  String get errBusyBody;
+
+  /// No description provided for @errNotFoundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Not found'**
+  String get errNotFoundTitle;
+
+  /// No description provided for @errNotFoundBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The requested resource could not be found.'**
+  String get errNotFoundBody;
+
+  /// No description provided for @errQuotaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Limit reached'**
+  String get errQuotaTitle;
+
+  /// No description provided for @errQuotaBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage limit or quota has been reached. Please try again later.'**
+  String get errQuotaBody;
+
+  /// No description provided for @errUnknownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong'**
+  String get errUnknownTitle;
+
+  /// No description provided for @errUnknownBody.
+  ///
+  /// In en, this message translates to:
+  /// **'An unexpected error occurred. Please try again.'**
+  String get errUnknownBody;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

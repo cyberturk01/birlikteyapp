@@ -1149,5 +1149,50 @@ class AppLocalizationsDe extends AppLocalizations {
   String get signIn => 'Anmelden';
 
   @override
-  String get retry => 'Wiederholen';
+  String get retry => 'Erneut versuchen';
+
+  @override
+  String get ok => 'OK';
+
+  @override
+  String get errPermissionTitle => 'Berechtigung erforderlich';
+
+  @override
+  String get errPermissionBody => 'Sie haben keine Berechtigung für diese Aktion. Bitte wenden Sie sich an den Familieninhaber.';
+
+  @override
+  String get errSigninTitle => 'Anmeldung erforderlich';
+
+  @override
+  String get errSigninBody => 'Bitte melden Sie sich an, um fortzufahren.';
+
+  @override
+  String get errNetworkTitle => 'Netzwerkfehler';
+
+  @override
+  String get errNetworkBody => 'Es gab ein Verbindungsproblem. Bitte prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.';
+
+  @override
+  String get errBusyTitle => 'Dienst ausgelastet';
+
+  @override
+  String get errBusyBody => 'Der Dienst ist vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut.';
+
+  @override
+  String get errNotFoundTitle => 'Nicht gefunden';
+
+  @override
+  String get errNotFoundBody => 'Die angeforderte Ressource wurde nicht gefunden.';
+
+  @override
+  String get errQuotaTitle => 'Limit erreicht';
+
+  @override
+  String get errQuotaBody => 'Das Nutzungs- oder Kontingentlimit wurde erreicht. Bitte versuchen Sie es später erneut.';
+
+  @override
+  String get errUnknownTitle => 'Etwas ist schiefgelaufen';
+
+  @override
+  String get errUnknownBody => 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.';
 }
