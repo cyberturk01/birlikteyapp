@@ -1195,4 +1195,64 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errUnknownBody => 'An unexpected error occurred. Please try again.';
+
+  @override
+  String get errTimeoutTitle => 'Timeout';
+
+  @override
+  String get errTimeoutBody => 'The request timed out. Please try again.';
+
+  @override
+  String get errAlreadyExistsTitle => 'Already Exists';
+
+  @override
+  String get errAlreadyExistsBody => 'An identical record already exists.';
+
+  @override
+  String get errInvalidTitle => 'Invalid Input';
+
+  @override
+  String get errInvalidBody => 'The data you sent appears to be invalid.';
+
+  @override
+  String get errPrecondTitle => 'Failed Precondition';
+
+  @override
+  String get errPrecondBody => 'Preconditions for this operation were not met.';
+
+  @override
+  String get errAbortedTitle => 'Operation Aborted';
+
+  @override
+  String get errAbortedBody => 'The operation was aborted.';
+
+  @override
+  String get errCancelledTitle => 'Cancelled';
+
+  @override
+  String get errCancelledBody => 'The operation was cancelled.';
+
+  @override
+  String get errInternalTitle => 'Internal Error';
+
+  @override
+  String get errInternalBody => 'An unexpected server error occurred.';
+
+  @override
+  String get errDataLossTitle => 'Data Loss';
+
+  @override
+  String get errDataLossBody => 'Data loss occurred during the operation.';
+
+  @override
+  String get errOutOfRangeTitle => 'Out of Range';
+
+  @override
+  String get errOutOfRangeBody => 'The value is out of the permitted range.';
+
+  @override
+  String get errUnimplementedTitle => 'Not Supported';
+
+  @override
+  String get errUnimplementedBody => 'This feature is not supported yet.';
 }

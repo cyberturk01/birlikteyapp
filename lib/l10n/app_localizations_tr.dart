@@ -1195,4 +1195,64 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get errUnknownBody => 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.';
+
+  @override
+  String get errTimeoutTitle => 'Timeout';
+
+  @override
+  String get errTimeoutBody => 'İstek zaman aşımına uğradı. Lütfen tekrar deneyin.';
+
+  @override
+  String get errAlreadyExistsTitle => 'Zaten Var';
+
+  @override
+  String get errAlreadyExistsBody => 'Aynı kayıttan zaten mevcut.';
+
+  @override
+  String get errInvalidTitle => 'Geçersiz Girdi';
+
+  @override
+  String get errInvalidBody => 'Gönderilen veriler geçersiz görünüyor.';
+
+  @override
+  String get errPrecondTitle => 'Ön Koşul Sağlanamadı';
+
+  @override
+  String get errPrecondBody => 'Bu işlem için gerekli koşullar sağlanamadı.';
+
+  @override
+  String get errAbortedTitle => 'İşlem Durduruldu';
+
+  @override
+  String get errAbortedBody => 'İşlem tamamlanmadan durduruldu.';
+
+  @override
+  String get errCancelledTitle => 'İptal Edildi';
+
+  @override
+  String get errCancelledBody => 'İşlem iptal edildi.';
+
+  @override
+  String get errInternalTitle => 'Sunucu Hatası';
+
+  @override
+  String get errInternalBody => 'Beklenmeyen bir sunucu hatası oluştu.';
+
+  @override
+  String get errDataLossTitle => 'Veri Kaybı';
+
+  @override
+  String get errDataLossBody => 'İşlem sırasında veri kaybı meydana geldi.';
+
+  @override
+  String get errOutOfRangeTitle => 'Aralık Dışı';
+
+  @override
+  String get errOutOfRangeBody => 'Değer izin verilen aralığın dışında.';
+
+  @override
+  String get errUnimplementedTitle => 'Desteklenmiyor';
+
+  @override
+  String get errUnimplementedBody => 'Bu özellik henüz desteklenmiyor.';
 }

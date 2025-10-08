@@ -58,7 +58,7 @@ class _LandingPageState extends State<LandingPage> {
     }
 
     // B) familyId yok → Aile kur/katıl "empty state"
-    if (familyId == null || familyId.isEmpty) {
+    if (famProv.familyId == null || familyId.isEmpty) {
       return _buildEmpty(context);
     }
 
@@ -83,10 +83,10 @@ class _LandingPageState extends State<LandingPage> {
               tooltip: t.signOut,
               icon: const Icon(Icons.logout, color: Colors.redAccent),
               onPressed: () async {
-                context.read<TaskCloudProvider>().teardown();
-                context.read<ItemCloudProvider>().teardown();
-                context.read<WeeklyCloudProvider>().teardown();
-                context.read<ExpenseCloudProvider>().teardown();
+                await context.read<TaskCloudProvider>().teardown();
+                await context.read<ItemCloudProvider>().teardown();
+                await context.read<WeeklyCloudProvider>().teardown();
+                await context.read<ExpenseCloudProvider>().teardown();
                 context.read<FamilyProvider>().clearActive();
 
                 await FirebaseAuth.instance.signOut();
@@ -106,7 +106,7 @@ class _LandingPageState extends State<LandingPage> {
             children: [
               // TAB 1
               StreamBuilder<List<FamilyMemberEntry>>(
-                key: ValueKey('${user?.uid}-${familyId}'),
+                key: ValueKey('${user?.uid}-$familyId'),
                 stream: famProv.watchMemberEntries(),
                 builder: (_, snap) {
                   if (snap.hasError) {

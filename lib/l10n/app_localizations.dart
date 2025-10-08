@@ -2232,6 +2232,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'An unexpected error occurred. Please try again.'**
   String get errUnknownBody;
+
+  /// No description provided for @errTimeoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeout'**
+  String get errTimeoutTitle;
+
+  /// No description provided for @errTimeoutBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The request timed out. Please try again.'**
+  String get errTimeoutBody;
+
+  /// No description provided for @errAlreadyExistsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Already Exists'**
+  String get errAlreadyExistsTitle;
+
+  /// No description provided for @errAlreadyExistsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'An identical record already exists.'**
+  String get errAlreadyExistsBody;
+
+  /// No description provided for @errInvalidTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid Input'**
+  String get errInvalidTitle;
+
+  /// No description provided for @errInvalidBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The data you sent appears to be invalid.'**
+  String get errInvalidBody;
+
+  /// No description provided for @errPrecondTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed Precondition'**
+  String get errPrecondTitle;
+
+  /// No description provided for @errPrecondBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Preconditions for this operation were not met.'**
+  String get errPrecondBody;
+
+  /// No description provided for @errAbortedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Operation Aborted'**
+  String get errAbortedTitle;
+
+  /// No description provided for @errAbortedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The operation was aborted.'**
+  String get errAbortedBody;
+
+  /// No description provided for @errCancelledTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get errCancelledTitle;
+
+  /// No description provided for @errCancelledBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The operation was cancelled.'**
+  String get errCancelledBody;
+
+  /// No description provided for @errInternalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Internal Error'**
+  String get errInternalTitle;
+
+  /// No description provided for @errInternalBody.
+  ///
+  /// In en, this message translates to:
+  /// **'An unexpected server error occurred.'**
+  String get errInternalBody;
+
+  /// No description provided for @errDataLossTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Data Loss'**
+  String get errDataLossTitle;
+
+  /// No description provided for @errDataLossBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Data loss occurred during the operation.'**
+  String get errDataLossBody;
+
+  /// No description provided for @errOutOfRangeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Out of Range'**
+  String get errOutOfRangeTitle;
+
+  /// No description provided for @errOutOfRangeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The value is out of the permitted range.'**
+  String get errOutOfRangeBody;
+
+  /// No description provided for @errUnimplementedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Not Supported'**
+  String get errUnimplementedTitle;
+
+  /// No description provided for @errUnimplementedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This feature is not supported yet.'**
+  String get errUnimplementedBody;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

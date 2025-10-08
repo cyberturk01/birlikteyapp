@@ -1195,4 +1195,64 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get errUnknownBody => 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.';
+
+  @override
+  String get errTimeoutTitle => 'Zeitüberschreitung';
+
+  @override
+  String get errTimeoutBody => 'Die Anfrage hat die Zeitüberschreitung erreicht. Bitte erneut versuchen.';
+
+  @override
+  String get errAlreadyExistsTitle => 'Bereits vorhanden';
+
+  @override
+  String get errAlreadyExistsBody => 'Ein identischer Eintrag ist bereits vorhanden.';
+
+  @override
+  String get errInvalidTitle => 'Ungültige Eingabe';
+
+  @override
+  String get errInvalidBody => 'Die gesendeten Daten scheinen ungültig zu sein.';
+
+  @override
+  String get errPrecondTitle => 'Vorbedingung nicht erfüllt';
+
+  @override
+  String get errPrecondBody => 'Die Voraussetzungen für diesen Vorgang wurden nicht erfüllt.';
+
+  @override
+  String get errAbortedTitle => 'Vorgang abgebrochen';
+
+  @override
+  String get errAbortedBody => 'Der Vorgang wurde abgebrochen.';
+
+  @override
+  String get errCancelledTitle => 'Abgebrochen';
+
+  @override
+  String get errCancelledBody => 'Der Vorgang wurde abgebrochen.';
+
+  @override
+  String get errInternalTitle => 'Interner Fehler';
+
+  @override
+  String get errInternalBody => 'Es ist ein unerwarteter Serverfehler aufgetreten.';
+
+  @override
+  String get errDataLossTitle => 'Datenverlust';
+
+  @override
+  String get errDataLossBody => 'Während des Vorgangs ist ein Datenverlust aufgetreten.';
+
+  @override
+  String get errOutOfRangeTitle => 'Außerhalb des Bereichs';
+
+  @override
+  String get errOutOfRangeBody => 'Der Wert liegt außerhalb des zulässigen Bereichs.';
+
+  @override
+  String get errUnimplementedTitle => 'Nicht unterstützt';
+
+  @override
+  String get errUnimplementedBody => 'Dieses Feature wird noch nicht unterstützt.';
 }

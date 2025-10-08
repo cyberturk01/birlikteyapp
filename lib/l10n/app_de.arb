@@ -432,6 +432,25 @@
   "errQuotaTitle": "Limit erreicht",
   "errQuotaBody": "Das Nutzungs- oder Kontingentlimit wurde erreicht. Bitte versuchen Sie es später erneut.",
   "errUnknownTitle": "Etwas ist schiefgelaufen",
-  "errUnknownBody": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
-
+  "errUnknownBody": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+  "errTimeoutTitle": "Zeitüberschreitung",
+  "errTimeoutBody": "Die Anfrage hat die Zeitüberschreitung erreicht. Bitte erneut versuchen.",
+  "errAlreadyExistsTitle": "Bereits vorhanden",
+  "errAlreadyExistsBody": "Ein identischer Eintrag ist bereits vorhanden.",
+  "errInvalidTitle": "Ungültige Eingabe",
+  "errInvalidBody": "Die gesendeten Daten scheinen ungültig zu sein.",
+  "errPrecondTitle": "Vorbedingung nicht erfüllt",
+  "errPrecondBody": "Die Voraussetzungen für diesen Vorgang wurden nicht erfüllt.",
+  "errAbortedTitle": "Vorgang abgebrochen",
+  "errAbortedBody": "Der Vorgang wurde abgebrochen.",
+  "errCancelledTitle": "Abgebrochen",
+  "errCancelledBody": "Der Vorgang wurde abgebrochen.",
+  "errInternalTitle": "Interner Fehler",
+  "errInternalBody": "Es ist ein unerwarteter Serverfehler aufgetreten.",
+  "errDataLossTitle": "Datenverlust",
+  "errDataLossBody": "Während des Vorgangs ist ein Datenverlust aufgetreten.",
+  "errOutOfRangeTitle": "Außerhalb des Bereichs",
+  "errOutOfRangeBody": "Der Wert liegt außerhalb des zulässigen Bereichs.",
+  "errUnimplementedTitle": "Nicht unterstützt",
+  "errUnimplementedBody": "Dieses Feature wird noch nicht unterstützt."
 }
