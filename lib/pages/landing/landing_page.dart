@@ -249,7 +249,7 @@ class _LandingPageState extends State<LandingPage> {
                         Center(
                           child: Image.asset(
                             'assets/images/family_welcome.png',
-                            height: 220, // çok büyük olmasın
+                            height: 180,
                             fit: BoxFit.contain,
                           ),
                         ),

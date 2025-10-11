@@ -1,10 +1,8 @@
 import 'dart:async';
 
-import 'package:birlikteyapp/models/weekly_task_cloud.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -14,10 +12,10 @@ import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
-import '../../providers/weekly_cloud_provider.dart';
 import '../../widgets/due_pill.dart';
 import '../../widgets/member_dropdown_uid.dart';
 import '../../widgets/task_edit_dialog.dart';
+import '../locations/location_card_ui.dart';
 import 'grouped_sheet.dart';
 
 enum SummaryDest { tasks, items, weekly, expenses }
@@ -33,11 +31,8 @@ class DashboardSummaryBar extends StatelessWidget {
     final tasks = context.watch<TaskCloudProvider>().tasks;
     final items = context.watch<ItemCloudProvider>().items;
 
-    // BUGÜN'e ait weekly sayısı
-    final String todayName = DateFormat('EEEE').format(DateTime.now());
-    final weeklyProv = Provider.of<WeeklyCloudProvider?>(context, listen: true);
-    final List<WeeklyTaskCloud> todaysWeekly =
-        weeklyProv?.tasksForDay(todayName) ?? const [];
+    final famProv = context.read<FamilyProvider>();
+    final famId = famProv.familyId ?? '';
 
     final expProv = context.watch<ExpenseCloudProvider>();
     final expensesWatch = expProv.all;
@@ -98,15 +93,7 @@ class DashboardSummaryBar extends StatelessWidget {
               onTap(SummaryDest.expenses);
             },
           ),
-          _SummaryCard(
-            icon: Icons.calendar_today,
-            title: t.weekly,
-            value: '${todaysWeekly.length}',
-            subtitle: todayName,
-            onTap: () {
-              onTap(SummaryDest.weekly);
-            },
-          ),
+          LocationCard(familyId: famId),
         ];
 
         return Column(

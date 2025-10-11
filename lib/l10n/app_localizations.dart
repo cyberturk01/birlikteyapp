@@ -130,7 +130,7 @@ abstract class AppLocalizations {
   /// No description provided for @weekly.
   ///
   /// In en, this message translates to:
-  /// **'Weekly'**
+  /// **'Weekly Plan'**
   String get weekly;
 
   /// No description provided for @members.
@@ -1554,6 +1554,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Off'**
   String get offLabel;
+
+  /// No description provided for @familyMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Family Map'**
+  String get familyMap;
+
+  /// No description provided for @shareLoc.
+  ///
+  /// In en, this message translates to:
+  /// **'Share Location'**
+  String get shareLoc;
 
   /// No description provided for @disableNotifications.
   ///

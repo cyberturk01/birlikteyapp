@@ -24,7 +24,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get expenses => 'Harcamalar';
 
   @override
-  String get weekly => 'Haftalık';
+  String get weekly => 'Haftalık Plan';
 
   @override
   String get members => 'Üyeler';
@@ -848,6 +848,12 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get offLabel => 'Kapalı';
+
+  @override
+  String get familyMap => 'Aile Haritası';
+
+  @override
+  String get shareLoc => 'Konum paylaş';
 
   @override
   String get disableNotifications => 'Bildirimleri kapat';

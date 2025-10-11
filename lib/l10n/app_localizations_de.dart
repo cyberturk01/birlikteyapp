@@ -24,7 +24,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get expenses => 'Ausgaben';
 
   @override
-  String get weekly => 'Wöchentlich';
+  String get weekly => 'Wochenplan';
 
   @override
   String get members => 'Mitglieder';
@@ -848,6 +848,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get offLabel => 'Aus';
+
+  @override
+  String get familyMap => 'Familienkarte';
+
+  @override
+  String get shareLoc => 'Standort teilen';
 
   @override
   String get disableNotifications => 'Benachrichtigungen deaktivieren';

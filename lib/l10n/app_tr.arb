@@ -5,7 +5,7 @@
   "tasks": "Görevler",
   "items": "Ürünler",
   "expenses": "Harcamalar",
-  "weekly": "Haftalık",
+  "weekly": "Haftalık Plan",
   "members": "Üyeler",
   "leaderboard": "Liderlik Tablosu",
   "signOut": "Çıkış yap",
@@ -110,6 +110,8 @@
   "itemBoughtToast": "🎉 Ürün alındı!",
   "addTaskFor": "{name} için görev ekle",
   "addItemFor": "{name} için ürün ekle",
+  "familyMap": "Aile Haritası",
+  "shareLoc": "Konum paylaş",
 
   "enterTasksHint": "Görevleri girin (virgül veya yeni satır)…",
   "tasksHelperExample": "Örnek: Çamaşır, Bulaşık, Çöpü çıkar",

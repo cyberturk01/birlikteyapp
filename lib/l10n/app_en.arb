@@ -5,7 +5,7 @@
   "tasks": "Tasks",
   "items": "Items",
   "expenses": "Expenses",
-  "weekly": "Weekly",
+  "weekly": "Weekly Plan",
   "members": "Members",
   "leaderboard": "Leaderboard",
   "signOut": "Sign out",
@@ -335,7 +335,8 @@
 
   "onLabel": "On",
   "offLabel": "Off",
-
+  "familyMap": "Family Map",
+  "shareLoc": "Share Location",
   "disableNotifications": "Disable notifications",
   "enableNotifications": "Enable notifications",
   "notificationsEnabled": "Notifications enabled",

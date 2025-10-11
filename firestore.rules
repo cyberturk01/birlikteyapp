@@ -151,6 +151,26 @@ service cloud.firestore {
           && (!('notifEnabled' in d) || isBool(d.notifEnabled));
       }
 
+      match /locations/{uid} {
+          // Aileyi görüntüleyebilen herkes okuyabilir
+          allow read: if isViewer(fid);
+
+          // Sadece oturum açan üye kendi konumunu yazabilir
+          allow write: if signedIn()
+                       && request.auth.uid == uid
+                       && isMember(fid);
+        }
+
+        match /location_prefs/{uid} {
+          allow read: if isViewer(fid); // isteyen herkes görebilsin (app içi)
+          allow create, update: if signedIn()
+                                && request.auth.uid == uid
+                                && isMember(fid)
+                                && (request.resource.data.keys().hasOnly(['share','updatedAt']))
+                                && (request.resource.data.share is bool);
+          allow delete: if false;
+        }
+
       match /expenses/{eid} {
               // herkes (viewer+) okuyabilsin
           allow read: if isViewer(fid);

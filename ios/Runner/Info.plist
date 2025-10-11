@@ -28,6 +28,20 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<key>io.flutter.embedded_views_preview</key><true/>
+    <key>GMSApiKey</key><string>YOUR_IOS_GOOGLE_MAPS_API_KEY</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>This app shows your family members' locations on a map.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>This app shows your family members' locations on a map.</string>
+    <!-- Arkaplan isteyeceksen:
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>We use your location to share with your family.</string>
+    <key>UIBackgroundModes</key>
+    <array>
+      <string>location</string>
+    </array>
+    -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

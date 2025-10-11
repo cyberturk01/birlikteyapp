@@ -106,6 +106,15 @@ class CloudErrorHandler {
     show(kind, asDialog: asDialog, context: context);
   }
 
+  static void showFromString(
+    String e, {
+    bool asDialog = false,
+    BuildContext? context,
+  }) {
+    final kind = mapExceptionToKind(e);
+    show(kind, asDialog: asDialog, context: context);
+  }
+
   /// Belirli hata türünü kullanıcı dostu mesajla göster
   static void show(
     CloudErrorKind kind, {

@@ -12,6 +12,7 @@ import 'package:birlikteyapp/pages/landing/landing_page.dart';
 import 'package:birlikteyapp/providers/expense_cloud_provider.dart';
 import 'package:birlikteyapp/providers/family_provider.dart';
 import 'package:birlikteyapp/providers/item_cloud_provider.dart';
+import 'package:birlikteyapp/providers/location_cloud_provider.dart';
 import 'package:birlikteyapp/providers/task_cloud_provider.dart';
 import 'package:birlikteyapp/providers/templates_provider.dart';
 import 'package:birlikteyapp/providers/ui_provider.dart';
@@ -143,6 +144,18 @@ class _RootState extends State<_Root> {
             ChangeNotifierProvider(create: (_) => ui..init()),
             Provider<ScoresRepo>(
               create: (_) => FirestoreScoresRepo(FirebaseFirestore.instance),
+            ),
+            ChangeNotifierProvider(
+              create: (_) => LocationCloudProvider(
+                FirebaseAuth.instance,
+                FirebaseFirestore.instance,
+              ),
+            ),
+            ChangeNotifierProvider(
+              create: (_) => LocationCloudProvider(
+                FirebaseAuth.instance,
+                FirebaseFirestore.instance,
+              ),
             ),
             Provider<AuthService>(create: (_) => AuthService()),
             Provider<TaskService>(create: (_) => TaskService()),

@@ -13,6 +13,7 @@ import '../../permissions/permissions.dart';
 import '../../providers/expense_cloud_provider.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/item_cloud_provider.dart';
+import '../../providers/location_cloud_provider.dart';
 import '../../providers/task_cloud_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../providers/weekly_cloud_provider.dart';
@@ -119,6 +120,16 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
+    items.add(
+      PopupMenuItem(
+        value: 'weekly',
+        child: ListTile(
+          leading: const Icon(Icons.calendar_today),
+          title: Text(t.weekly), // mevcut yerelleştirme anahtarın
+        ),
+      ),
+    );
+
     // Config (Bütçe vb.) → manageBudgets izni
     if (context.canManageBudgets) {
       items.add(
@@ -205,6 +216,7 @@ class _HomePageState extends State<HomePage> {
         await context.read<ItemCloudProvider>().setFamilyId(familyId);
         context.read<WeeklyCloudProvider>().setFamilyId(familyId);
         await context.read<ExpenseCloudProvider>().setFamilyId(familyId);
+        await context.read<LocationCloudProvider>().setFamilyId(familyId);
 
         try {
           await ensureMembership(familyId);
@@ -351,6 +363,12 @@ class _HomePageState extends State<HomePage> {
                         MaterialPageRoute(builder: (_) => const ManagePage()),
                       );
                       break;
+                    case 'weekly':
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const WeeklyPage()),
+                      );
+                      break;
                     case 'config':
                       await Navigator.push(
                         context,
@@ -367,6 +385,7 @@ class _HomePageState extends State<HomePage> {
                       await context.read<ItemCloudProvider>().teardown();
                       await context.read<WeeklyCloudProvider>().teardown();
                       await context.read<ExpenseCloudProvider>().teardown();
+                      await context.read<LocationCloudProvider>().teardown();
                       context.read<FamilyProvider>().clearActive();
 
                       await FirebaseAuth.instance.signOut();
@@ -530,7 +549,7 @@ class _HomePageState extends State<HomePage> {
                             },
                           ),
 
-                          if (!isShort) const SizedBox(height: 12),
+                          if (!isShort) const SizedBox(height: 24),
                         ],
                       );
                       return isShort
