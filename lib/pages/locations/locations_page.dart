@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -34,6 +33,12 @@ class _LocationsPageState extends State<LocationsPage> {
   void initState() {
     super.initState();
     _primeInitialCamera();
+
+    // Start/Stop butonunun doğru çalışması için provider'a familyId verelim
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<LocationCloudProvider>().setFamilyId(widget.familyId);
+    });
   }
 
   Future<void> _primeInitialCamera() async {
@@ -90,8 +95,6 @@ class _LocationsPageState extends State<LocationsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final dictStream = context.watch<FamilyProvider>().watchMemberDirectory();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Family Locations'),
@@ -109,79 +112,122 @@ class _LocationsPageState extends State<LocationsPage> {
             .snapshots(),
         builder: (ctx, snap) {
           final docs = snap.data?.docs ?? const [];
-          final markers = <Marker>{};
 
-          return StreamBuilder<Map<String, String>>(
-            stream: dictStream,
-            builder: (ctx2, dictSnap) {
-              final dict = dictSnap.data ?? const <String, String>{};
+          final entriesStream = context
+              .watch<FamilyProvider>()
+              .watchMemberEntries();
+          return StreamBuilder<List<FamilyMemberEntry>>(
+            stream: entriesStream,
+            builder: (ctx2, entriesSnap) {
+              final entries = entriesSnap.data ?? const <FamilyMemberEntry>[];
+              final byUid = {for (final e in entries) e.uid: e};
 
               LatLngBounds? bounds;
+              final markers = <Marker>{};
+
               for (final d in docs) {
                 final data = d.data();
-                final isSharing = data['isSharing'] as bool? ?? false;
-                final updated = (data['updatedAt'] as Timestamp?)?.toDate();
-                if (!isSharing && updated == null) continue;
+                final uid = (data['uid'] as String?) ?? d.id;
 
                 final lat = (data['lat'] as num?)?.toDouble();
                 final lng = (data['lng'] as num?)?.toDouble();
                 if (lat == null || lng == null) continue;
 
-                final uid = data['uid'] as String? ?? d.id;
                 final ts = (data['updatedAt'] as Timestamp?)?.toDate();
-                final title = dict[uid] ?? uid;
-                final subtitle = _lastSeen(ts);
+                final isOn = data['isSharing'] == true;
+
+                // “eski veri” eşiği – istersen 7 gün yerine 24 saat yap
+                final isFresh =
+                    ts != null &&
+                    DateTime.now().difference(ts) <= const Duration(days: 7);
+
+                // 🔴 eski ve paylaşım kapalı ise hiç gösterme
+                if (!isOn && !isFresh) continue;
+
+                final entry = byUid[uid];
+                final title = entry?.label ?? uid;
+                final photoUrl = entry?.photoUrl;
+
+                // Paylaşım kapalıysa gri; açıksa kullanıcı rengi
+                final pal = MarkerIconHelper.paletteFor(uid, dimmed: !isOn);
+                final accent = pal.accent; // yazı/avatar kenarı rengi
+                final bubble = pal.bubble; // balon arka plan rengi
+
+                if (lat == null || lng == null) continue;
+                if (!isFresh && ts == null) continue;
 
                 final pos = LatLng(lat, lng);
+                final cacheKey = '$uid|$photoUrl|$title|${accent.value}|$isOn';
+
+                final cached = _iconCache[cacheKey];
+                if (cached == null) {
+                  MarkerIconHelper.createProfileMarker(
+                    uid: uid,
+                    label: title,
+                    photoUrl: photoUrl,
+                    color: accent,
+                    bubbleBg: bubble,
+                    logicalWidth: 180,
+                    logicalHeight: 72,
+                    fontSize: 16,
+                  ).then((bmp) {
+                    if (!mounted) return;
+                    _iconCache[cacheKey] = bmp;
+                    setState(() {}); // ikon hazır → marker güncellensin
+                  });
+                }
+
                 markers.add(
                   Marker(
                     markerId: MarkerId(uid),
                     position: pos,
-                    icon: _iconCache[uid] ?? _defaultIcon,
-                    infoWindow: InfoWindow(title: title, snippet: subtitle),
+                    icon:
+                        cached ??
+                        _defaultIcon, // ilk turda default, sonra cache
+                    infoWindow: InfoWindow(
+                      title: title,
+                      snippet: ts == null
+                          ? 'last seen: unknown'
+                          : 'last seen: ${_lastSeen(ts)}${isOn ? ' (live)' : ''}',
+                    ),
                   ),
                 );
+
                 bounds = _extend(bounds, pos);
-                if (!_iconCache.containsKey(uid)) {
-                  _getIconFor(uid, title, Colors.green).then((_) {
-                    if (!mounted) return;
-                    setState(() {
-                      // rebuild → markers aynı loop’ta yeniden üretileceği için
-                      // _iconCache sayesinde bu sefer custom icon gelecektir.
-                    });
-                  });
-                }
               }
 
               _fitOnce(bounds, markers.length);
-
-              if (markers.isEmpty) {
-                _goToUserIfNoMarkers();
-              }
-
               return Stack(
                 children: [
-                  FloatingActionButton(
-                    child: const Icon(Icons.my_location),
-                    onPressed: () async {
-                      try {
-                        final p = await Geolocator.getCurrentPosition(
-                          locationSettings: const LocationSettings(
-                            accuracy: LocationAccuracy.high,
+                  GoogleMap(
+                    initialCameraPosition: _initialCam,
+                    markers: markers,
+                    myLocationEnabled: true,
+                    zoomControlsEnabled: true,
+                    padding: const EdgeInsets.only(
+                      top: 96,
+                    ), // üstteki buton için boşluk
+                    onMapCreated: (c) async {
+                      if (!_controller.isCompleted) _controller.complete(c);
+                      await Future.delayed(const Duration(milliseconds: 60));
+                      await _fitOnce(bounds, markers.length);
+
+                      if (markers.length == 1) {
+                        final p = markers.first.position;
+                        (await _controller.future).animateCamera(
+                          CameraUpdate.newCameraPosition(
+                            CameraPosition(target: p, zoom: 16),
                           ),
                         );
-                        final c = await _controller.future;
-                        await c.animateCamera(
-                          CameraUpdate.newLatLngZoom(
-                            LatLng(p.latitude, p.longitude),
-                            13,
-                          ),
-                        );
-                      } catch (_) {}
+                      }
+                      if (markers.isEmpty) {
+                        await _goToUserIfNoMarkers();
+                      }
                     },
                   ),
+                  // ✅ Üye çipleri (butonun altında)
                   Positioned(
-                    top: 72, // Start/Stop butonunun altına
+                    top: 72,
                     left: 0,
                     right: 0,
                     child: SafeArea(
@@ -192,38 +238,70 @@ class _LocationsPageState extends State<LocationsPage> {
                           children: docs.map((d) {
                             final data = d.data();
                             final uid = data['uid'] ?? d.id;
-                            final title = dict[uid] ?? uid;
+                            final title = byUid[uid]?.label ?? uid;
                             final ts = (data['updatedAt'] as Timestamp?)
                                 ?.toDate();
-                            final lastSeen = ts == null
-                                ? 'never'
-                                : _fmtLast(ts);
                             final isOn = data['isSharing'] == true;
-                            final color = isOn
-                                ? Colors.green.shade600
-                                : Colors.grey.shade500;
 
+                            final pal = MarkerIconHelper.paletteFor(
+                              uid,
+                              dimmed: !isOn,
+                            );
+                            final chipColor = pal.accent;
+                            final bg = pal.bubble;
+
+                            final last = ts == null ? 'never' : _fmtLast(ts);
+
+                            // Üye çipleri (butonun altında) — chip builder içinde:
                             return Padding(
                               padding: const EdgeInsets.only(right: 6),
-                              child: Chip(
-                                backgroundColor: color.withOpacity(0.15),
-                                avatar: CircleAvatar(
-                                  backgroundColor: color,
-                                  child: Text(
-                                    title.isNotEmpty
-                                        ? title[0].toUpperCase()
-                                        : '?',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () async {
+                                  // 1) Koordinatları al
+                                  final lat = (data['lat'] as num?)?.toDouble();
+                                  final lng = (data['lng'] as num?)?.toDouble();
+                                  if (lat == null || lng == null) return;
+
+                                  final target = LatLng(lat, lng);
+
+                                  // 2) Kamera animasyonu
+                                  final c = await _controller.future;
+                                  await c.animateCamera(
+                                    CameraUpdate.newCameraPosition(
+                                      CameraPosition(target: target, zoom: 16),
+                                    ),
+                                  );
+
+                                  // 3) Marker infoWindow’u aç (plugin destekliyorsa)
+                                  // GoogleMapController.showMarkerInfoWindow(MarkerId) mevcutsa çalışır.
+                                  Future.delayed(
+                                    const Duration(milliseconds: 150),
+                                    () {
+                                      c.showMarkerInfoWindow(MarkerId(uid));
+                                    },
+                                  );
+                                },
+                                child: Chip(
+                                  backgroundColor: bg,
+                                  avatar: CircleAvatar(
+                                    backgroundColor: chipColor,
+                                    child: Text(
+                                      title.isNotEmpty
+                                          ? title[0].toUpperCase()
+                                          : '?',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                label: Text(
-                                  '$title • $lastSeen',
-                                  style: TextStyle(
-                                    color: color,
-                                    fontWeight: FontWeight.w500,
+                                  label: Text(
+                                    '$title • $last',
+                                    style: TextStyle(
+                                      color: chipColor,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -233,59 +311,7 @@ class _LocationsPageState extends State<LocationsPage> {
                       ),
                     ),
                   ),
-                  GoogleMap(
-                    initialCameraPosition: _initialCam,
-                    markers: markers,
-                    zoomControlsEnabled: true, // +/-
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: true,
-                    compassEnabled: true,
-                    padding: const EdgeInsets.only(top: 96),
-                    onMapCreated: (c) async {
-                      if (!_controller.isCompleted) _controller.complete(c);
-                      await Future.delayed(
-                        const Duration(milliseconds: 60),
-                      ); // harita hazır olsun
-                      await _fitOnce(bounds, markers.length);
-                      if (markers.length == 1) {
-                        final p = markers.first.position;
-                        (await _controller.future).animateCamera(
-                          CameraUpdate.newCameraPosition(
-                            CameraPosition(target: p, zoom: 13),
-                          ),
-                        );
-                        return;
-                      } else if (markers.length > 1) {
-                        LatLngBounds? b;
-                        for (final m in markers) {
-                          b = _extend(b, m.position);
-                        }
-                        if (b != null) {
-                          (await _controller.future).animateCamera(
-                            CameraUpdate.newLatLngBounds(
-                              b,
-                              100,
-                            ), // geniş padding
-                          );
-                          return;
-                        }
-                      }
-
-                      try {
-                        final last = await Geolocator.getLastKnownPosition();
-                        if (last != null) {
-                          final me = LatLng(last.latitude, last.longitude);
-                          (await _controller.future).animateCamera(
-                            CameraUpdate.newCameraPosition(
-                              CameraPosition(target: me, zoom: 16),
-                            ),
-                          );
-                        }
-                      } catch (_) {
-                        // izin yoksa/fail olursa fallback zaten Germany
-                      }
-                    },
-                  ),
+                  // 🔴 Start/Stop düğmesi
                   Positioned(
                     top: 16,
                     left: 16,
@@ -325,10 +351,10 @@ class _LocationsPageState extends State<LocationsPage> {
                                       .startSharing();
                                 }
                               } catch (e) {
-                                final msg = e is StateError
-                                    ? (e.message ?? '$e')
-                                    : '$e';
                                 if (context.mounted) {
+                                  final msg = e is StateError
+                                      ? (e.message ?? '$e')
+                                      : '$e';
                                   ScaffoldMessenger.of(
                                     context,
                                   ).showSnackBar(SnackBar(content: Text(msg)));
@@ -378,26 +404,6 @@ class _LocationsPageState extends State<LocationsPage> {
       b.northeast.longitude > p.longitude ? b.northeast.longitude : p.longitude,
     );
     return LatLngBounds(southwest: sw, northeast: ne);
-  }
-
-  Future<BitmapDescriptor> _getIconFor(
-    String uid,
-    String title,
-    Color color,
-  ) async {
-    if (_iconCache.containsKey(uid)) return _iconCache[uid]!;
-    final me = FirebaseAuth.instance.currentUser?.uid;
-    final color = uid == me ? Colors.deepPurple : Colors.green;
-    final icon = await MarkerIconHelper.createCustomMarker(
-      context,
-      title, // chip’te gördüğün label
-      color: color,
-      logicalWidth: 180, // daha da büyük istersen artır
-      logicalHeight: 72,
-      fontSize: 20,
-    );
-    _iconCache[uid] = icon;
-    return icon;
   }
 
   String _lastSeen(DateTime? t) {

@@ -36,6 +36,15 @@ service cloud.firestore {
     function isMember(fid) { return hasRole(fid, ['owner','editor','member']); }
     function isViewer(fid) { return hasRole(fid, ['owner','editor','member','viewer']); }
 
+    function hasOnlyKeys(d, keys) {
+      return d.keys().hasOnly(keys);
+    }
+    function isTimestampOrServer(d) {
+      // serverTimestamp doğrulaması rules tarafında tam yapılamaz,
+      // ama tip kaçaklarını önlemek için Timestamp kabul ediyoruz.
+      return d is timestamp;
+    }
+
     // tiny helpers
     function isString(x) { return x is string; }
     function isBool(x)   { return x is bool; }
@@ -152,23 +161,51 @@ service cloud.firestore {
       }
 
       match /locations/{uid} {
-          // Aileyi görüntüleyebilen herkes okuyabilir
           allow read: if isViewer(fid);
 
-          // Sadece oturum açan üye kendi konumunu yazabilir
-          allow write: if signedIn()
-                       && request.auth.uid == uid
-                       && isMember(fid);
+            function validLocCommon(d) {
+              return hasOnlyKeys(d, ['uid','lat','lng','accuracy','speed','heading','updatedAt','isSharing','source']) &&
+                     d.uid == request.auth.uid &&
+                     (d.lat is number) && (d.lng is number) &&
+                     // Lat/Lng aralığı
+                     (d.lat >= -90 && d.lat <= 90) &&
+                     (d.lng >= -180 && d.lng <= 180) &&
+                     // Opsiyoneller doğru tipte mi
+                     (!('accuracy' in d) || (d.accuracy is number && d.accuracy >= 0)) &&
+                     (!('speed'    in d) || (d.speed is number)) &&
+                     (!('heading'  in d) || (d.heading is number && d.heading >= 0 && d.heading <= 360)) &&
+                     (!('isSharing' in d) || (d.isSharing is bool)) &&
+                     (!('source' in d) || (d.source is string)) &&
+                     // Zaman damgası tip kontrolü
+                     ('updatedAt' in d) && isTimestampOrServer(d.updatedAt);
+            }
+
+            // CREATE: ilk yazı
+            allow create: if signedIn()
+                           && request.auth.uid == uid
+                           && isMember(fid)
+                           && validLocCommon(request.resource.data);
+
+            // UPDATE: sadece kendi konumunu ve yalnızca izin verilen alan setiyle
+            allow update: if signedIn()
+                           && request.auth.uid == uid
+                           && isMember(fid)
+                           && validLocCommon(request.resource.data);
+
+            // DELETE: istersen kapalı tut
+            allow delete: if false;
         }
 
         match /location_prefs/{uid} {
-          allow read: if isViewer(fid); // isteyen herkes görebilsin (app içi)
-          allow create, update: if signedIn()
-                                && request.auth.uid == uid
-                                && isMember(fid)
-                                && (request.resource.data.keys().hasOnly(['share','updatedAt']))
-                                && (request.resource.data.share is bool);
-          allow delete: if false;
+          allow read: if isViewer(fid);
+            allow create, update: if signedIn()
+                                  && request.auth.uid == uid
+                                  && isMember(fid)
+                                  && hasOnlyKeys(request.resource.data, ['share','updatedAt'])
+                                  && (request.resource.data.share is bool)
+                                  && (!('updatedAt' in request.resource.data)
+                                      || isTimestampOrServer(request.resource.data.updatedAt));
+            allow delete: if false;
         }
 
       match /expenses/{eid} {

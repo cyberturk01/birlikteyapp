@@ -209,11 +209,13 @@ class MemberTile extends StatelessWidget {
               }
 
               if (v == 'photo') {
+                Navigator.pop(context); // önce sheet’i kapat
+                await Future.delayed(const Duration(milliseconds: 300));
+
                 final picker = ImagePicker();
                 final x = await picker.pickImage(
                   source: ImageSource.gallery,
                   imageQuality: 85,
-                  maxWidth: 1024,
                 );
                 if (x == null) return;
 
@@ -234,10 +236,7 @@ class MemberTile extends StatelessWidget {
                       SnackBar(content: Text(t.photoUpdateFailed('$e'))),
                     );
                   }
-                } finally {
-                  if (context.mounted) Navigator.pop(context);
                 }
-                return;
               }
 
               if (v == 'removePhoto') {
