@@ -1270,4 +1270,133 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errUnimplementedBody => 'This feature is not supported yet.';
+
+  @override
+  String get locSharingStarted => 'Live location sharing started.';
+
+  @override
+  String get locSharingStopped => 'Live location sharing stopped.';
+
+  @override
+  String get locLiveOn => 'Live location is ON';
+
+  @override
+  String get locPermNeeded => 'Location permission is required.';
+
+  @override
+  String get locServiceOffTitle => 'Location is off';
+
+  @override
+  String get locServiceOffBody => 'Location services seem to be turned off. Would you like to open settings?';
+
+  @override
+  String get locPermTitle => 'Permission needed';
+
+  @override
+  String get locPermBody => 'You need to enable location permission for the app in Settings.';
+
+  @override
+  String get actionOpen => 'Open';
+
+  @override
+  String get actionOpenSettings => 'Open Settings';
+
+  @override
+  String get actionCancel => 'Cancel';
+
+  @override
+  String get actionEnable => 'Enable';
+
+  @override
+  String get errUnknown => 'Something went wrong.';
+
+  @override
+  String get permissionDeniedForever => 'Permission denied forever';
+
+  @override
+  String get familyNotSelected => 'Family is not selected.';
+
+  @override
+  String get noSession => 'No session';
+
+  @override
+  String get bannerLiveOn => 'Live location is ON.';
+
+  @override
+  String get bannerPermNeededBody => 'Location permission is required to share your live location.';
+
+  @override
+  String get bannerAutoOffBody => 'Live sharing seems to be off (no updates for a while). Turn it back on?';
+
+  @override
+  String get bannerStaleBody => 'Your last location is old. Share once to refresh.';
+
+  @override
+  String get actionDismiss => 'Dismiss';
+
+  @override
+  String get actionTurnOn => 'Turn On';
+
+  @override
+  String get actionStop => 'Stop';
+
+  @override
+  String get actionShareNow => 'Share now';
+
+  @override
+  String get bannerStoppedBody => 'Live sharing is turned off.';
+
+  @override
+  String get lastSeenUnknown => 'last seen: unknown';
+
+  @override
+  String get lastSeenJustNow => 'last seen: just now';
+
+  @override
+  String lastSeenMinutes(Object mins) {
+    return 'last seen: $mins min ago';
+  }
+
+  @override
+  String lastSeenHours(Object hours) {
+    return 'last seen: $hours h ago';
+  }
+
+  @override
+  String lastSeenDays(Object days) {
+    return 'last seen: $days d ago';
+  }
+
+  @override
+  String get chipAgoNow => 'just now';
+
+  @override
+  String chipAgoMinutes(Object mins) {
+    return '${mins}m ago';
+  }
+
+  @override
+  String chipAgoHours(Object hours) {
+    return '${hours}h ago';
+  }
+
+  @override
+  String chipAgoDays(Object days) {
+    return '${days}d ago';
+  }
+
+  @override
+  String get chipNever => 'never';
+
+  @override
+  String get menuMapTab => 'Family Locations';
+
+  @override
+  String get actionFitAll => 'Fit all';
+
+  @override
+  String get actionStartSharing => 'Start Sharing';
+
+  @override
+  String get actionStopSharing => 'Stop Sharing';
 }

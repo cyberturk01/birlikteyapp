@@ -2382,6 +2382,240 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This feature is not supported yet.'**
   String get errUnimplementedBody;
+
+  /// No description provided for @locSharingStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Live location sharing started.'**
+  String get locSharingStarted;
+
+  /// No description provided for @locSharingStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Live location sharing stopped.'**
+  String get locSharingStopped;
+
+  /// No description provided for @locLiveOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Live location is ON'**
+  String get locLiveOn;
+
+  /// No description provided for @locPermNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission is required.'**
+  String get locPermNeeded;
+
+  /// No description provided for @locServiceOffTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Location is off'**
+  String get locServiceOffTitle;
+
+  /// No description provided for @locServiceOffBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Location services seem to be turned off. Would you like to open settings?'**
+  String get locServiceOffBody;
+
+  /// No description provided for @locPermTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission needed'**
+  String get locPermTitle;
+
+  /// No description provided for @locPermBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You need to enable location permission for the app in Settings.'**
+  String get locPermBody;
+
+  /// No description provided for @actionOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get actionOpen;
+
+  /// No description provided for @actionOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Settings'**
+  String get actionOpenSettings;
+
+  /// No description provided for @actionCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get actionCancel;
+
+  /// No description provided for @actionEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get actionEnable;
+
+  /// No description provided for @errUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong.'**
+  String get errUnknown;
+
+  /// No description provided for @permissionDeniedForever.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission denied forever'**
+  String get permissionDeniedForever;
+
+  /// No description provided for @familyNotSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Family is not selected.'**
+  String get familyNotSelected;
+
+  /// No description provided for @noSession.
+  ///
+  /// In en, this message translates to:
+  /// **'No session'**
+  String get noSession;
+
+  /// No description provided for @bannerLiveOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Live location is ON.'**
+  String get bannerLiveOn;
+
+  /// No description provided for @bannerPermNeededBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission is required to share your live location.'**
+  String get bannerPermNeededBody;
+
+  /// No description provided for @bannerAutoOffBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Live sharing seems to be off (no updates for a while). Turn it back on?'**
+  String get bannerAutoOffBody;
+
+  /// No description provided for @bannerStaleBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your last location is old. Share once to refresh.'**
+  String get bannerStaleBody;
+
+  /// No description provided for @actionDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get actionDismiss;
+
+  /// No description provided for @actionTurnOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn On'**
+  String get actionTurnOn;
+
+  /// No description provided for @actionStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get actionStop;
+
+  /// No description provided for @actionShareNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Share now'**
+  String get actionShareNow;
+
+  /// No description provided for @bannerStoppedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Live sharing is turned off.'**
+  String get bannerStoppedBody;
+
+  /// No description provided for @lastSeenUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'last seen: unknown'**
+  String get lastSeenUnknown;
+
+  /// No description provided for @lastSeenJustNow.
+  ///
+  /// In en, this message translates to:
+  /// **'last seen: just now'**
+  String get lastSeenJustNow;
+
+  /// No description provided for @lastSeenMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'last seen: {mins} min ago'**
+  String lastSeenMinutes(Object mins);
+
+  /// No description provided for @lastSeenHours.
+  ///
+  /// In en, this message translates to:
+  /// **'last seen: {hours} h ago'**
+  String lastSeenHours(Object hours);
+
+  /// No description provided for @lastSeenDays.
+  ///
+  /// In en, this message translates to:
+  /// **'last seen: {days} d ago'**
+  String lastSeenDays(Object days);
+
+  /// No description provided for @chipAgoNow.
+  ///
+  /// In en, this message translates to:
+  /// **'just now'**
+  String get chipAgoNow;
+
+  /// No description provided for @chipAgoMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{mins}m ago'**
+  String chipAgoMinutes(Object mins);
+
+  /// No description provided for @chipAgoHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours}h ago'**
+  String chipAgoHours(Object hours);
+
+  /// No description provided for @chipAgoDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{days}d ago'**
+  String chipAgoDays(Object days);
+
+  /// No description provided for @chipNever.
+  ///
+  /// In en, this message translates to:
+  /// **'never'**
+  String get chipNever;
+
+  /// No description provided for @menuMapTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Family Locations'**
+  String get menuMapTab;
+
+  /// No description provided for @actionFitAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit all'**
+  String get actionFitAll;
+
+  /// No description provided for @actionStartSharing.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Sharing'**
+  String get actionStartSharing;
+
+  /// No description provided for @actionStopSharing.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop Sharing'**
+  String get actionStopSharing;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

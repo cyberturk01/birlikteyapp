@@ -1,4 +1,5 @@
 // lib/utils/marker_icon.dart
+import 'dart:collection';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -6,7 +7,90 @@ import 'package:flutter/services.dart' show NetworkAssetBundle;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class MarkerIconHelper {
-  static final Map<String, BitmapDescriptor> _cache = {};
+  static const int _maxEntries = 64;
+
+  // Erişimde sona taşımak için LinkedHashMap
+  static final LinkedHashMap<String, BitmapDescriptor> _cache =
+      LinkedHashMap<String, BitmapDescriptor>();
+  static final Map<String, Future<BitmapDescriptor>> _pending = {};
+
+  static String _key({
+    required String uid,
+    required String label,
+    String? photoUrl,
+    required Color color,
+    required Color bubbleBg,
+    required double logicalWidth,
+    required double logicalHeight,
+    required double fontSize,
+  }) {
+    return '$uid|${photoUrl ?? ""}|$label|${color.value}|${bubbleBg.value}|$logicalWidth|$logicalHeight|$fontSize';
+  }
+
+  static Future<BitmapDescriptor> getOrCreate({
+    required String uid,
+    required String label,
+    String? photoUrl,
+    Color color = Colors.blue,
+    Color bubbleBg = Colors.white,
+    double logicalWidth = 200,
+    double logicalHeight = 90,
+    double fontSize = 16,
+  }) {
+    final key = _key(
+      uid: uid,
+      label: label,
+      photoUrl: photoUrl,
+      color: color,
+      bubbleBg: bubbleBg,
+      logicalWidth: logicalWidth,
+      logicalHeight: logicalHeight,
+      fontSize: fontSize,
+    );
+
+    // LRU: hit → sona taşı
+    final hit = _cache.remove(key);
+    if (hit != null) {
+      _cache[key] = hit;
+      return Future.value(hit);
+    }
+
+    final pend = _pending[key];
+    if (pend != null) return pend;
+
+    final fut =
+        createProfileMarker(
+              uid: uid,
+              label: label,
+              photoUrl: photoUrl,
+              color: color,
+              bubbleBg: bubbleBg,
+              logicalWidth: logicalWidth,
+              logicalHeight: logicalHeight,
+              fontSize: fontSize,
+            )
+            .then((bmp) {
+              _insertLru(key, bmp);
+              _pending.remove(key);
+              return bmp;
+            })
+            .catchError((e) {
+              _pending.remove(key);
+              throw e;
+            });
+
+    _pending[key] = fut;
+    return fut;
+  }
+
+  static void _insertLru(String key, BitmapDescriptor bmp) {
+    _cache[key] = bmp;
+    if (_cache.length > _maxEntries) {
+      // ilk eklenen (en az kullanılan) → remove
+      final firstKey = _cache.keys.first;
+      _cache.remove(firstKey);
+    }
+  }
 
   static Future<BitmapDescriptor> createProfileMarker({
     required String uid,
@@ -18,24 +102,33 @@ class MarkerIconHelper {
     double logicalHeight = 90,
     double fontSize = 16,
   }) async {
-    final key =
-        '$uid|$photoUrl|$label|${color.value}|${bubbleBg.value}|$logicalWidth|$logicalHeight|$fontSize';
-    if (_cache.containsKey(key)) return _cache[key]!;
+    final key = _key(
+      uid: uid,
+      label: label,
+      photoUrl: photoUrl,
+      color: color,
+      bubbleBg: bubbleBg,
+      logicalWidth: logicalWidth,
+      logicalHeight: logicalHeight,
+      fontSize: fontSize,
+    );
+    final cached = _cache.remove(key);
+    if (cached != null) {
+      // LRU: hit → sona taşı
+      _cache[key] = cached;
+      return cached;
+    }
 
-    // 🔧 EKRAN DPI
     final dpr = ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
 
-    // Canvas’ı DPR ile ölçekle (logical px yaz, gerçek px üret)
     final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    canvas.scale(dpr);
+    final canvas = Canvas(recorder)..scale(dpr);
 
     final paint = Paint()..isAntiAlias = true;
     final w = logicalWidth;
     final h = logicalHeight;
     const avatarSize = 48.0;
 
-    // Arka plan
     final bgRect = RRect.fromRectAndRadius(
       Rect.fromLTWH(0, 0, w, h - 10),
       const Radius.circular(16),
@@ -43,7 +136,6 @@ class MarkerIconHelper {
     paint.color = bubbleBg;
     canvas.drawRRect(bgRect, paint);
 
-    // Kuyruk
     final tip = Path()
       ..moveTo(w / 2 - 8, h - 10)
       ..lineTo(w / 2 + 8, h - 10)
@@ -51,16 +143,15 @@ class MarkerIconHelper {
       ..close();
     canvas.drawPath(tip, paint);
 
-    // Avatar çerçevesi
     final avatarRect = const Rect.fromLTWH(8, 8, avatarSize, avatarSize);
     paint.color = color;
     canvas.drawCircle(avatarRect.center, avatarSize / 2, paint);
 
-    // Fotoğraf varsa dene
     if (photoUrl != null && photoUrl.isNotEmpty) {
       try {
-        final bundle = NetworkAssetBundle(Uri.parse(photoUrl));
-        final bytes = await bundle.load("");
+        final uri = Uri.parse(photoUrl);
+        final bundle = NetworkAssetBundle(uri);
+        final bytes = await bundle.load(uri.toString());
         final img = await decodeImageFromList(bytes.buffer.asUint8List());
         final clip = Path()..addOval(avatarRect);
         canvas.save();
@@ -74,14 +165,12 @@ class MarkerIconHelper {
         canvas.drawImageRect(img, src, avatarRect, Paint());
         canvas.restore();
       } catch (_) {
-        // foto yüklenmezse baş harfe düş
         _drawInitial(canvas, avatarRect, label);
       }
     } else {
       _drawInitial(canvas, avatarRect, label);
     }
 
-    // İsim
     final name = TextPainter(
       textDirection: TextDirection.ltr,
       text: TextSpan(
@@ -99,12 +188,11 @@ class MarkerIconHelper {
     );
 
     final picture = recorder.endRecording();
-
-    // 🔧 Gerçek px’e çevirirken DPR ile çarp
     final image = await picture.toImage((w * dpr).toInt(), (h * dpr).toInt());
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     final bmp = BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
-    _cache[key] = bmp;
+
+    _insertLru(key, bmp);
     return bmp;
   }
 

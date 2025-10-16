@@ -160,40 +160,57 @@ service cloud.firestore {
           && (!('notifEnabled' in d) || isBool(d.notifEnabled));
       }
 
-      match /locations/{uid} {
+      match /locations_history/{docId} {
           allow read: if isViewer(fid);
 
-            function validLocCommon(d) {
-              return hasOnlyKeys(d, ['uid','lat','lng','accuracy','speed','heading','updatedAt','isSharing','source']) &&
-                     d.uid == request.auth.uid &&
-                     (d.lat is number) && (d.lng is number) &&
-                     // Lat/Lng aralığı
-                     (d.lat >= -90 && d.lat <= 90) &&
-                     (d.lng >= -180 && d.lng <= 180) &&
-                     // Opsiyoneller doğru tipte mi
-                     (!('accuracy' in d) || (d.accuracy is number && d.accuracy >= 0)) &&
-                     (!('speed'    in d) || (d.speed is number)) &&
-                     (!('heading'  in d) || (d.heading is number && d.heading >= 0 && d.heading <= 360)) &&
-                     (!('isSharing' in d) || (d.isSharing is bool)) &&
-                     (!('source' in d) || (d.source is string)) &&
-                     // Zaman damgası tip kontrolü
-                     ('updatedAt' in d) && isTimestampOrServer(d.updatedAt);
-            }
+          allow create: if signedIn()
+                        && isMember(fid)
+                        && request.resource.data.uid == request.auth.uid
+                        && request.resource.data.keys().hasOnly(
+                             ['uid','lat','lng','accuracy','createdAt','expireAt']
+                           )
+                        // tip & aralık doğrulamaları
+                        && (request.resource.data.lat is number)
+                        && (request.resource.data.lng is number)
+                        && (request.resource.data.lat >= -90 && request.resource.data.lat <= 90)
+                        && (request.resource.data.lng >= -180 && request.resource.data.lng <= 180)
+                        && (!('accuracy' in request.resource.data) || (request.resource.data.accuracy is number && request.resource.data.accuracy >= 0))
+                        // timestamp alanları (serverTimestamp direkt doğrulanamaz; tip kontrolü yeterli)
+                        && (!('createdAt' in request.resource.data) || request.resource.data.createdAt is timestamp)
+                        && (!('expireAt'  in request.resource.data) || request.resource.data.expireAt  is timestamp);
 
-            // CREATE: ilk yazı
-            allow create: if signedIn()
-                           && request.auth.uid == uid
-                           && isMember(fid)
-                           && validLocCommon(request.resource.data);
+          allow update, delete: if false;
+        }
 
-            // UPDATE: sadece kendi konumunu ve yalnızca izin verilen alan setiyle
-            allow update: if signedIn()
-                           && request.auth.uid == uid
-                           && isMember(fid)
-                           && validLocCommon(request.resource.data);
+        match /locations/{uid} {
+          allow read: if isViewer(fid);
 
-            // DELETE: istersen kapalı tut
-            allow delete: if false;
+          function validLocCommon(d) {
+            return hasOnlyKeys(d, ['uid','lat','lng','accuracy','speed','heading','updatedAt','isSharing','source']) &&
+                   d.uid == request.auth.uid &&
+                   (d.lat is number) && (d.lng is number) &&
+                   (d.lat >= -90 && d.lat <= 90) &&
+                   (d.lng >= -180 && d.lng <= 180) &&
+                   (!('accuracy' in d) || (d.accuracy is number && d.accuracy >= 0)) &&
+                   (!('speed'    in d) || (d.speed is number)) &&
+                   (!('heading'  in d) || (d.heading is number && d.heading >= 0 && d.heading <= 360)) &&
+                   (!('isSharing' in d) || (d.isSharing is bool)) &&
+                   (!('source' in d) || (d.source is string)) &&
+                   // updatedAt: opsiyonel, varsa timestamp
+                   (!('updatedAt' in d) || (d.updatedAt is timestamp));
+          }
+
+          allow create: if signedIn()
+                         && request.auth.uid == uid
+                         && isMember(fid)
+                         && validLocCommon(request.resource.data);
+
+          allow update: if signedIn()
+                         && request.auth.uid == uid
+                         && isMember(fid)
+                         && validLocCommon(request.resource.data);
+
+          allow delete: if false;
         }
 
         match /location_prefs/{uid} {

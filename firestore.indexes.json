@@ -1,35 +1,65 @@
 {
   "indexes": [
-    {
-      "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
+    { "collectionGroup": "tasks", "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "name", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {"fieldPath": "name", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
       ]
     },
-    {
-      "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
+    { "collectionGroup": "tasks", "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "completed", "order": "ASCENDING" },
-        { "fieldPath": "assignedToUid", "order": "ASCENDING" }
+        {"fieldPath": "completed", "order": "ASCENDING"},
+        {"fieldPath": "assignedToUid", "order": "ASCENDING"}
       ]
     },
-    {
-      "collectionGroup": "items",
-      "queryScope": "COLLECTION",
+    { "collectionGroup": "tasks", "queryScope": "COLLECTION_GROUP",
       "fields": [
-        { "fieldPath": "name", "order": "ASCENDING" },
-        { "fieldPath": "assignedToUid", "order": "ASCENDING" }
+        {"fieldPath": "name", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
       ]
     },
-    {
-      "collectionGroup": "items",
-      "queryScope": "COLLECTION",
+    { "collectionGroup": "tasks", "queryScope": "COLLECTION_GROUP",
       "fields": [
-        { "fieldPath": "bought", "order": "ASCENDING" },
-        { "fieldPath": "assignedToUid", "order": "ASCENDING" }
+        {"fieldPath": "completed", "order": "ASCENDING"},
+        {"fieldPath": "assignedToUid", "order": "ASCENDING"}
+      ]
+    },
+
+    { "collectionGroup": "items", "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "name", "order": "ASCENDING"},
+        {"fieldPath": "assignedToUid", "order": "ASCENDING"}
+      ]
+    },
+    { "collectionGroup": "items", "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "bought", "order": "ASCENDING"},
+        {"fieldPath": "assignedToUid", "order": "ASCENDING"}
+      ]
+    },
+    { "collectionGroup": "items", "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "name", "order": "ASCENDING"},
+        {"fieldPath": "assignedToUid", "order": "ASCENDING"}
+      ]
+    },
+    { "collectionGroup": "items", "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "bought", "order": "ASCENDING"},
+        {"fieldPath": "assignedToUid", "order": "ASCENDING"}
+      ]
+    },
+
+    { "collectionGroup": "locations", "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "isSharing", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "ASCENDING"}
+      ]
+    },
+    { "collectionGroup": "locations", "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "isSharing", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "ASCENDING"}
       ]
     }
   ],

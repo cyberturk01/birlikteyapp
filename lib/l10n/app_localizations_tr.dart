@@ -1270,4 +1270,133 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get errUnimplementedBody => 'Bu özellik henüz desteklenmiyor.';
+
+  @override
+  String get locSharingStarted => 'Canlı konum paylaşımı başladı.';
+
+  @override
+  String get locSharingStopped => 'Canlı konum paylaşımı durduruldu.';
+
+  @override
+  String get locLiveOn => 'Canlı konum açık';
+
+  @override
+  String get locPermNeeded => 'Konum izni gerekiyor.';
+
+  @override
+  String get locServiceOffTitle => 'Konum kapalı';
+
+  @override
+  String get locServiceOffBody => 'Konum servisleri kapalı görünüyor. Ayarlara gitmek ister misin?';
+
+  @override
+  String get locPermTitle => 'İzin gerekli';
+
+  @override
+  String get locPermBody => 'Uygulama için konum iznini Ayarlar’dan açman gerekiyor.';
+
+  @override
+  String get actionOpen => 'Aç';
+
+  @override
+  String get actionOpenSettings => 'Ayarları aç';
+
+  @override
+  String get actionCancel => 'İptal';
+
+  @override
+  String get actionEnable => 'Etkinleştir';
+
+  @override
+  String get errUnknown => 'Bir şeyler ters gitti.';
+
+  @override
+  String get permissionDeniedForever => 'İzin süresiz reddedildi';
+
+  @override
+  String get familyNotSelected => 'Aile seçilmedi.';
+
+  @override
+  String get noSession => 'Oturum yok';
+
+  @override
+  String get bannerLiveOn => 'Canlı konum açık.';
+
+  @override
+  String get bannerPermNeededBody => 'Canlı konumu paylaşmak için konum izni gerekiyor.';
+
+  @override
+  String get bannerAutoOffBody => 'Bir süredir güncelleme yok, paylaşım kapanmış olabilir. Tekrar açmak ister misin?';
+
+  @override
+  String get bannerStaleBody => 'Son konumun eski. Yenilemek için bir kere paylaş.';
+
+  @override
+  String get actionDismiss => 'Kapat';
+
+  @override
+  String get actionTurnOn => 'Aç';
+
+  @override
+  String get actionStop => 'Durdur';
+
+  @override
+  String get actionShareNow => 'Şimdi paylaş';
+
+  @override
+  String get bannerStoppedBody => 'Canlı konum paylaşımı şu anda kapalı.';
+
+  @override
+  String get lastSeenUnknown => 'son görülme: bilinmiyor';
+
+  @override
+  String get lastSeenJustNow => 'son görülme: az önce';
+
+  @override
+  String lastSeenMinutes(Object mins) {
+    return 'son görülme: $mins dk önce';
+  }
+
+  @override
+  String lastSeenHours(Object hours) {
+    return 'son görülme: $hours sa önce';
+  }
+
+  @override
+  String lastSeenDays(Object days) {
+    return 'son görülme: $days gün önce';
+  }
+
+  @override
+  String get chipAgoNow => 'az önce';
+
+  @override
+  String chipAgoMinutes(Object mins) {
+    return '${mins}dk önce';
+  }
+
+  @override
+  String chipAgoHours(Object hours) {
+    return '${hours}s önce';
+  }
+
+  @override
+  String chipAgoDays(Object days) {
+    return '${days}g önce';
+  }
+
+  @override
+  String get chipNever => 'hiç';
+
+  @override
+  String get menuMapTab => 'Aile Konumları';
+
+  @override
+  String get actionFitAll => 'Hepsini sığdır';
+
+  @override
+  String get actionStartSharing => 'Paylaşımı Başlat';
+
+  @override
+  String get actionStopSharing => 'Paylaşımı Durdur';
 }

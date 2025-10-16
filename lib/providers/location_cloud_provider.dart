@@ -8,6 +8,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart' as ph;
 import 'package:uuid/uuid.dart';
 
+import '../l10n/app_localizations.dart';
+import '../main.dart';
 import '../services/cloud_error_handler.dart'; // varsa
 import '../services/offline_queue.dart'; // varsa
 import '../services/retry.dart'; // varsa
@@ -126,23 +128,22 @@ class LocationCloudProvider extends ChangeNotifier {
   }
 
   Future<void> _ensurePermissionOrExplain(BuildContext context) async {
+    final t = _t(context);
     if (!await Geolocator.isLocationServiceEnabled()) {
       final ok =
           await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
-              title: const Text('Konum kapalı'),
-              content: const Text(
-                'Konum servisleri kapalı görünüyor. Ayarlara gidip açmak ister misin?',
-              ),
+              title: Text(t.locServiceOffTitle),
+              content: Text(t.locServiceOffBody),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('İptal'),
+                  child: Text(t.actionCancel),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('Aç'),
+                  child: Text(t.actionOpen),
                 ),
               ],
             ),
@@ -161,26 +162,32 @@ class LocationCloudProvider extends ChangeNotifier {
           await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
-              title: const Text('İzin gerekli'),
-              content: const Text(
-                'Uygulama için konum iznini Ayarlar’dan açman gerekiyor.',
-              ),
+              title: Text(t.locPermTitle),
+              content: Text(t.locPermBody),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('İptal'),
+                  child: Text(t.actionCancel),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('Aç'),
+                  child: Text(t.actionOpenSettings),
                 ),
               ],
             ),
           ) ??
           false;
       if (ok) await ph.openAppSettings();
-      throw StateError('Permission denied forever');
+      throw StateError(t.permissionDeniedForever);
     }
+  }
+
+  AppLocalizations _t(BuildContext? ctx) {
+    // context aktif mi?
+    final alive = (ctx is Element) && ctx.mounted;
+    final safeCtx = alive ? ctx : navigatorKey.currentContext;
+    // Son çare: İngilizce fallback (kütüphanende varsa)
+    return AppLocalizations.of(safeCtx!)!;
   }
 
   // ---- public API
@@ -304,6 +311,50 @@ class LocationCloudProvider extends ChangeNotifier {
     final c = 2 * h.sqrt.asin;
     return earth * c;
   }
+
+  Future<void> startSharingWithUi(BuildContext context) async {
+    final t = _t(context);
+
+    try {
+      await _ensurePermissionOrExplain(context); // dialogları da içeriyor
+    } on StateError catch (e) {
+      // kullanıcı iptal ettiyse sessiz geç
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message ?? t.errUnknown)));
+      return;
+    }
+
+    try {
+      await startSharing();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(t.locSharingStarted)));
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(t.errUnknown)));
+    }
+  }
+
+  Future<void> stopSharingWithUi(BuildContext context) async {
+    final t = _t(context);
+    try {
+      await stopSharing();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(t.locSharingStopped)));
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(t.errUnknown)));
+    }
+  }
 }
 
 extension on double {
@@ -341,19 +392,42 @@ extension _Writer on LocationCloudProvider {
       'source': 'geolocator',
     };
 
-    Future<void> write() async => doc.set(data, SetOptions(merge: true));
+    await (() async {
+      try {
+        await _db.collection('families/$_familyId/locations_history').add({
+          'uid': _uid,
+          'lat': pos.latitude,
+          'lng': pos.longitude,
+          'accuracy': pos.accuracy,
+          'createdAt': FieldValue.serverTimestamp(),
+          'expireAt': Timestamp.fromDate(
+            DateTime.now().add(const Duration(days: 30)),
+          ),
+        });
+      } catch (e, st) {
+        debugPrint('history write failed: $e');
+        return null;
+      }
+    })();
 
+    Future<void> write() async => doc.set(data, SetOptions(merge: true));
+    final queueData = Map<String, dynamic>.from(data);
+    queueData.remove('updatedAt');
     try {
-      await Retry.attempt(write);
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
     } catch (e) {
       CloudErrorHandler.showFromException(e);
-      // OfflineQueue kullanıyorsan:
+      debugPrint('[LOC] write failed, queueing: $e');
+
+      final queued = Map<String, dynamic>.from(data);
+      queued.remove('updatedAt');
+
       await OfflineQueue.I.enqueue(
         OfflineOp(
           id: _uuid.v4(),
           path: doc.path,
           type: OpType.set,
-          data: data,
+          data: queued,
           merge: true,
         ),
       );

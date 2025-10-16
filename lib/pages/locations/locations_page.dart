@@ -1,14 +1,21 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_localizations.dart';
+import '../../main.dart';
 import '../../providers/family_provider.dart';
 import '../../providers/location_cloud_provider.dart';
 import '../../utils/marker_icon.dart';
+import '../../widgets/debug_menu.dart';
+
+enum BannerKind { none, perm, live, autoOff, stale, stopped }
 
 class LocationsPage extends StatefulWidget {
   final String familyId;
@@ -19,10 +26,14 @@ class LocationsPage extends StatefulWidget {
 }
 
 class _LocationsPageState extends State<LocationsPage> {
+  String? _filteredUid;
   final _controller = Completer<GoogleMapController>();
+  BannerKind _currentBanner = BannerKind.none;
   bool _fitted = false;
   final Map<String, BitmapDescriptor> _iconCache = {};
   final BitmapDescriptor _defaultIcon = BitmapDescriptor.defaultMarker;
+  MarkerId _mkId(String uid) => MarkerId('${widget.familyId}::$uid');
+  final Set<String> _lastMarkerIds = {};
 
   CameraPosition _initialCam = const CameraPosition(
     target: LatLng(51.1657, 10.4515), // Germany fallback
@@ -95,21 +106,23 @@ class _LocationsPageState extends State<LocationsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Family Locations'),
+        title: Text(t.menuMapTab),
         actions: [
           IconButton(
-            tooltip: 'Fit all',
+            tooltip: t.actionFitAll,
             icon: const Icon(Icons.center_focus_strong),
             onPressed: () => setState(() => _fitted = false),
           ),
+          const DebugMenu(),
         ],
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('families/${widget.familyId}/locations')
-            .snapshots(),
+            .snapshots(includeMetadataChanges: true),
         builder: (ctx, snap) {
           final docs = snap.data?.docs ?? const [];
 
@@ -136,66 +149,92 @@ class _LocationsPageState extends State<LocationsPage> {
                 final ts = (data['updatedAt'] as Timestamp?)?.toDate();
                 final isOn = data['isSharing'] == true;
 
+                // 15 dk canlı eşiği
+                final isLive =
+                    isOn &&
+                    ts != null &&
+                    DateTime.now().difference(ts) <=
+                        const Duration(minutes: 15);
+
                 // “eski veri” eşiği – istersen 7 gün yerine 24 saat yap
                 final isFresh =
                     ts != null &&
                     DateTime.now().difference(ts) <= const Duration(days: 7);
 
-                // 🔴 eski ve paylaşım kapalı ise hiç gösterme
-                if (!isOn && !isFresh) continue;
+                if (!isLive && !isFresh) {
+                  continue;
+                }
 
                 final entry = byUid[uid];
                 final title = entry?.label ?? uid;
                 final photoUrl = entry?.photoUrl;
 
-                // Paylaşım kapalıysa gri; açıksa kullanıcı rengi
-                final pal = MarkerIconHelper.paletteFor(uid, dimmed: !isOn);
+                final pal = MarkerIconHelper.paletteFor(uid, dimmed: !isLive);
                 final accent = pal.accent; // yazı/avatar kenarı rengi
                 final bubble = pal.bubble; // balon arka plan rengi
 
-                if (lat == null || lng == null) continue;
                 if (!isFresh && ts == null) continue;
 
                 final pos = LatLng(lat, lng);
-                final cacheKey = '$uid|$photoUrl|$title|${accent.value}|$isOn';
+                final cacheKey =
+                    '$uid|$photoUrl|$title|${accent.value}|${bubble.value}|$isLive';
 
                 final cached = _iconCache[cacheKey];
-                if (cached == null) {
-                  MarkerIconHelper.createProfileMarker(
-                    uid: uid,
-                    label: title,
-                    photoUrl: photoUrl,
-                    color: accent,
-                    bubbleBg: bubble,
-                    logicalWidth: 180,
-                    logicalHeight: 72,
-                    fontSize: 16,
-                  ).then((bmp) {
-                    if (!mounted) return;
-                    _iconCache[cacheKey] = bmp;
-                    setState(() {}); // ikon hazır → marker güncellensin
-                  });
-                }
 
                 markers.add(
                   Marker(
-                    markerId: MarkerId(uid),
+                    markerId: _mkId(uid),
                     position: pos,
-                    icon:
-                        cached ??
-                        _defaultIcon, // ilk turda default, sonra cache
+                    icon: cached ?? _defaultIcon,
                     infoWindow: InfoWindow(
                       title: title,
                       snippet: ts == null
-                          ? 'last seen: unknown'
-                          : 'last seen: ${_lastSeen(ts)}${isOn ? ' (live)' : ''}',
+                          ? t.lastSeenUnknown
+                          : '${_lastSeenL10n(t, ts)}${isLive ? ' • (live)' : ''}',
                     ),
                   ),
                 );
 
+                MarkerIconHelper.getOrCreate(
+                  uid: uid,
+                  label: title,
+                  photoUrl: photoUrl,
+                  color: accent,
+                  bubbleBg: bubble,
+                  logicalWidth: 180,
+                  logicalHeight: 72,
+                  fontSize: 16,
+                ).then((bmp) {
+                  if (!mounted) return;
+                  _iconCache[cacheKey] = bmp;
+                  setState(() {});
+                });
+
                 bounds = _extend(bounds, pos);
               }
+              _lastMarkerIds
+                ..clear()
+                ..addAll(markers.map((m) => m.markerId.value));
+              final meUid = FirebaseAuth.instance.currentUser?.uid;
+              Map<String, dynamic>? myLoc; // benim kaydımın data'sı
+              if (meUid != null) {
+                for (final d in docs) {
+                  final data = d.data();
+                  final uid = (data['uid'] as String?) ?? d.id;
+                  if (_filteredUid != null && _filteredUid != uid) continue;
+                  if (uid == meUid) {
+                    myLoc = data;
+                    break;
+                  }
+                }
 
+                // build sırasında show/hide banner çağrısı için post-frame
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  if (myLoc == null) return;
+                  _maybeShowStatusBanner(context, myLoc);
+                });
+              }
               _fitOnce(bounds, markers.length);
               return Stack(
                 children: [
@@ -205,7 +244,7 @@ class _LocationsPageState extends State<LocationsPage> {
                     myLocationEnabled: true,
                     zoomControlsEnabled: true,
                     padding: const EdgeInsets.only(
-                      top: 96,
+                      top: 76,
                     ), // üstteki buton için boşluk
                     onMapCreated: (c) async {
                       if (!_controller.isCompleted) _controller.complete(c);
@@ -225,9 +264,62 @@ class _LocationsPageState extends State<LocationsPage> {
                       }
                     },
                   ),
-                  // ✅ Üye çipleri (butonun altında)
+                  // 🔴 Start/Stop düğmesi
                   Positioned(
-                    top: 72,
+                    top: 26,
+                    left: 16,
+                    right: 16,
+                    child: SafeArea(
+                      child: Consumer<LocationCloudProvider>(
+                        builder: (context, loc, _) {
+                          final isOn = loc.isSharing;
+                          return ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isOn
+                                  ? Colors.red.shade400
+                                  : Colors.green.shade600,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            icon: Icon(isOn ? Icons.stop : Icons.play_arrow),
+                            label: Text(
+                              isOn ? t.actionStopSharing : t.actionStartSharing,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            onPressed: () async {
+                              final loc = context.read<LocationCloudProvider>();
+                              try {
+                                if (isOn) {
+                                  await loc.stopSharingWithUi(context);
+                                } else {
+                                  await loc.startSharingWithUi(context);
+                                }
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                final t =
+                                    AppLocalizations.of(context) ??
+                                    AppLocalizations.of(
+                                      navigatorKey.currentContext!,
+                                    )!;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(t.errUnknown)),
+                                );
+                              }
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+
+                  Positioned(
+                    top: 84,
                     left: 0,
                     right: 0,
                     child: SafeArea(
@@ -242,15 +334,20 @@ class _LocationsPageState extends State<LocationsPage> {
                             final ts = (data['updatedAt'] as Timestamp?)
                                 ?.toDate();
                             final isOn = data['isSharing'] == true;
+                            final isLiveForChip =
+                                isOn &&
+                                ts != null &&
+                                DateTime.now().difference(ts) <=
+                                    const Duration(minutes: 15);
 
                             final pal = MarkerIconHelper.paletteFor(
                               uid,
-                              dimmed: !isOn,
+                              dimmed: !isLiveForChip,
                             );
                             final chipColor = pal.accent;
                             final bg = pal.bubble;
 
-                            final last = ts == null ? 'never' : _fmtLast(ts);
+                            final last = ts == null ? 'never' : _fmtLast(t, ts);
 
                             // Üye çipleri (butonun altında) — chip builder içinde:
                             return Padding(
@@ -258,30 +355,47 @@ class _LocationsPageState extends State<LocationsPage> {
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(16),
                                 onTap: () async {
-                                  // 1) Koordinatları al
                                   final lat = (data['lat'] as num?)?.toDouble();
                                   final lng = (data['lng'] as num?)?.toDouble();
                                   if (lat == null || lng == null) return;
 
                                   final target = LatLng(lat, lng);
-
-                                  // 2) Kamera animasyonu
                                   final c = await _controller.future;
+
                                   await c.animateCamera(
                                     CameraUpdate.newCameraPosition(
                                       CameraPosition(target: target, zoom: 16),
                                     ),
                                   );
 
-                                  // 3) Marker infoWindow’u aç (plugin destekliyorsa)
-                                  // GoogleMapController.showMarkerInfoWindow(MarkerId) mevcutsa çalışır.
-                                  Future.delayed(
-                                    const Duration(milliseconds: 150),
-                                    () {
-                                      c.showMarkerInfoWindow(MarkerId(uid));
-                                    },
-                                  );
+                                  await _safeShowInfo(uid);
+                                  final markerId = _mkId(uid);
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) async {
+                                    try {
+                                      await Future.delayed(
+                                        const Duration(milliseconds: 50),
+                                      );
+                                      (await _controller.future)
+                                          .showMarkerInfoWindow(markerId);
+                                    } catch (_) {
+                                      // marker o an yoksa sessiz geç
+                                    }
+                                  });
                                 },
+                                onLongPress: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(() {
+                                    if (_filteredUid == uid) {
+                                      _filteredUid = null;
+                                    } else {
+                                      _filteredUid = uid;
+                                      _fitted = false;
+                                    }
+                                  });
+                                },
+
                                 child: Chip(
                                   backgroundColor: bg,
                                   avatar: CircleAvatar(
@@ -311,59 +425,15 @@ class _LocationsPageState extends State<LocationsPage> {
                       ),
                     ),
                   ),
-                  // 🔴 Start/Stop düğmesi
                   Positioned(
-                    top: 16,
-                    left: 16,
+                    bottom: 26,
                     right: 16,
-                    child: SafeArea(
-                      child: Consumer<LocationCloudProvider>(
-                        builder: (context, loc, _) {
-                          final isOn = loc.isSharing;
-                          return ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isOn
-                                  ? Colors.red.shade400
-                                  : Colors.green.shade600,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
-                            icon: Icon(isOn ? Icons.stop : Icons.play_arrow),
-                            label: Text(
-                              isOn ? 'Stop Sharing' : 'Start Sharing',
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            onPressed: () async {
-                              try {
-                                if (isOn) {
-                                  await context
-                                      .read<LocationCloudProvider>()
-                                      .stopSharing();
-                                } else {
-                                  await context
-                                      .read<LocationCloudProvider>()
-                                      .startSharing();
-                                }
-                              } catch (e) {
-                                if (context.mounted) {
-                                  final msg = e is StateError
-                                      ? (e.message ?? '$e')
-                                      : '$e';
-                                  ScaffoldMessenger.of(
-                                    context,
-                                  ).showSnackBar(SnackBar(content: Text(msg)));
-                                }
-                              }
-                            },
-                          );
-                        },
-                      ),
+                    child: FloatingActionButton(
+                      heroTag: 'centerMeBtn',
+                      backgroundColor: Colors.blue.shade600,
+                      onPressed:
+                          _goToUserIfNoMarkers, // zaten var olan fonksiyon
+                      child: const Icon(Icons.my_location, color: Colors.white),
                     ),
                   ),
                 ],
@@ -373,6 +443,27 @@ class _LocationsPageState extends State<LocationsPage> {
         },
       ),
     );
+  }
+
+  Future<void> _safeShowInfo(String uid) async {
+    if (!_controller.isCompleted) return;
+    // marker id gerçekten var mı?
+    if (!_lastMarkerIds.contains(uid)) return;
+
+    final c = await _controller.future;
+
+    // build’ler tamamlansın
+    await Future.delayed(const Duration(milliseconds: 80));
+    if (!mounted) return;
+
+    // hâlâ var mı?
+    if (!_lastMarkerIds.contains(uid)) return;
+
+    try {
+      c.showMarkerInfoWindow(MarkerId(uid));
+    } catch (_) {
+      // sessizce yut
+    }
   }
 
   Future<void> _fitOnce(LatLngBounds? b, int markerCount) async {
@@ -406,20 +497,155 @@ class _LocationsPageState extends State<LocationsPage> {
     return LatLngBounds(southwest: sw, northeast: ne);
   }
 
-  String _lastSeen(DateTime? t) {
-    if (t == null) return 'last seen: unknown';
-    final diff = DateTime.now().difference(t);
-    if (diff.inSeconds < 60) return 'last seen: just now';
-    if (diff.inMinutes < 60) return 'last seen: ${diff.inMinutes} min ago';
-    if (diff.inHours < 24) return 'last seen: ${diff.inHours} h ago';
-    return 'last seen: ${diff.inDays} d ago';
+  String _lastSeenL10n(AppLocalizations t, DateTime? t0) {
+    if (t0 == null) return t.lastSeenUnknown;
+    final d = DateTime.now().difference(t0);
+    if (d.inSeconds < 60) return t.lastSeenJustNow;
+    if (d.inMinutes < 60) return t.lastSeenMinutes(d.inMinutes);
+    if (d.inHours < 24) return t.lastSeenHours(d.inHours);
+    return t.lastSeenDays(d.inDays);
   }
 
-  String _fmtLast(DateTime t) {
-    final d = DateTime.now().difference(t);
-    if (d.inMinutes < 1) return 'just now';
-    if (d.inHours < 1) return '${d.inMinutes}m ago';
-    if (d.inHours < 24) return '${d.inHours}h ago';
-    return '${d.inDays}d ago';
+  void _showBannerOnce(
+    ScaffoldMessengerState messenger,
+    BannerKind kind,
+    MaterialBanner banner,
+  ) {
+    if (_currentBanner == kind) return; // aynıysa tekrar göstermeyelim
+    messenger.hideCurrentMaterialBanner();
+    messenger.showMaterialBanner(banner);
+    _currentBanner = kind;
+  }
+
+  String _fmtLast(AppLocalizations t, DateTime t0) {
+    final d = DateTime.now().difference(t0);
+    if (d.inMinutes < 1) return t.chipAgoNow;
+    if (d.inHours < 1) return t.chipAgoMinutes(d.inMinutes);
+    if (d.inHours < 24) return t.chipAgoHours(d.inHours);
+    return t.chipAgoDays(d.inDays);
+  }
+
+  void _maybeShowStatusBanner(
+    BuildContext context,
+    Map<String, dynamic>? myLoc,
+  ) {
+    final t =
+        AppLocalizations.of(context) ??
+        AppLocalizations.of(navigatorKey.currentContext!)!;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentMaterialBanner(); // önce mevcut varsa kapat
+
+    final locProv = context.read<LocationCloudProvider>();
+
+    // 1) İzin yoksa
+    if (!locProv.permissionGranted) {
+      _showBannerOnce(
+        messenger,
+        BannerKind.perm,
+        MaterialBanner(
+          backgroundColor: Colors.orange.shade700,
+          content: Text(
+            t.bannerPermNeededBody,
+            style: const TextStyle(color: Colors.white),
+          ),
+          leading: const Icon(Icons.location_off, color: Colors.white),
+          actions: [
+            TextButton(
+              onPressed: () {
+                messenger.hideCurrentMaterialBanner();
+                _currentBanner = BannerKind.none;
+              },
+              child: Text(
+                t.actionDismiss,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                await locProv.startSharingWithUi(context);
+                messenger.hideCurrentMaterialBanner();
+                _currentBanner = BannerKind.none;
+              },
+              child: Text(
+                t.actionEnable,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // 2) Kendi konum kaydına göre durumlar
+    final ts = (myLoc?['updatedAt'] as Timestamp?)?.toDate();
+    final isSharing = myLoc?['isSharing'] == true;
+    final now = DateTime.now();
+
+    // helper
+    bool olderThan(Duration d) => ts != null && now.difference(ts) > d;
+    bool within(Duration d) => ts != null && now.difference(ts) <= d;
+
+    if (olderThan(const Duration(minutes: 15)) &&
+        (ts != null && now.difference(ts) <= const Duration(days: 7))) {
+      messenger.showMaterialBanner(
+        MaterialBanner(
+          backgroundColor: Colors.blueGrey.shade700,
+          content: Text(
+            t.bannerAutoOffBody,
+            style: const TextStyle(color: Colors.white),
+          ),
+          leading: const Icon(Icons.timer_off, color: Colors.white),
+          actions: [
+            TextButton(
+              onPressed: () => messenger.hideCurrentMaterialBanner(),
+              child: Text(
+                t.actionDismiss,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+            TextButton(
+              onPressed: () => locProv.startSharingWithUi(context),
+              child: Text(
+                t.actionTurnOn,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // c) Çok eski (7 günü geçmiş) → gizlenmiş olabilir / “stale”
+    if (olderThan(const Duration(days: 7))) {
+      messenger.showMaterialBanner(
+        MaterialBanner(
+          backgroundColor: Colors.grey.shade800,
+          content: Text(
+            t.bannerStaleBody,
+            style: const TextStyle(color: Colors.white),
+          ),
+          leading: const Icon(Icons.history, color: Colors.white),
+          actions: [
+            TextButton(
+              onPressed: () => messenger.hideCurrentMaterialBanner(),
+              child: Text(
+                t.actionDismiss,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+            TextButton(
+              onPressed: () => locProv.startSharingWithUi(context),
+              child: Text(
+                t.actionShareNow,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
   }
 }

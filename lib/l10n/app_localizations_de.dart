@@ -1270,4 +1270,133 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get errUnimplementedBody => 'Dieses Feature wird noch nicht unterstützt.';
+
+  @override
+  String get locSharingStarted => 'Live-Standortfreigabe gestartet.';
+
+  @override
+  String get locSharingStopped => 'Live-Standortfreigabe gestoppt.';
+
+  @override
+  String get locLiveOn => 'Live-Standort ist AKTIV';
+
+  @override
+  String get locPermNeeded => 'Standortberechtigung erforderlich.';
+
+  @override
+  String get locServiceOffTitle => 'Standort deaktiviert';
+
+  @override
+  String get locServiceOffBody => 'Die Ortungsdienste scheinen deaktiviert zu sein. Einstellungen öffnen?';
+
+  @override
+  String get locPermTitle => 'Berechtigung erforderlich';
+
+  @override
+  String get locPermBody => 'Bitte erlaube den Standortzugriff für die App in den Einstellungen.';
+
+  @override
+  String get actionOpen => 'Öffnen';
+
+  @override
+  String get actionOpenSettings => 'Einstellungen öffnen';
+
+  @override
+  String get actionCancel => 'Abbrechen';
+
+  @override
+  String get actionEnable => 'Aktivieren';
+
+  @override
+  String get errUnknown => 'Etwas ist schiefgelaufen.';
+
+  @override
+  String get permissionDeniedForever => 'Berechtigung für immer verweigert';
+
+  @override
+  String get familyNotSelected => 'Familie ist nicht ausgewählt.';
+
+  @override
+  String get noSession => 'Keine Sitzung';
+
+  @override
+  String get bannerLiveOn => 'Live-Standort ist AKTIV.';
+
+  @override
+  String get bannerPermNeededBody => 'Für die Live-Freigabe wird die Standortberechtigung benötigt.';
+
+  @override
+  String get bannerAutoOffBody => 'Keine Updates seit einiger Zeit – Freigabe könnte aus sein. Wieder aktivieren?';
+
+  @override
+  String get bannerStaleBody => 'Dein letzter Standort ist veraltet. Einmal teilen, um zu aktualisieren.';
+
+  @override
+  String get actionDismiss => 'Schließen';
+
+  @override
+  String get actionTurnOn => 'Einschalten';
+
+  @override
+  String get actionStop => 'Stoppen';
+
+  @override
+  String get actionShareNow => 'Jetzt teilen';
+
+  @override
+  String get bannerStoppedBody => 'Live-Standortfreigabe ist derzeit aus.';
+
+  @override
+  String get lastSeenUnknown => 'zuletzt gesehen: unbekannt';
+
+  @override
+  String get lastSeenJustNow => 'zuletzt gesehen: gerade eben';
+
+  @override
+  String lastSeenMinutes(Object mins) {
+    return 'zuletzt gesehen: vor $mins Min.';
+  }
+
+  @override
+  String lastSeenHours(Object hours) {
+    return 'zuletzt gesehen: vor $hours Std.';
+  }
+
+  @override
+  String lastSeenDays(Object days) {
+    return 'zuletzt gesehen: vor $days Tg.';
+  }
+
+  @override
+  String get chipAgoNow => 'soeben';
+
+  @override
+  String chipAgoMinutes(Object mins) {
+    return 'vor ${mins}m';
+  }
+
+  @override
+  String chipAgoHours(Object hours) {
+    return 'vor ${hours}h';
+  }
+
+  @override
+  String chipAgoDays(Object days) {
+    return 'vor ${days}t';
+  }
+
+  @override
+  String get chipNever => 'nie';
+
+  @override
+  String get menuMapTab => 'Familienstandorte';
+
+  @override
+  String get actionFitAll => 'Alle zentrieren';
+
+  @override
+  String get actionStartSharing => 'Freigabe starten';
+
+  @override
+  String get actionStopSharing => 'Freigabe stoppen';
 }

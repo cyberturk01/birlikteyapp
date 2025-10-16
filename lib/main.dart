@@ -277,6 +277,18 @@ class _RootState extends State<_Root> {
       Hive.openBox('oplog'),
     ]);
     await OfflineQueue.I.init();
+    final auth = FirebaseAuth.instance;
+    await OfflineQueue.I.setOwner(auth.currentUser?.uid);
+    auth.authStateChanges().listen((u) {
+      OfflineQueue.I.setOwner(u?.uid);
+    });
+
+    try {
+      await OfflineQueue.I.flush();
+      debugPrint('[OQ] initial flush done');
+    } catch (_) {
+      /* sessiz geç */
+    }
     // İlk seed (sadece boşsa)
     final taskBox = Hive.box<Task>('taskBox');
     if (taskBox.isEmpty) {
