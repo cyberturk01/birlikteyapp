@@ -312,6 +312,28 @@ class _LocationsPageState extends State<LocationsPage> {
                                 );
                               }
                             },
+                            onLongPress: () async {
+                              // Uzun bas: tek seferlik paylaşım
+                              final loc = context.read<LocationCloudProvider>();
+                              try {
+                                await loc.shareOnce();
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(t.sharedOnceOk)),
+                                );
+                              } on StateError catch (e) {
+                                if (!context.mounted) return;
+                                final msg = e.message ?? t.errUnknown;
+                                ScaffoldMessenger.of(
+                                  context,
+                                ).showSnackBar(SnackBar(content: Text(msg)));
+                              } catch (_) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(t.sharedOnceFail)),
+                                );
+                              }
+                            },
                           );
                         },
                       ),
@@ -447,8 +469,9 @@ class _LocationsPageState extends State<LocationsPage> {
 
   Future<void> _safeShowInfo(String uid) async {
     if (!_controller.isCompleted) return;
-    // marker id gerçekten var mı?
-    if (!_lastMarkerIds.contains(uid)) return;
+
+    final fullId = _mkId(uid).value;
+    if (!_lastMarkerIds.contains(fullId)) return;
 
     final c = await _controller.future;
 
@@ -456,11 +479,10 @@ class _LocationsPageState extends State<LocationsPage> {
     await Future.delayed(const Duration(milliseconds: 80));
     if (!mounted) return;
 
-    // hâlâ var mı?
-    if (!_lastMarkerIds.contains(uid)) return;
+    if (!_lastMarkerIds.contains(fullId)) return;
 
     try {
-      c.showMarkerInfoWindow(MarkerId(uid));
+      c.showMarkerInfoWindow(_mkId(uid));
     } catch (_) {
       // sessizce yut
     }

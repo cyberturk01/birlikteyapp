@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">birlikteyapp</string>
+    <string name="google_maps_api_key">REDACTED_GOOGLE_API_KEY</string>
+</resources>

@@ -532,5 +532,14 @@
   "menuMapTab": "Family Locations",
   "actionFitAll": "Fit all",
   "actionStartSharing": "Start Sharing",
-  "actionStopSharing": "Stop Sharing"
+  "actionStopSharing": "Stop Sharing",
+  "offlineQueued": "Offline: Your action was queued and will sync when you are back online.",
+  "@offlineQueued": {
+    "description": "Shown when a Firestore write is queued for offline sync."
+  },
+  "queuedTaskToggle": "Offline: Task toggle queued. It will sync when online.",
+  "queuedExpenseAdd": "Offline: Expense was queued. It will sync when online.",
+  "queuedItemAdd": "Offline: Item was queued. It will sync when online.",
+  "sharedOnceOk": "Location shared once.",
+  "sharedOnceFail": "Couldn't share location."
 }
