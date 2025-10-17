@@ -11,7 +11,6 @@ import 'package:hive/hive.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/family_role.dart';
-import '../services/firestore_write_helpers.dart';
 
 class FamilyProvider extends ChangeNotifier {
   final _familyBox = Hive.box<String>('familyBox');
@@ -81,8 +80,7 @@ class FamilyProvider extends ChangeNotifier {
       throw StateError('Owner role cannot be changed from owner');
     }
 
-    final ref = FirebaseFirestore.instance.collection('families').doc(fid);
-    await updateDocWithRetryQueue(ref, {
+    await FirebaseFirestore.instance.collection('families').doc(fid).update({
       'members.$memberUid': role,
       'updatedAt': FieldValue.serverTimestamp(),
     });
@@ -152,15 +150,15 @@ class FamilyProvider extends ChangeNotifier {
     // yoksa yeni üret ve yaz
     if (code == null || code.isEmpty) {
       code = _randomCode(length: 8);
-      final invRef = FirebaseFirestore.instance.collection('invites').doc(code);
-      await setDocWithRetryQueue(invRef, {
+      await FirebaseFirestore.instance.collection('invites').doc(code).set({
         'familyId': id,
         'ownerUid': FirebaseAuth.instance.currentUser!.uid,
         'active': true,
         'createdAt': FieldValue.serverTimestamp(),
-      }, merge: false);
-      final famRef = FirebaseFirestore.instance.collection('families').doc(id);
-      await setDocWithRetryQueue(famRef, {'inviteCode': code}, merge: true);
+      });
+      await FirebaseFirestore.instance.collection('families').doc(id).set({
+        'inviteCode': code,
+      }, SetOptions(merge: true));
     }
     return code;
   }
@@ -208,11 +206,10 @@ class FamilyProvider extends ChangeNotifier {
         .get();
     final code = (famDoc.data()?['inviteCode'] as String?)?.trim();
     if (code == null || code.isEmpty) return;
-    final invRef = FirebaseFirestore.instance.collection('invites').doc(code);
-    await setDocWithRetryQueue(invRef, {
+    await FirebaseFirestore.instance.collection('invites').doc(code).set({
       'active': active,
       'updatedAt': FieldValue.serverTimestamp(),
-    }, merge: true);
+    }, SetOptions(merge: true));
   }
 
   Future<void> loadActiveFamily() async {
@@ -690,11 +687,10 @@ class FamilyProvider extends ChangeNotifier {
 
     final url = await ref.getDownloadURL();
 
-    final famRef = FirebaseFirestore.instance.collection('families').doc(fid);
-    await setDocWithRetryQueue(famRef, {
+    await FirebaseFirestore.instance.collection('families').doc(fid).set({
       'memberPhotos': {memberUid: url},
       'updatedAt': FieldValue.serverTimestamp(),
-    }, merge: true);
+    }, SetOptions(merge: true));
 
     notifyListeners(); // UI hızlıca güncellensin
     return url;
@@ -704,16 +700,16 @@ class FamilyProvider extends ChangeNotifier {
   Future<void> removeMemberPhoto(String memberUid) async {
     final fid = _familyId;
     if (fid == null) return;
+    // Storage'tan da silmek istersen:
     try {
       await FirebaseStorage.instance
           .ref('families/$fid/members/$memberUid.jpg')
           .delete();
     } catch (_) {}
-    final famRef = FirebaseFirestore.instance.collection('families').doc(fid);
-    await setDocWithRetryQueue(famRef, {
+    await FirebaseFirestore.instance.collection('families').doc(fid).set({
       'memberPhotos': {memberUid: FieldValue.delete()},
       'updatedAt': FieldValue.serverTimestamp(),
-    }, merge: true);
+    }, SetOptions(merge: true));
     notifyListeners();
   }
 
@@ -721,10 +717,9 @@ class FamilyProvider extends ChangeNotifier {
   Future<void> updateMemberLabel(String uid, String newLabel) async {
     final famId = _familyId;
     if (famId == null) return;
-    final ref = FirebaseFirestore.instance.collection('families').doc(famId);
-    await setDocWithRetryQueue(ref, {
+    await FirebaseFirestore.instance.collection('families').doc(famId).set({
       'memberNames': {uid: newLabel.trim()},
-    }, merge: true);
+    }, SetOptions(merge: true));
   }
 
   Future<void> removeMemberFromFamily(String uid) async {
@@ -742,10 +737,10 @@ class FamilyProvider extends ChangeNotifier {
       throw StateError('You cannot remove yourself');
     }
 
-    await updateDocWithRetryQueue(ref, {
-      'members.$uid': FieldValue.delete(),
-      'memberNames.$uid': FieldValue.delete(),
-    });
+    await ref.set({
+      'members': {uid: FieldValue.delete()},
+      'memberNames': {uid: FieldValue.delete()},
+    }, SetOptions(merge: true));
   }
 
   Future<void> unassignAllByUid({
@@ -768,7 +763,7 @@ class FamilyProvider extends ChangeNotifier {
 
     await clear('tasks', 'assignedToUid');
     await clear('items', 'assignedToUid');
-    await clear('expenses', 'assignedToUid');
+    await clear('expenses', 'assignedToUid'); // kullanıyorsan
   }
 }
 

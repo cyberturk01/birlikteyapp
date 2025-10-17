@@ -5,13 +5,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
-import '../l10n/app_localizations.dart';
-import '../main.dart';
 import '../models/task.dart';
 import '../services/auth_service.dart';
 import '../services/cloud_error_handler.dart';
-import '../services/firestore_write_helpers.dart';
 import '../services/notification_service.dart';
+import '../services/offline_queue.dart';
+import '../services/retry.dart';
 import '../services/scores_repo.dart';
 import '../services/task_service.dart';
 import '_base_cloud.dart';
@@ -169,29 +168,31 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
       if (t.reminderAt != null) 'reminderAt': Timestamp.fromDate(t.reminderAt!),
       'createdAt': FieldValue.serverTimestamp(),
     };
-    final ref = FirebaseFirestore.instance.doc(path);
-    await setDocWithRetryQueue(ref, data, merge: false);
+
     debugPrint('[TaskCloud] ADDED id=$id');
+    await _qSet(path: path, data: data, merge: false);
     t.remoteId = id;
   }
 
   Future<void> removeTask(Task t) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
-    final ref = FirebaseFirestore.instance.doc('${col.path}/$id');
-    await deleteDocWithRetryQueue(ref);
     await NotificationService.cancel(_notifIdForTask(t));
+    await _qDelete(path: '${col.path}/$id');
   }
 
   Future<void> updateDueDate(Task t, DateTime? due) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
-    final ref = FirebaseFirestore.instance.doc('${col.path}/$id');
-    if (due == null) {
-      await safeFieldDeletesWithRetryQueue(ref, {'dueAt': FieldValue.delete()});
-    } else {
-      await updateDocWithRetryQueue(ref, {'dueAt': Timestamp.fromDate(due)});
-    }
+    await _qUpdate(
+      path: '${col.path}/$id',
+      data: {
+        if (due == null)
+          'dueAt': FieldValue.delete()
+        else
+          'dueAt': Timestamp.fromDate(due),
+      },
+    );
     t.dueAt = due;
     notifyListeners();
   }
@@ -199,16 +200,16 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> updateReminder(Task t, DateTime? at) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
-    final ref = FirebaseFirestore.instance.doc('${col.path}/$id');
-    if (at == null) {
-      await safeFieldDeletesWithRetryQueue(ref, {
-        'reminderAt': FieldValue.delete(),
-      });
-    } else {
-      await updateDocWithRetryQueue(ref, {
-        'reminderAt': Timestamp.fromDate(at),
-      });
-    }
+
+    await _qUpdate(
+      path: '${col.path}/$id',
+      data: {
+        if (at == null)
+          'reminderAt': FieldValue.delete()
+        else
+          'reminderAt': Timestamp.fromDate(at),
+      },
+    );
     t.reminderAt = at;
     notifyListeners();
 
@@ -233,7 +234,7 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     }
     final snap = await q.get();
     for (final d in snap.docs) {
-      await deleteDocWithRetryQueue(d.reference);
+      await _qDelete(path: d.reference.path);
     }
   }
 
@@ -292,14 +293,17 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     }
 
     final genId = _uuid.v4();
-    final ref = FirebaseFirestore.instance.doc('${col.path}/$genId');
-    await setDocWithRetryQueue(ref, {
-      'name': t.name,
-      'completed': t.completed,
-      if ((t.assignedToUid?.trim().isNotEmpty ?? false))
-        'assignedToUid': t.assignedToUid!.trim(),
-      'createdAt': FieldValue.serverTimestamp(),
-    }, merge: false);
+    await _qSet(
+      path: '${col.path}/$genId',
+      data: {
+        'name': t.name,
+        'completed': t.completed,
+        if ((t.assignedToUid?.trim().isNotEmpty ?? false))
+          'assignedToUid': t.assignedToUid!.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+      merge: false,
+    );
     t.remoteId = genId;
     return genId;
   }
@@ -312,45 +316,35 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> updateAssignment(Task t, String? memberUid) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
-    final ref = FirebaseFirestore.instance.doc('${col.path}/$id');
-    await updateDocWithRetryQueue(ref, {
-      'assignedToUid': (memberUid == null || memberUid.trim().isEmpty)
-          ? FieldValue.delete()
-          : memberUid.trim(),
-    });
+    await _qUpdate(
+      path: '${col.path}/$id',
+      data: {
+        'assignedToUid': (memberUid == null || memberUid.trim().isEmpty)
+            ? FieldValue.delete()
+            : memberUid.trim(),
+      },
+    );
 
-    final newAssignee = (memberUid == null || memberUid.trim().isEmpty)
-        ? null
-        : memberUid.trim();
     final idx = _tasks.indexWhere((x) => x.remoteId == id);
     if (idx != -1) {
       _tasks[idx] = Task(
         t.name,
         completed: t.completed,
-        assignedToUid: newAssignee,
+        assignedToUid: (memberUid?.trim().isEmpty ?? true)
+            ? null
+            : memberUid!.trim(),
       )..remoteId = id;
-    } else {
-      t.assignedToUid = newAssignee;
+
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<ToggleResult> toggleTask(Task t, bool value) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
-    final ref = FirebaseFirestore.instance.doc('${col.path}/$id');
-    await updateDocWithRetryQueue(
-      ref,
-      {'completed': value},
-      onQueued: () {
-        final ctx = navigatorKey.currentContext;
-        final tLoc = (ctx != null) ? AppLocalizations.of(ctx) : null;
-        final msg =
-            tLoc?.queuedTaskToggle ??
-            'Offline: Task toggle queued. It will sync when online.';
-        CloudErrorHandler.showFromString(msg);
-      },
-    );
+
+    await _qUpdate(path: '${col.path}/$id', data: {'completed': value});
+
     if (value == true && t.reminderAt != null) {
       await NotificationService.cancel(_notifIdForTask(t));
     }
@@ -400,8 +394,8 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
   Future<void> renameTask(Task t, String newName) async {
     final col = _ensureCol();
     final id = await _ensureId(col, t);
-    final ref = FirebaseFirestore.instance.doc('${col.path}/$id');
-    await updateDocWithRetryQueue(ref, {'name': newName.trim()});
+    await _qUpdate(path: '${col.path}/$id', data: {'name': newName.trim()});
+    // local model’i de güncelle ki UI’da anında görünsün
     t.name = newName.trim();
     notifyListeners();
   }
@@ -437,6 +431,31 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
     super.dispose();
   }
 
+  Future<void> _qSet({
+    required String path,
+    required Map<String, dynamic> data,
+    bool merge = false,
+  }) async {
+    Future<void> write() async => FirebaseFirestore.instance
+        .doc(path)
+        .set(data, SetOptions(merge: merge));
+
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      final safe = _sanitizeForQueue(data);
+      await OfflineQueue.I.enqueue(
+        OfflineOp(
+          id: _uuid.v4(),
+          path: path,
+          type: OpType.set,
+          data: safe,
+          merge: merge,
+        ),
+      );
+    }
+  }
+
   Future<void> upsertByOrigin({
     required String origin, // ör: 'weekly:<weeklyId>'
     required String title,
@@ -467,7 +486,7 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
         notifyListeners();
       }
       // Alanları güncel tut
-      await updateDocWithRetryQueue(col.doc(d.id), {
+      await col.doc(d.id).update({
         'name': title,
         'assignedToUid': (assignedToUid == null || assignedToUid.trim().isEmpty)
             ? FieldValue.delete()
@@ -478,5 +497,53 @@ class TaskCloudProvider extends ChangeNotifier with CloudErrorMixin {
 
     // 2) Hiç yoksa oluştur (origin ile)
     await addTask(Task(title, assignedToUid: assignedToUid, origin: origin));
+  }
+
+  Map<String, dynamic> _sanitizeForQueue(Map<String, dynamic> input) {
+    final Map<String, dynamic> out = {};
+    input.forEach((k, v) {
+      if (v is FieldValue) {
+        final s = v.toString();
+        if (s.contains('serverTimestamp')) {
+          out[k] = DateTime.now(); // JSON'a uygun
+        }
+      } else if (v is Map) {
+        out[k] = _sanitizeForQueue(Map<String, dynamic>.from(v));
+      } else if (v is List) {
+        out[k] = v.map((e) {
+          if (e is Map) return _sanitizeForQueue(Map<String, dynamic>.from(e));
+          return (e is FieldValue) ? null : e;
+        }).toList();
+      } else {
+        out[k] = v;
+      }
+    });
+    return out;
+  }
+
+  Future<void> _qUpdate({
+    required String path,
+    required Map<String, dynamic> data,
+  }) async {
+    Future<void> write() async =>
+        FirebaseFirestore.instance.doc(path).update(data);
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(id: _uuid.v4(), path: path, type: OpType.update, data: data),
+      );
+    }
+  }
+
+  Future<void> _qDelete({required String path}) async {
+    Future<void> write() async => FirebaseFirestore.instance.doc(path).delete();
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(id: _uuid.v4(), path: path, type: OpType.delete),
+      );
+    }
   }
 }

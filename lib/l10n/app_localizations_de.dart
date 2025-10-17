@@ -1399,22 +1399,4 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get actionStopSharing => 'Freigabe stoppen';
-
-  @override
-  String get offlineQueued => 'Offline: Deine Aktion wurde in die Warteschlange gelegt und wird synchronisiert, sobald du wieder online bist.';
-
-  @override
-  String get queuedTaskToggle => 'Offline: Aufgabenstatus wurde in die Warteschlange gelegt. Synchronisiert sich, sobald du online bist.';
-
-  @override
-  String get queuedExpenseAdd => 'Offline: Ausgabe wurde in die Warteschlange gelegt. Synchronisiert sich, sobald du online bist.';
-
-  @override
-  String get queuedItemAdd => 'Offline: Artikel wurde in die Warteschlange gelegt. Synchronisiert sich, sobald du online bist.';
-
-  @override
-  String get sharedOnceOk => 'Standort einmal geteilt.';
-
-  @override
-  String get sharedOnceFail => 'Standort konnte nicht geteilt werden.';
 }

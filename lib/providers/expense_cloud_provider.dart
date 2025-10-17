@@ -5,10 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
-import '../l10n/app_localizations.dart';
-import '../main.dart';
 import '../services/cloud_error_handler.dart';
-import '../services/firestore_write_helpers.dart';
+import '../services/offline_queue.dart';
+import '../services/retry.dart';
 import '../utils/recent_categories.dart';
 import '_base_cloud.dart';
 
@@ -279,18 +278,22 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
       return;
     }
 
-    final famDoc = _db.collection('families').doc(fid);
+    final docPath = _db.collection('families').doc(fid).path;
 
     if (amount == null) {
       final field = 'settings.budgets.$category';
-      await updateDocWithRetryQueue(famDoc, {field: FieldValue.delete()});
+      await _qUpdateDoc(docPath: docPath, data: {field: FieldValue.delete()});
       _monthlyBudgets.remove(category);
     } else {
-      await setDocWithRetryQueue(famDoc, {
-        'settings': {
-          'budgets': {category: amount},
+      await _qSetDoc(
+        docPath: docPath,
+        data: {
+          'settings': {
+            'budgets': {category: amount},
+          },
         },
-      }, merge: true);
+        merge: true,
+      );
       _monthlyBudgets[category] = amount;
     }
     notifyListeners();
@@ -308,7 +311,7 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
     if (c == null) throw StateError('[ExpenseCloud] No active familyId set');
 
     final id = _uuid.v4();
-    final ref = c.doc(id);
+    final path = '${c.path}/$id';
 
     if ((category ?? '').trim().isNotEmpty) {
       RecentExpenseCats.push(category!.trim());
@@ -322,33 +325,26 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
       'category': (category?.trim().isEmpty ?? true) ? null : category!.trim(),
       'createdAt': FieldValue.serverTimestamp(),
     };
-    await setDocWithRetryQueue(
-      ref,
-      data,
-      merge: false,
-      onQueued: () {
-        final ctx = navigatorKey.currentContext;
-        final tLoc = (ctx != null) ? AppLocalizations.of(ctx) : null;
-        final msg =
-            tLoc?.queuedExpenseAdd ??
-            'Offline: Expense was queued. It will sync when online.';
-        CloudErrorHandler.showFromString(msg);
-      },
-    );
+    await _qSet(path: path, data: data, merge: false);
   }
 
   Future<void> remove(String id) async {
     final c = _col;
     if (c == null) throw StateError('[ExpenseCloud] No active familyId set');
-    await deleteDocWithRetryQueue(c.doc(id));
+    await _qDelete(path: '${c.path}/$id');
   }
 
   Future<void> updateCategory(String id, String? category) async {
     final c = _col;
     if (c == null) throw StateError('[ExpenseCloud] No active familyId set');
-    await updateDocWithRetryQueue(c.doc(id), {
-      'category': (category?.trim().isEmpty ?? true) ? null : category!.trim(),
-    });
+    await _qUpdate(
+      path: '${_col!.path}/$id',
+      data: {
+        'category': (category?.trim().isEmpty ?? true)
+            ? null
+            : category!.trim(),
+      },
+    );
   }
 
   Future<void> updateExpense(
@@ -379,7 +375,7 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
     }
     if (data.isEmpty) return;
 
-    await setDocWithRetryQueue(c.doc(id), data, merge: true);
+    await c.doc(id).set(data, SetOptions(merge: true));
   }
 
   // ---- queries / aggregates ----
@@ -480,5 +476,98 @@ class ExpenseCloudProvider extends ChangeNotifier with CloudErrorMixin {
       map.update(key, (v) => v + e.amount, ifAbsent: () => e.amount);
     }
     return map;
+  }
+
+  // ---- queued writes ----
+  Future<void> _qSet({
+    required String path,
+    required Map<String, dynamic> data,
+    bool merge = false,
+  }) async {
+    Future<void> write() async => FirebaseFirestore.instance
+        .doc(path)
+        .set(data, SetOptions(merge: merge));
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(
+          id: _uuid.v4(),
+          path: path,
+          type: OpType.set,
+          data: data,
+          merge: merge,
+        ),
+      );
+    }
+  }
+
+  Future<void> _qUpdate({
+    required String path,
+    required Map<String, dynamic> data,
+  }) async {
+    Future<void> write() async =>
+        FirebaseFirestore.instance.doc(path).update(data);
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(id: _uuid.v4(), path: path, type: OpType.update, data: data),
+      );
+    }
+  }
+
+  Future<void> _qDelete({required String path}) async {
+    Future<void> write() async => FirebaseFirestore.instance.doc(path).delete();
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(id: _uuid.v4(), path: path, type: OpType.delete),
+      );
+    }
+  }
+
+  Future<void> _qSetDoc({
+    required String docPath,
+    required Map<String, dynamic> data,
+    bool merge = false,
+  }) async {
+    Future<void> write() async => FirebaseFirestore.instance
+        .doc(docPath)
+        .set(data, SetOptions(merge: merge));
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(
+          id: _uuid.v4(),
+          path: docPath,
+          type: OpType.set,
+          data: data,
+          merge: merge,
+        ),
+      );
+    }
+  }
+
+  Future<void> _qUpdateDoc({
+    required String docPath,
+    required Map<String, dynamic> data,
+  }) async {
+    Future<void> write() async =>
+        FirebaseFirestore.instance.doc(docPath).update(data);
+    try {
+      await Retry.attempt(write, retryOn: isTransientFirestoreError);
+    } catch (_) {
+      await OfflineQueue.I.enqueue(
+        OfflineOp(
+          id: _uuid.v4(),
+          path: docPath,
+          type: OpType.update,
+          data: data,
+        ),
+      );
+    }
   }
 }

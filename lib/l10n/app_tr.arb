@@ -496,15 +496,5 @@
   "menuMapTab": "Aile Konumları",
   "actionFitAll": "Hepsini sığdır",
   "actionStartSharing": "Paylaşımı Başlat",
-  "actionStopSharing": "Paylaşımı Durdur",
-  "offlineQueued": "Çevrimdışı: İşlemin sıraya alındı, bağlantı gelince otomatik olarak eşitlenecek.",
-  "@offlineQueued": {
-    "description": "Firestore yazımı çevrimdışı kuyruğa alındığında gösterilen mesaj."
-  },
-  "queuedTaskToggle": "Çevrimdışı: Görev durumu sıraya alındı. İnternet gelince eşitlenecek.",
-  "queuedExpenseAdd": "Çevrimdışı: Harcama ekleme sıraya alındı. İnternet gelince eşitlenecek.",
-  "queuedItemAdd": "Çevrimdışı: Ürün ekleme sıraya alındı. İnternet gelince eşitlenecek.",
-  "sharedOnceOk": "Konum bir kez paylaşıldı.",
-  "sharedOnceFail": "Konum paylaşılamadı."
-
+  "actionStopSharing": "Paylaşımı Durdur"
 }

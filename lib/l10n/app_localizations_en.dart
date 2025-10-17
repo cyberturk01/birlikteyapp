@@ -1399,22 +1399,4 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get actionStopSharing => 'Stop Sharing';
-
-  @override
-  String get offlineQueued => 'Offline: Your action was queued and will sync when you are back online.';
-
-  @override
-  String get queuedTaskToggle => 'Offline: Task toggle queued. It will sync when online.';
-
-  @override
-  String get queuedExpenseAdd => 'Offline: Expense was queued. It will sync when online.';
-
-  @override
-  String get queuedItemAdd => 'Offline: Item was queued. It will sync when online.';
-
-  @override
-  String get sharedOnceOk => 'Location shared once.';
-
-  @override
-  String get sharedOnceFail => 'Couldn\'t share location.';
 }

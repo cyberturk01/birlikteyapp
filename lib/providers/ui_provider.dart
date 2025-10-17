@@ -9,7 +9,6 @@ enum TaskViewFilter { pending, completed }
 enum ItemViewFilter { toBuy, bought }
 
 class UiProvider extends ChangeNotifier {
-  bool _inited = false;
   // ====== mevcut alanlar ======
   String? _filterMember;
   HomeSection _section = HomeSection.tasks;
@@ -40,7 +39,6 @@ class UiProvider extends ChangeNotifier {
 
   /// Tek giriş noktası: tüm prefs burada okunur
   Future<void> init() async {
-    if (_inited) return;
     final sp = await SharedPreferences.getInstance();
 
     // ---- ThemeMode (tek anahtar, tip güvenli) ----
@@ -89,7 +87,6 @@ class UiProvider extends ChangeNotifier {
     }
 
     notifyListeners();
-    _inited = true;
   }
 
   Future<void> setBrand(BrandSeed b) async {
@@ -114,21 +111,6 @@ class UiProvider extends ChangeNotifier {
     await sp.setInt('weeklyReminderMinute', time.minute);
   }
 
-  /// Weekly reminder'ı temizlemek için null destekli sürüm
-  Future<void> setWeeklyDefaultReminderNullable(TimeOfDay? time) async {
-    final sp = await SharedPreferences.getInstance();
-    if (time == null) {
-      _weeklyDefaultReminder = null;
-      await sp.remove('weeklyReminderHour');
-      await sp.remove('weeklyReminderMinute');
-    } else {
-      _weeklyDefaultReminder = time;
-      await sp.setInt('weeklyReminderHour', time.hour);
-      await sp.setInt('weeklyReminderMinute', time.minute);
-    }
-    notifyListeners();
-  }
-
   Future<void> setActiveMemberUid(String? uid) async {
     _activeMember = (uid != null && uid.trim().isEmpty) ? null : uid?.trim();
     notifyListeners();
@@ -139,6 +121,8 @@ class UiProvider extends ChangeNotifier {
       await sp.remove('activeMember');
     } else {
       await sp.setString('activeMemberUid', _activeMember!);
+      // (opsiyonel) bir-iki sürüm sonra bunu yazmayı bırakabilirsin:
+      await sp.setString('activeMember', _activeMember!);
     }
   }
 
@@ -217,7 +201,6 @@ class UiProvider extends ChangeNotifier {
     await sp.remove('weeklyReminderHour');
     await sp.remove('weeklyReminderMinute');
     await sp.setInt('themeMode', ThemeMode.system.index); // tek tip: int
-    await sp.remove('ui_locale_code'); // locale'i de sıfırla
   }
 
   Future<void> resetUi() async {
@@ -227,7 +210,5 @@ class UiProvider extends ChangeNotifier {
     final sp = await SharedPreferences.getInstance();
     await sp.remove('themeMode');
     await sp.remove('brandSeed');
-    await sp.remove('activeMemberUid');
-    await sp.remove('activeMember');
   }
 }
