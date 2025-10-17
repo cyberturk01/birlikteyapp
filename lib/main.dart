@@ -151,14 +151,13 @@ class _RootState extends State<_Root> {
                 FirebaseFirestore.instance,
               ),
             ),
-            ChangeNotifierProvider(
-              create: (_) => LocationCloudProvider(
-                FirebaseAuth.instance,
-                FirebaseFirestore.instance,
-              ),
-            ),
             Provider<AuthService>(create: (_) => AuthService()),
-            Provider<TaskService>(create: (_) => TaskService()),
+            ProxyProvider<FamilyProvider, TaskService>(
+              update: (_, fam, prev) {
+                final fid = fam.familyId;
+                return TaskService(fid ?? '');
+              },
+            ),
             ChangeNotifierProvider(create: (_) => WeeklyCloudProvider()),
             ChangeNotifierProxyProvider<FamilyProvider, ExpenseCloudProvider>(
               create: (_) => ExpenseCloudProvider(

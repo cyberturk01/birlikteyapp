@@ -1,113 +1,46 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class RemoteTask {
-  final String id;
-  final String name;
-  final bool completed;
-  final String? assignedTo;
-  final DateTime createdAt;
-
-  RemoteTask({
-    required this.id,
-    required this.name,
-    required this.completed,
-    required this.createdAt,
-    this.assignedTo,
-  });
-
-  RemoteTask copyWith({
-    String? id,
-    String? name,
-    bool? completed,
-    String? assignedTo,
-    DateTime? createdAt,
-  }) {
-    return RemoteTask(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      completed: completed ?? this.completed,
-      assignedTo: assignedTo ?? this.assignedTo,
-      createdAt: createdAt ?? this.createdAt,
-    );
-  }
-
-  static RemoteTask fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final d = doc.data()!;
-    return RemoteTask(
-      id: doc.id,
-      name: d['name'] as String,
-      completed: (d['completed'] as bool?) ?? false,
-      assignedTo: d['assignedTo'] as String?,
-      createdAt: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-    );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'completed': completed,
-      'assignedTo': assignedTo,
-      'createdAt': FieldValue.serverTimestamp(),
-    };
-  }
-}
+import 'firestore_write_helpers.dart';
 
 class TaskService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  TaskService(this.familyId);
+  final String familyId;
 
-  CollectionReference<Map<String, dynamic>> _col(String uid) =>
-      _db.collection('users').doc(uid).collection('tasks');
+  CollectionReference<Map<String, dynamic>> get _col => FirebaseFirestore
+      .instance
+      .collection('families')
+      .doc(familyId)
+      .collection('tasks');
 
-  Stream<List<RemoteTask>> watch(String uid) {
-    return _col(uid)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snap) => snap.docs.map(RemoteTask.fromDoc).toList());
+  Stream<QuerySnapshot<Map<String, dynamic>>> watchRaw() {
+    return _col.orderBy('createdAt', descending: true).snapshots();
   }
 
-  Future<String> add(
-    String uid, {
-    required String name,
-    String? assignedTo,
+  Future<String> add({
+    required String id, // provider genelde uuid üretip verir
+    required Map<String, dynamic> data,
   }) async {
-    final ref = _col(uid).doc();
-    await ref.set({
-      'name': name.trim(),
-      'completed': false,
-      'assignedTo': assignedTo,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    return ref.id;
+    final ref = _col.doc(id);
+    await setDocWithRetryQueue(ref, data, merge: false);
+    return id;
   }
 
-  Future<void> toggle(String uid, String taskId, bool value) async {
-    await _col(uid).doc(taskId).update({'completed': value});
+  Future<void> update(String id, Map<String, dynamic> patch) async {
+    await updateDocWithRetryQueue(_col.doc(id), patch);
   }
 
-  Future<void> remove(String uid, String taskId) async {
-    await _col(uid).doc(taskId).delete();
+  Future<void> remove(String id) async {
+    await deleteDocWithRetryQueue(_col.doc(id));
   }
 
-  Future<void> updateAssignment(
-    String uid,
-    String taskId,
-    String? member,
-  ) async {
-    await _col(uid).doc(taskId).update({'assignedTo': member});
-  }
-
-  Future<void> clearCompleted(String uid, {String? forMember}) async {
-    Query<Map<String, dynamic>> q = _col(
-      uid,
-    ).where('completed', isEqualTo: true);
+  Future<void> clearCompleted({String? forMember}) async {
+    Query<Map<String, dynamic>> q = _col.where('completed', isEqualTo: true);
     if (forMember != null) {
-      q = q.where('assignedTo', isEqualTo: forMember);
+      q = q.where('assignedToUid', isEqualTo: forMember);
     }
-    final batch = _db.batch();
     final snap = await q.get();
     for (final d in snap.docs) {
-      batch.delete(d.reference);
+      await deleteDocWithRetryQueue(d.reference);
     }
-    await batch.commit();
   }
 }

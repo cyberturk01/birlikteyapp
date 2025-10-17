@@ -61,17 +61,6 @@ class LocationCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // const SizedBox(width: 4),
-              // SizedBox(
-              //   width: 16,
-              //   height: 16,
-              //   child: DecoratedBox(
-              //     decoration: BoxDecoration(
-              //       color: isOn ? Colors.green : Colors.grey,
-              //       shape: BoxShape.circle,
-              //     ),
-              //   ),
-              // ),
             ],
           ),
         ),

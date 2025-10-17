@@ -11,8 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../services/cloud_error_handler.dart';
-import '../services/offline_queue.dart';
-import '../services/retry.dart';
+import '../services/firestore_write_helpers.dart';
 import '_base_cloud.dart';
 
 class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
@@ -20,7 +19,7 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
   final Box<int> _notifBox;
 
   bool _listening = false;
-  String? _boundFamilyId; // opsiyonel: debug/guard
+  String? _boundFamilyId;
 
   WeeklyCloudProvider({FirebaseFirestore? db, Box<int>? notifBox})
     : _db = db ?? FirebaseFirestore.instance,
@@ -161,9 +160,8 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
     task.day = _canonicalDay(task.day);
     final colPath = 'families/$_familyId/weekly';
     final id = task.id ?? _uuid.v4();
-    final path = '$colPath/$id';
-
-    await _qSet(path: path, data: task.toMapForCreate(), merge: false);
+    final ref = _db.doc('$colPath/$id');
+    await setDocWithRetryQueue(ref, task.toMapForCreate(), merge: false);
 
     task.id ??= id;
     _list.add(task);
@@ -196,10 +194,6 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
         needsReschedule = true;
       }
     }
-    // if (day != null && day.trim().isNotEmpty && day != task.day) {
-    //   task.day = day.trim();
-    //   needsReschedule = true;
-    // }
     if (assignedToUid != null) {
       final v = assignedToUid.trim();
       task.assignedToUid = v.isEmpty ? null : v;
@@ -230,10 +224,8 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
         }
       }
     }
-    await _qUpdate(
-      path: 'families/$_familyId/weekly/${task.id}',
-      data: task.toMapForUpdate(),
-    );
+    final ref = _db.doc('families/$_familyId/weekly/${task.id}');
+    await updateDocWithRetryQueue(ref, task.toMapForUpdate());
 
     if (forceCancel) {
       await _cancelForId(task.id);
@@ -264,8 +256,8 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
 
   Future<void> removeWeeklyTaskById(String? id) async {
     if (_familyId == null || id == null) return;
-    await _cancelForId(id);
-    await _qDelete(path: 'families/$_familyId/weekly/$id');
+    final ref = _db.doc('families/$_familyId/weekly/$id');
+    await deleteDocWithRetryQueue(ref);
   }
 
   Future<void> removeWeeklyTask(WeeklyTaskCloud task) =>
@@ -485,73 +477,9 @@ class WeeklyCloudProvider extends ChangeNotifier with CloudErrorMixin {
   String _dateKey(DateTime dt) =>
       '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 
-  Map<String, dynamic> _stripFieldValues(Map<String, dynamic> src) {
-    final out = <String, dynamic>{};
-    src.forEach((k, v) {
-      if (v == null) return; // null yazma
-      if (v is FieldValue) return; // FieldValue'ları kuyrukta tutma
-      out[k] = v;
-    });
-    return out;
-  }
-
   @override
   void dispose() {
     _sub?.cancel();
     super.dispose();
-  }
-
-  Future<void> _qSet({
-    required String path,
-    required Map<String, dynamic> data,
-    bool merge = false,
-  }) async {
-    Future<void> write() async => FirebaseFirestore.instance
-        .doc(path)
-        .set(data, SetOptions(merge: merge));
-    try {
-      await Retry.attempt(write, retryOn: isTransientFirestoreError);
-    } catch (_) {
-      await OfflineQueue.I.enqueue(
-        OfflineOp(
-          id: _uuid.v4(),
-          path: path,
-          type: OpType.set,
-          data: _stripFieldValues(data),
-          merge: merge,
-        ),
-      );
-    }
-  }
-
-  Future<void> _qUpdate({
-    required String path,
-    required Map<String, dynamic> data,
-  }) async {
-    Future<void> write() async =>
-        FirebaseFirestore.instance.doc(path).update(data);
-    try {
-      await Retry.attempt(write, retryOn: isTransientFirestoreError);
-    } catch (_) {
-      await OfflineQueue.I.enqueue(
-        OfflineOp(
-          id: _uuid.v4(),
-          path: path,
-          type: OpType.update,
-          data: _stripFieldValues(data),
-        ),
-      );
-    }
-  }
-
-  Future<void> _qDelete({required String path}) async {
-    Future<void> write() async => FirebaseFirestore.instance.doc(path).delete();
-    try {
-      await Retry.attempt(write, retryOn: isTransientFirestoreError);
-    } catch (_) {
-      await OfflineQueue.I.enqueue(
-        OfflineOp(id: _uuid.v4(), path: path, type: OpType.delete),
-      );
-    }
   }
 }

@@ -1399,4 +1399,22 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get actionStopSharing => 'Paylaşımı Durdur';
+
+  @override
+  String get offlineQueued => 'Çevrimdışı: İşlemin sıraya alındı, bağlantı gelince otomatik olarak eşitlenecek.';
+
+  @override
+  String get queuedTaskToggle => 'Çevrimdışı: Görev durumu sıraya alındı. İnternet gelince eşitlenecek.';
+
+  @override
+  String get queuedExpenseAdd => 'Çevrimdışı: Harcama ekleme sıraya alındı. İnternet gelince eşitlenecek.';
+
+  @override
+  String get queuedItemAdd => 'Çevrimdışı: Ürün ekleme sıraya alındı. İnternet gelince eşitlenecek.';
+
+  @override
+  String get sharedOnceOk => 'Konum bir kez paylaşıldı.';
+
+  @override
+  String get sharedOnceFail => 'Konum paylaşılamadı.';
 }

@@ -122,7 +122,11 @@ class OfflineQueue {
         debugPrint('[OQ] ✅ applied ${op.type.name} ${op.path}');
       } catch (e) {
         debugPrint('[OQ] ❌ failed ${op.type.name} ${op.path}: $e');
-        // başarısız olanı bırak (bir sonraki flush’ta tekrar denenir)
+        final transient = isTransientFirestoreError(e);
+        if (!transient) {
+          await _remove(op.id);
+          debugPrint('[OQ] removed non-transient op from queue');
+        }
       }
     }
 

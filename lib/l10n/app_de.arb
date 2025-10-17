@@ -495,5 +495,15 @@
   "menuMapTab": "Familienstandorte",
   "actionFitAll": "Alle zentrieren",
   "actionStartSharing": "Freigabe starten",
-  "actionStopSharing": "Freigabe stoppen"
+  "actionStopSharing": "Freigabe stoppen",
+  "offlineQueued": "Offline: Deine Aktion wurde in die Warteschlange gelegt und wird synchronisiert, sobald du wieder online bist.",
+  "@offlineQueued": {
+    "description": "Hinweis, wenn ein Firestore-Schreibvorgang offline in die Queue fällt."
+  },
+  "queuedTaskToggle": "Offline: Aufgabenstatus wurde in die Warteschlange gelegt. Synchronisiert sich, sobald du online bist.",
+  "queuedExpenseAdd": "Offline: Ausgabe wurde in die Warteschlange gelegt. Synchronisiert sich, sobald du online bist.",
+  "queuedItemAdd": "Offline: Artikel wurde in die Warteschlange gelegt. Synchronisiert sich, sobald du online bist.",
+  "sharedOnceOk": "Standort einmal geteilt.",
+  "sharedOnceFail": "Standort konnte nicht geteilt werden."
+
 }

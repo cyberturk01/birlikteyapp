@@ -2616,6 +2616,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stop Sharing'**
   String get actionStopSharing;
+
+  /// Shown when a Firestore write is queued for offline sync.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline: Your action was queued and will sync when you are back online.'**
+  String get offlineQueued;
+
+  /// No description provided for @queuedTaskToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline: Task toggle queued. It will sync when online.'**
+  String get queuedTaskToggle;
+
+  /// No description provided for @queuedExpenseAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline: Expense was queued. It will sync when online.'**
+  String get queuedExpenseAdd;
+
+  /// No description provided for @queuedItemAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline: Item was queued. It will sync when online.'**
+  String get queuedItemAdd;
+
+  /// No description provided for @sharedOnceOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Location shared once.'**
+  String get sharedOnceOk;
+
+  /// No description provided for @sharedOnceFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t share location.'**
+  String get sharedOnceFail;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

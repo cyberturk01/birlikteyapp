@@ -11,8 +11,7 @@ import 'package:uuid/uuid.dart';
 import '../l10n/app_localizations.dart';
 import '../main.dart';
 import '../services/cloud_error_handler.dart'; // varsa
-import '../services/offline_queue.dart'; // varsa
-import '../services/retry.dart'; // varsa
+import '../services/firestore_write_helpers.dart';
 
 class LocationCloudProvider extends ChangeNotifier {
   final FirebaseAuth _auth;
@@ -25,14 +24,17 @@ class LocationCloudProvider extends ChangeNotifier {
   String? _familyId;
   StreamSubscription<Position>? _posSub;
   DateTime? _lastWriteAt;
-  bool _isSharing = false; // kullanıcı toggle'ı
+  bool _isSharing = false;
+  bool _starting = false;
   bool _permissionGranted = false; // son kontrol sonucu
   Position? _lastPosition;
   Position? _lastWritten;
 
   // Throttle ayarları
   Duration minInterval = const Duration(seconds: 20);
-  double minDistanceMeters = 25; // bu kadar oynamadan yazma
+  double minDistanceMeters = 25;
+  bool _flagWriteInFlight = false;
+  bool _writeInFlight = false;
 
   String? get familyId => _familyId;
   bool get isSharing => _isSharing;
@@ -78,7 +80,7 @@ class LocationCloudProvider extends ChangeNotifier {
     required Position pos,
   }) async {
     final ref = _db.collection('families/$fid/locations').doc(uid);
-    await ref.set({
+    await setDocWithRetryQueue(ref, {
       'uid': uid,
       'lat': pos.latitude,
       'lng': pos.longitude,
@@ -88,7 +90,7 @@ class LocationCloudProvider extends ChangeNotifier {
       'updatedAt': FieldValue.serverTimestamp(),
       'isSharing': true,
       'source': 'shareOnce', // ek bilgi
-    }, SetOptions(merge: true));
+    }, merge: true);
     _lastWriteAt = DateTime.now();
     _lastWritten = pos;
   }
@@ -201,13 +203,16 @@ class LocationCloudProvider extends ChangeNotifier {
   }
 
   Future<void> startSharing() async {
-    if (_isSharing) return;
+    if (_isSharing || _starting || _posSub != null) return;
+    _starting = true;
     if ((_familyId ?? '').isEmpty) {
-      CloudErrorHandler.showFromString('Aile seçili değil.');
+      CloudErrorHandler.showFromString(_t(null).familyNotSelected);
+      _starting = false;
       return;
     }
     if (_auth.currentUser == null) {
-      CloudErrorHandler.showFromString('Oturum yok.');
+      CloudErrorHandler.showFromString(_t(null).noSession);
+      _starting = false;
       return;
     }
 
@@ -261,6 +266,8 @@ class LocationCloudProvider extends ChangeNotifier {
       notifyListeners();
       CloudErrorHandler.showFromException(e);
       debugPrint('startSharing failed: $e\n$st'); // asıl hatayı consola yaz
+    } finally {
+      _starting = false;
     }
   }
 
@@ -379,6 +386,8 @@ extension _Writer on LocationCloudProvider {
   String get _uid => _auth.currentUser!.uid;
 
   Future<void> _maybeWrite(Position pos) async {
+    if (_writeInFlight) return;
+    _writeInFlight = true;
     _lastWriteAt = DateTime.now();
 
     final doc = _col.doc(_uid);
@@ -391,52 +400,36 @@ extension _Writer on LocationCloudProvider {
       'isSharing': true,
       'source': 'geolocator',
     };
+    final histRef = _db
+        .collection('families/$_familyId/locations_history')
+        .doc(_uuid.v4());
+    await setDocWithRetryQueue(histRef, {
+      'uid': _uid,
+      'lat': pos.latitude,
+      'lng': pos.longitude,
+      'accuracy': pos.accuracy,
+      'createdAt': FieldValue.serverTimestamp(),
+      'expireAt': Timestamp.fromDate(
+        DateTime.now().add(const Duration(days: 30)),
+      ),
+    }, merge: false);
 
-    await (() async {
-      try {
-        await _db.collection('families/$_familyId/locations_history').add({
-          'uid': _uid,
-          'lat': pos.latitude,
-          'lng': pos.longitude,
-          'accuracy': pos.accuracy,
-          'createdAt': FieldValue.serverTimestamp(),
-          'expireAt': Timestamp.fromDate(
-            DateTime.now().add(const Duration(days: 30)),
-          ),
-        });
-      } catch (e, st) {
-        debugPrint('history write failed: $e');
-        return null;
-      }
-    })();
-
-    Future<void> write() async => doc.set(data, SetOptions(merge: true));
-    final queueData = Map<String, dynamic>.from(data);
-    queueData.remove('updatedAt');
     try {
-      await Retry.attempt(write, retryOn: isTransientFirestoreError);
-    } catch (e) {
-      CloudErrorHandler.showFromException(e);
-      debugPrint('[LOC] write failed, queueing: $e');
-
-      final queued = Map<String, dynamic>.from(data);
-      queued.remove('updatedAt');
-
-      await OfflineQueue.I.enqueue(
-        OfflineOp(
-          id: _uuid.v4(),
-          path: doc.path,
-          type: OpType.set,
-          data: queued,
-          merge: true,
-        ),
-      );
+      await setDocWithRetryQueue(doc, data, merge: true);
+    } finally {
+      _writeInFlight = false;
     }
   }
 
   Future<void> _writeFlagOnly({required bool isSharing}) async {
     if ((_familyId ?? '').isEmpty || _auth.currentUser == null) return;
     final doc = _col.doc(_uid);
-    await doc.set({'isSharing': isSharing}, SetOptions(merge: true));
+    if (_flagWriteInFlight) return;
+    _flagWriteInFlight = true;
+    try {
+      await updateDocWithRetryQueue(doc, {'isSharing': isSharing});
+    } finally {
+      _flagWriteInFlight = false;
+    }
   }
 }
